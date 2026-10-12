@@ -61,7 +61,8 @@ export function createPlaybackControls(deps) {
   const seekTo = (time, options = {}) => {
     const clamped = Math.max(0, Math.min(deps.timelineDurationRef.current || MAX_TIMELINE_DURATION_SECONDS, time));
     const shouldPlay = deps.isPlaying && !options.pause;
-    deps.currentTimeRef.current = clamped; deps.setCurrentTime(clamped);
+    deps.currentTimeRef.current = clamped;
+    if (options.updateUi !== false) deps.setCurrentTime(clamped);
     // Seeking while playback is active must also move the fallback timeline
     // clock. This matters after trimming: the video element can briefly be
     // paused/ended while its new source range is applied, so the animation
@@ -122,6 +123,8 @@ export function createPlaybackControls(deps) {
     // seeks; the initial press and final release still commit synchronously.
     let pendingFrame = 0;
     let latestClientX = event.clientX;
+    let lastUiUpdate = -Infinity;
+    let lastUiSegment = -1;
     let bypassSnap = event.altKey;
     const snapPoints = normalizeTimelineMarkers(deps.timelineMarkers).flatMap((marker) => [
       { time: marker.time, track: "marker", id: marker.id, edge: "start" },
@@ -134,7 +137,13 @@ export function createPlaybackControls(deps) {
       const snap = !bypassSnap && width > 0
         ? findClosestTimelineSnap(time, snapPoints, 10 / width * deps.timelineDurationRef.current) : null;
       deps.setSnapGuide?.(createTimelineSnapGuide(snap, "playhead"));
-      seekTo(snap?.time ?? time, { immediate, pause: true });
+      const targetTime = snap?.time ?? time;
+      const segment = getVisualSegmentIndexAtTime(deps.visualSegments, targetTime);
+      const now = performance.now();
+      const updateUi = immediate || segment !== lastUiSegment || now - lastUiUpdate >= 1000 / 30;
+      if (updateUi) { lastUiUpdate = now; lastUiSegment = segment; }
+      seekTo(targetTime, { immediate, pause: true, updateUi });
+      window.dispatchEvent(new CustomEvent("timeline-seek-position", { detail: { time: targetTime } }));
     };
     commit(true);
     const isPointer = (e) => e.pointerId === event.pointerId;
