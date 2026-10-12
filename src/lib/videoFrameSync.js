@@ -66,6 +66,17 @@ function applyLatestSeek(video, state) {
   };
   const onSeeked = () => {
     if (state.version !== version || finished) return;
+    // A completed native seek has freed the decoder. During scrubbing there
+    // is no reason to spend two compositor frames observing an obsolete
+    // target before starting the latest one. Do not interrupt an active
+    // decode on every pointer move: that can starve long-GOP sources entirely.
+    if (!video.seeking && video.readyState >= 2 && state.pending) {
+      finished = true;
+      clearObservation(video, state);
+      state.active = null;
+      applyLatestSeek(video, state);
+      return;
+    }
     // Decoder completion and compositor confirmation are separate signals.
     // Paused/same-frame seeks may never produce another video-frame callback;
     // do not hold subsequent scrub targets behind that optional notification.
