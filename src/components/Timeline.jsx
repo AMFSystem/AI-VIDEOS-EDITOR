@@ -1533,6 +1533,7 @@ export function Timeline({
       || (segment.type || visualType) !== "video"
       || segment.preparing
       || timelineSeekActive
+      || isPlaying
       || !segment.blob
       || !segmentRange
       || rulerViewport.contentWidth <= 0
@@ -1663,10 +1664,11 @@ export function Timeline({
     setVisualSegments,
     timelineDuration,
     timelineSeekActive,
+    isPlaying,
     visualType,
   ]);
   useEffect(() => {
-    if (timelineSeekActive || localTimelineZoom < 3 || typeof setVisualSegments !== "function") return undefined;
+    if (isPlaying || timelineSeekActive || localTimelineZoom < 3 || typeof setVisualSegments !== "function") return undefined;
     const inFlight = filmstripUpgradeInFlightRef.current;
     const segment = displayedVisualSegments.find((item) => {
       if ((item.type || visualType) !== "video" || item.remoteSrc || !item.src || inFlight.has(item.src)) return false;
@@ -1714,7 +1716,7 @@ export function Timeline({
         inFlight.delete(sourceKey);
       }
     };
-  }, [displayedVisualSegments, localTimelineZoom, setVisualSegments, timelineSeekActive, visualType]);
+  }, [displayedVisualSegments, isPlaying, localTimelineZoom, setVisualSegments, timelineSeekActive, visualType]);
   useEffect(() => {
     if (!window.matchMedia?.("(max-width: 760px)").matches || timelineDuration <= 0) return;
     const minimumZoom = getTimelineZoomForVisibleDuration(timelineDuration);
