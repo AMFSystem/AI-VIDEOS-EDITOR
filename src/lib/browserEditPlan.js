@@ -1,3 +1,6 @@
+import { getDepthAnalysisSignature, normalizeCinematicDepth } from "./depthOfField.js";
+import { getVisionKey } from "./vision.js";
+import { validateRelightPatch } from "./relightCommand.js";
 import { applyCommandPlan, diffProjects, inspectProject, materializeProjectCaptionTimings } from "./projectCommandEngine.js";
 import { applyTimelineRipple } from "./timelineRipple.js";
 import { MAX_TIMELINE_DURATION_SECONDS, MIN_VISUAL_SEGMENT_SECONDS } from "../config/editor.js";
@@ -56,7 +59,9 @@ export function browserProjectFingerprint(project, rippleEditing, visualSegments
         originalBlob: runtimeIdentity(clip.originalBlob), cutoutVisual: runtimeIdentity(clip.cutoutVisual), enhancement: runtimeIdentity(clip.enhancement) }))])),
     musicBlob: runtimeIdentity(runtimeProject.musicBlob), sourceAudioBlob: runtimeIdentity(runtimeProject.sourceAudioBlob),
   } : undefined;
-  return JSON.stringify({ ...semanticProject, rippleEditing, runtimeVisuals, runtimeMedia });
+  const depthAnalysis = Object.entries(runtimeProject?.depthRecords || {}).map(([key, record]) =>
+    [key, record.complete, record.signature, record.analyzedAt, runtimeIdentity(record.samples)]);
+  return JSON.stringify({ ...semanticProject, rippleEditing, runtimeVisuals, runtimeMedia, depthAnalysis });
 }
 
 export function getBrowserPlanningClips(visualSegments = []) {
@@ -348,6 +353,7 @@ export const BROWSER_OPERATION_FIELDS = Object.freeze({
   "project.set_fit": ["fitMode"],
   "clip.set_property": ["clipId", "property", "value"],
   "clip.set_muted": ["clipId", "muted"],
+  "clip.set_relight": ["clipId", "enabled", "quality", "light"],
   "marker.add": ["markerId", "markerType", "time", "endTime", "title", "notes", "color"],
   "marker.update": ["markerId", "markerType", "time", "endTime", "title", "notes", "color"],
   "marker.delete": ["markerId"],
@@ -588,6 +594,18 @@ export function buildBrowserOperationReview(inputProject, response, options = {}
         if (clip.speedCurve?.enabled || clip.reversed || clip.reverse) reject("BROWSER_EDIT_COMPLEX_TIMING");
       }
       focusTime = operation.start ?? clip.start;
+    }
+    if (operation.type === "clip.set_relight") {
+      validateRelightPatch(operation);
+      assertClipUnlocked(next, operation.clipId, locks, originalAudioLanes);
+      const { key, clip } = findProjectClip(next, operation.clipId);
+      if (!["visualSegments", "visualOverlaySegments"].includes(key) || !["image", "video"].includes(clip.type)) reject("BROWSER_EDIT_INVALID_PLAN");
+      const effect = normalizeCinematicDepth(clip.cinematicDepth);
+      if (operation.enabled ?? effect.enabled) {
+        const live = restoreBrowserProjectMedia(next, initialRuntime, origins, options.assets)[key].find((item) => item.id === clip.id);
+        const analysis = initialRuntime.depthRecords?.[getVisionKey(live)];
+        if (!analysis?.complete || !analysis.samples?.length || analysis.signature !== getDepthAnalysisSignature(live, operation.quality ?? effect.quality)) reject("AI_DEPTH_ANALYSIS_REQUIRED");
+      }
     }
     if (operation.type === "clip.set_property" || operation.type === "clip.set_muted") {
       assertClipUnlocked(next, operation.clipId, locks, originalAudioLanes);

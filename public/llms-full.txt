@@ -133,3 +133,5 @@ React 19, Vite 6, ONNX Runtime Web, WebAssembly, WebGPU, MediaRecorder, browser 
 - https://video-editor.ai-creator.top/local-ai-video-editor/
 - https://video-editor.ai-creator.top/talking-avatar-generator/
 - https://video-editor.ai-creator.top/articles/
+
+- WebMCP also supports `relight-analysis` and `depth-map` AI jobs for inspected visual/overlay clips through prepare/start/inspect/cancel. Lighting parameters use reviewed `clip.set_relight` with matching complete analysis; depth videos return My assets IDs before separate reviewed insertion. Source trim/speed mapping, locks, cancellation and stale-source checks use the existing production pipeline. Local CLI/STDIO edits settings only, with browser execution/rendering required for these effects.

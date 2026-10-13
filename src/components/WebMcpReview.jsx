@@ -3,6 +3,7 @@ import "./WebMcpReview.css";
 
 const TRACK_LABELS = { visuals: "trackVisuals", overlays: "trackOverlays", audio: "trackAudio", captions: "trackCaptions", stickers: "trackStickers", music: "trackMusic", markers: "trackMarkers" };
 const FIELD_LABELS = {
+  quality: "fieldDepthQuality", output: "fieldEffect", cinematicDepth: "relightTitle", relight: "relightTitle", strength: "relightStrength", range: "relightRange", softness: "relightSoftness", distance: "relightDistance",
   name: "fieldName", title: "fieldName", text: "fieldText", script: "fieldText", note: "fieldNote", notes: "fieldNote", description: "fieldNote",
   time: "fieldStart", start: "fieldStart", end: "fieldEnd", rangeEnd: "fieldEnd", endTime: "fieldEnd", duration: "fieldDuration",
   sourceStart: "fieldSourceStart", sourceDuration: "fieldSourceDuration", volume: "fieldVolume", fadeIn: "fieldFadeIn", fadeOut: "fieldFadeOut",
@@ -26,6 +27,8 @@ const SUMMARY_FIELDS = ["type", "text", "note", "notes", "start", "time", "end",
 // and marker notes are deliberately rendered as React text, never as markup.
 const PRIVATE_FIELDS = /^(?:blob|src|url|file|path|archivePath|integrity|archiveMediaId|assetId|originalAssetId|thumbnail.*|poster.*|waveform.*|media.*|cache.*|.*token|.*credential|.*secret)$/i;
 const ENUM_LABELS = {
+  quality: { fast: "depthQualityFast", balanced: "depthQualityBalanced", quality: "depthQualityFine" },
+  output: { relight: "relightTitle", "depth-map": "aiDepthMap" },
   type: { video: "mediaVideo", image: "mediaImage", audio: "mediaAudio", marker: "markerPoint", chapter: "markerChapter", range: "markerRange", note: "markerNote" },
   color: { cyan: "colorCyan", amber: "colorAmber", violet: "colorViolet", rose: "colorRose", green: "colorGreen" },
   fitMode: { cover: "fitCover", contain: "fitContain" },
@@ -195,7 +198,7 @@ export function WebMcpAiStatus({ agent }) {
   if (!job) return null;
   const running = ["queued", "running"].includes(job.status);
   return <aside className="webmcp-ai-status" aria-label={t("aiJobTitle")}>
-    <header><Robot size={18} aria-hidden="true" /><strong>{t(job.kind === "voiceover" ? "aiVoiceover" : "aiTranscription")}</strong>
+    <header><Robot size={18} aria-hidden="true" /><strong>{t(job.kind === "voiceover" ? "aiVoiceover" : job.kind === "transcription" ? "aiTranscription" : job.kind === "depth-map" ? "aiDepthMap" : "aiRelightAnalysis")}</strong>
       {!running ? <button type="button" className="webmcp-review-close" aria-label={t("aiDismiss")} onClick={agent.dismissAi}><X size={17} /></button> : null}
     </header>
     <div className="webmcp-ai-progress" role="status" aria-live="polite">

@@ -43,7 +43,7 @@ The standalone `validate_edit_plan.mjs` checks transport shape only. `project.di
 - `asset.import`
 - `visual.append`, `visual.insert`, `visual.trim`, `visual.split`, `visual.reorder`
 - `overlay.add`, `timed.move`, `timed.resize`
-- `clip.delete`, `clip.set_property`, `clip.set_speed`, `clip.set_muted`
+- `clip.delete`, `clip.set_property`, `clip.set_speed`, `clip.set_muted`, `clip.set_relight`
 - `caption.add`, `caption.update`, `caption.link_audio`, `caption.unlink_audio`
 - `marker.add`, `marker.update`, `marker.delete`
 - `transition.set`, `track.set_visibility`, `track.set_locked`
@@ -83,3 +83,5 @@ On failure, return `ok: false`, a stable error `code`, a human-readable `message
 ## Architectural rule
 
 Do not implement CLI and MCP editing separately. The bundled MCP server must remain a thin transport over the CLI's single command registry, pure project-state reducers, and shared validation. The browser WebMCP adapter compiles reviewed multi-track operation plans and legacy reorder/trim plans into this same engine, restores media only from trusted editor snapshots, integrates ripple helpers, and commits through normal history. Browser export jobs use the real editor export hook and cancellation controller. Expand shared coverage instead of copying reducers or renderers into another transport.
+
+`clip.set_relight` edits main/overlay lighting parameters in the shared registry (see [relighting and depth video](relighting-and-depth-video.md)). Local diff/apply edits settings only; depth inference, depth-video generation and rendered lighting require the live browser route.

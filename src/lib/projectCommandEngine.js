@@ -1,3 +1,4 @@
+import { applyRelightPatch } from "./relightCommand.js";
 import { MAX_TIMELINE_MARKER_SECONDS, TIMELINE_MARKER_COLORS, TIMELINE_MARKER_TYPES, normalizeTimelineMarkers } from "./timelineMarkers.js";
 import { getCaptionTimeline, getTimedSegmentsEnd } from "./timeline.js";
 import { CAPTION_FONT_CATALOG } from "./captionFonts.js";
@@ -875,6 +876,7 @@ const reducers = {
   "clip.set_property": setClipProperty,
   "clip.set_speed": setClipSpeed,
   "clip.set_muted": setClipMuted,
+  "clip.set_relight": applyRelightPatch,
   "track.set_visibility": (project, operation) => setTrackState(project, operation, "visible"),
   "track.set_locked": (project, operation) => setTrackState(project, operation, "locked"),
   "project.set_ratio": setProjectRatio,

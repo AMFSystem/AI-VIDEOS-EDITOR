@@ -1,3 +1,5 @@
+import { getDepthAnalysisSignature, normalizeCinematicDepth } from "./depthOfField.js";
+import { getVisionKey } from "./vision.js";
 import { inspectClip, inspectMarkers, inspectProject, inspectTrack, inspectTranscript } from "./projectCommandEngine.js";
 import { browserProjectFingerprint, buildBrowserOperationReview, buildBrowserTimelineReview, getBrowserPlanningClips } from "./browserEditPlan.js";
 import { WEB_MCP_EDIT_CAPABILITIES, WEB_MCP_OPERATION_SCHEMA } from "./webMcpOperationSchema.js";
@@ -25,7 +27,7 @@ const ERROR_KEYS = {
   BROWSER_EDIT_ASSET_UNAVAILABLE: "assetUnavailable", BROWSER_EDIT_MULTIPLE_MUSIC_SOURCES: "invalidOperation",
   BROWSER_EDIT_MUSIC_OVERLAP: "invalidOperation",
   MEDIA_SAMPLE_FAILED: "mediaSampleFailed", MEDIA_SAMPLE_UNAVAILABLE: "mediaSampleUnavailable",
-  AI_UNAVAILABLE: "aiUnavailable", AI_INVALID_VOICE: "aiInvalidVoice", AI_INVALID_SOURCE: "aiInvalidSource",
+  AI_DEPTH_ANALYSIS_REQUIRED: "aiDepthAnalysisRequired", AI_UNAVAILABLE: "aiUnavailable", AI_INVALID_VOICE: "aiInvalidVoice", AI_INVALID_SOURCE: "aiInvalidSource",
   AI_MODEL_DOWNLOAD_REQUIRED: "aiModelDownloadRequired", AI_JOB_NOT_FOUND: "aiJobNotFound", AI_JOB_LIMIT: "aiJobLimit", AI_FAILED: "aiFailed",
 };
 const fail = (code) => { throw Object.assign(new Error(code), { code }); };
@@ -123,7 +125,7 @@ export function createWebMcpEditorSession(getEditor, { publish = () => {}, publi
         requiresPreview: true, projectSave: "download-timeline-archive", videoExport: Boolean(state.editor.exportVideo),
         assets: "existing-local-assets", exportRequiresPrepare: true,
         mediaSample: Boolean(state.editor.sampleMedia),
-        aiTasks: ["voiceover", "transcription"], aiRequiresPrepare: true,
+        aiTasks: ["voiceover", "transcription", "relight-analysis", "depth-map"], aiRequiresPrepare: true,
         timeUnits: { timeline: "seconds", source: "absolute source-media seconds", split: "clip-local seconds", volume: "multiplier (1 = 100%)", fades: "seconds" },
       },
     };
@@ -176,7 +178,13 @@ export function createWebMcpEditorSession(getEditor, { publish = () => {}, publi
           const clip = inspectClip(state.project, text(input.clipId));
           const { revision: _revision, properties: raw, ...metadata } = clip;
           const planning = clip.track === "visuals" ? planningClips(state.editor).find((item) => (item.clipId || item.id) === input.clipId) : null;
-          result = { ...metadata, stateToken: state.stateToken, properties: properties(raw), ...(planning ? { editing: planning } : {}) };
+          const live = [...(state.editor.visualSegments || []), ...(state.editor.visualOverlaySegments || [])].find((item) => item.id === input.clipId);
+          const depth = live && runtimeProject(state.editor, state.project).depthRecords?.[getVisionKey(live)];
+          const depthAnalysis = live ? { complete: Boolean(depth?.complete),
+            readyQualities: ["fast", "balanced", "quality"].filter((quality) => depth?.complete && depth.samples?.length && depth.signature === getDepthAnalysisSignature(live, quality)),
+            enabled: normalizeCinematicDepth(live.cinematicDepth).enabled,
+          } : undefined;
+          result = { ...metadata, stateToken: state.stateToken, ...(depthAnalysis ? { depthAnalysis } : {}), properties: properties(raw), ...(planning ? { editing: planning } : {}) };
           break;
         }
         case "timeline_transcript_inspect": {

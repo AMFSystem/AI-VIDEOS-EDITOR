@@ -1,3 +1,5 @@
+import { getDepthAnalysisSignature, DEPTH_MODEL_HUGGING_FACE_REVISION, DEPTH_MODEL_MODELSCOPE_REVISION } from "./depthOfField.js";
+import { getVisionKey } from "./vision.js";
 import { MAX_TIMELINE_DURATION_SECONDS, VOICES } from "../config/editor.js";
 import { AUTOMATIC_CAPTION_MODEL_ID } from "../config/models.js";
 import { VOICE_MODEL_HUGGING_FACE_REVISION, VOICE_MODEL_MODELSCOPE_REVISION } from "../config/voiceModels.js";
@@ -33,6 +35,9 @@ const id = { type: "string", minLength: 1, maxLength: 256 };
 
 export const WEB_MCP_AI_REQUEST_SCHEMA = {
   oneOf: [
+    schema({ kind: { type: "string", enum: ["relight-analysis", "depth-map"] }, clipId: id,
+      quality: { type: "string", enum: ["fast", "balanced", "quality"] }, inverted: { type: "boolean" },
+      reanalyze: { type: "boolean" } }, ["kind", "clipId"]),
     schema({
       kind: { type: "string", const: "voiceover" }, voiceId: id,
       text: { type: "string", minLength: 1, maxLength: MAX_TEXT },
@@ -114,12 +119,28 @@ export function createWebMcpAiJobs(getEditor, { makeId = () => crypto.randomUUID
     if (asset.type !== "audio" || !(asset.blob instanceof Blob) || !asset.blob.size || !(asset.duration > 0)) fail("AI_INVALID_SOURCE");
     return asset;
   };
+  const findVisual = (clipId) => {
+    const editor = getEditor();
+    const main = (editor.visualSegments || []).find((clip) => clip.id === clipId);
+    const clip = main || (editor.visualOverlaySegments || []).find((item) => item.id === clipId);
+    if (!clip || !["image", "video"].includes(clip.type) || !clip.src || clip.preparing) fail("AI_INVALID_SOURCE");
+    if (editor.getProjectSnapshot().trackLocks?.[main ? "image" : "overlay"]) fail("BROWSER_EDIT_TRACK_LOCKED");
+    return clip;
+  };
+  const depthAvailable = () => Boolean(globalThis.navigator?.gpu && globalThis.Worker && typeof getEditor().runDepthTask === "function");
   const capabilities = (input = {}) => {
     guard(); object(input, ["language"]);
     if (input.language !== undefined && !LANGUAGES.includes(input.language)) fail("INVALID_ARGUMENT");
     return {
       execution: "browser-local", modelReadiness: "not-probed", modelDownload: "on-demand-at-start",
       requiresPrepare: true, requiresAllowModelDownload: true, maxConcurrentJobs: 1,
+      depth: {
+        available: depthAvailable(), tasks: ["relight-analysis", "depth-map"], source: "inspected-visual-or-overlay-clip",
+        qualities: { fast: 8, balanced: 16, quality: 24 }, maxAnalysisSamples: 720, outputFps: 24,
+        relightDelivery: "analysis-only-then-clip.set_relight", depthMapDelivery: "my-assets", timelineInsertion: false,
+        cancellation: "abort-analysis-and-render-terminate-worker", relativeDepthOnly: true,
+        ownedModelRevisions: { huggingFace: DEPTH_MODEL_HUGGING_FACE_REVISION, modelScope: DEPTH_MODEL_MODELSCOPE_REVISION },
+      },
       voiceover: {
         available: browserSupport() && typeof getEditor().commitAiVoiceAssets === "function",
         maxTextCharacters: MAX_TEXT, maxSegments: MAX_SEGMENTS, delivery: "my-assets", timelineInsertion: false,
@@ -147,6 +168,26 @@ export function createWebMcpAiJobs(getEditor, { makeId = () => crypto.randomUUID
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) fail("INVALID_ARGUMENT");
     const timelineOffset = number(raw.timelineOffset ?? 0, 0, MAX_TIMELINE_DURATION_SECONDS);
     const downloadPolicy = { allowedAtPrepare: false, cacheState: "unknown", startRequiresAllowModelDownload: true, behavior: "reuse-existing-cache-or-fetch-missing-model-artifacts" };
+    if (["relight-analysis", "depth-map"].includes(raw.kind)) {
+      object(raw, ["kind", "clipId", "quality", "inverted", "reanalyze"]);
+      if (!depthAvailable()) fail("AI_UNAVAILABLE");
+      const clip = findVisual(string(raw.clipId));
+      if (raw.kind === "depth-map" && clip.type !== "video") fail("AI_INVALID_SOURCE");
+      const quality = raw.quality ?? "balanced";
+      if (!["fast", "balanced", "quality"].includes(quality) || [raw.inverted, raw.reanalyze].some((value) => value !== undefined && typeof value !== "boolean")) fail("INVALID_ARGUMENT");
+      if (raw.kind === "relight-analysis" && raw.inverted !== undefined) fail("INVALID_ARGUMENT");
+      const cached = getEditor().getRuntimeProject?.().depthRecords?.[getVisionKey(clip)];
+      return {
+        request: { kind: raw.kind, clipId: clip.id, quality, reanalyze: raw.reanalyze ?? false,
+          ...(raw.kind === "depth-map" ? { inverted: raw.inverted ?? false } : {}) },
+        source: { clipId: clip.id, name: String(clip.name || ""), type: clip.type, duration: clip.duration,
+          sourceStart: clip.sourceStart, sourceDuration: clip.sourceDuration, playbackRate: clip.playbackRate,
+          speedCurveEnabled: Boolean(clip.speedCurve?.enabled) },
+        analysisReusable: Boolean(!raw.reanalyze && cached?.complete && cached.samples?.length && cached.signature === getDepthAnalysisSignature(clip, quality)),
+        downloadPolicy, delivery: raw.kind === "depth-map" ? "my-assets" : "analysis-only-then-clip.set_relight",
+        timelineInsertion: false, cancellation: "abort-analysis-and-render-terminate-worker",
+      };
+    }
     if (raw.kind === "voiceover") {
       object(raw, ["kind", "voiceId", "text", "speed", "gain", "timelineOffset"]);
       const voice = VOICES.find((item) => item.id === string(raw.voiceId));
@@ -287,12 +328,30 @@ export function createWebMcpAiJobs(getEditor, { makeId = () => crypto.randomUUID
       timelineInserted: false,
     };
   };
+  const runDepth = async (job) => {
+    const { request } = job.plan;
+    const source = findVisual(request.clipId);
+    const signature = getDepthAnalysisSignature(source, request.quality);
+    const validateSource = () => {
+      aborted(job.controller.signal);
+      const current = findVisual(request.clipId);
+      if (getDepthAnalysisSignature(current, request.quality) !== signature || current.blob !== source.blob) fail("STALE_STATE");
+    };
+    const result = await getEditor().runDepthTask(request, {
+      segment: source, signal: job.controller.signal, validateSource,
+      onProgress: ({ stage, progress }) => update(job, stage === "setup" ? "aiPreparing" : stage === "encoding" ? "aiDepthEncoding" : "aiDepthAnalyzing", progress),
+    });
+    if (!result?.analysis?.complete || (request.kind === "depth-map" && !result.asset?.id)) fail("AI_FAILED");
+    return { delivery: job.plan.delivery, clipId: request.clipId, analysis: result.analysis,
+      ...(result.asset ? { assetIds: [result.asset.id] } : {}), timelineInserted: false,
+      ...(request.kind === "relight-analysis" ? { nextOperation: { type: "clip.set_relight", clipId: request.clipId, quality: request.quality, enabled: true } } : {}) };
+  };
   const start = (input, { signal } = {}) => {
     guard(); object(input, ["stateToken", "requestId", "request", "allowModelDownload"]);
     const stateToken = string(input.stateToken);
     const requestId = string(input.requestId);
     if (input.allowModelDownload !== true) fail("AI_MODEL_DOWNLOAD_REQUIRED");
-    object(input.request, Object.keys(WEB_MCP_AI_REQUEST_SCHEMA.oneOf.find((entry) => entry.properties.kind.const === input.request?.kind)?.properties || {}));
+    object(input.request, Object.keys(WEB_MCP_AI_REQUEST_SCHEMA.oneOf.find((entry) => (entry.properties.kind.const === input.request?.kind || entry.properties.kind.enum?.includes(input.request?.kind)))?.properties || {}));
     const signature = JSON.stringify({ stateToken, request: Object.entries(input.request).sort(([a], [b]) => a.localeCompare(b)) });
     if (requests.has(requestId)) {
       const previous = requests.get(requestId);
@@ -324,14 +383,14 @@ export function createWebMcpAiJobs(getEditor, { makeId = () => crypto.randomUUID
     signal?.addEventListener("abort", abort, { once: true });
     job.detachSignal = () => signal?.removeEventListener("abort", abort);
     publish(job);
-    const completion = plan.request.kind === "voiceover" ? runVoiceover(job) : runTranscription(job, sourceBlob);
+    const completion = plan.request.kind === "voiceover" ? runVoiceover(job) : plan.request.kind === "transcription" ? runTranscription(job, sourceBlob) : runDepth(job);
     Promise.resolve(completion).then((result) => {
       // A late cancellation cannot remove an already committed asset batch.
       job.result = result; finish(job, "succeeded");
     }).catch((error) => {
       if (error?.name !== "AbortError" && !job.controller.signal.aborted) console.warn("[WebMCP AI] Local job failed.", error);
       finish(job, error?.name === "AbortError" || job.controller.signal.aborted ? "cancelled" : "failed",
-        error?.name === "AbortError" || job.controller.signal.aborted ? undefined : error?.code === "EDITOR_BUSY" ? "EDITOR_BUSY" : "AI_FAILED");
+        error?.name === "AbortError" || job.controller.signal.aborted ? undefined : ["EDITOR_BUSY", "STALE_STATE", "BROWSER_EDIT_TRACK_LOCKED", "AI_INVALID_SOURCE"].includes(error?.code) ? error.code : "AI_FAILED");
     });
     return describe(job);
   };

@@ -1,3 +1,4 @@
+import { WEBMCP_DEPTH_COPY } from "./i18nWebMcpDepth.js";
 import { WEBMCP_EXTENDED_COPY } from "./i18nWebMcpExtended.js";
 import { WEBMCP_MEDIA_COPY } from "./i18nWebMcpMedia.js";
 import { WEBMCP_AI_COPY } from "./i18nWebMcpAi.js";
@@ -235,6 +236,8 @@ for (const [locale, copy] of Object.entries(WEBMCP_MEDIA_COPY)) Object.assign(WE
 for (const [locale, copy] of Object.entries(WEBMCP_AI_COPY)) Object.assign(WEBMCP_COPY[locale], copy);
 
 for (const [locale, copy] of Object.entries(WEBMCP_STYLE_COPY)) Object.assign(WEBMCP_COPY[locale], copy);
+
+for (const [locale, copy] of Object.entries(WEBMCP_DEPTH_COPY)) Object.assign(WEBMCP_COPY[locale], copy);
 
 export function createWebMcpTranslator(language) {
   const locale = String(language || "en").toLowerCase().split(/[-_]/)[0];

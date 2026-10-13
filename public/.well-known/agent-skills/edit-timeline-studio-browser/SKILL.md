@@ -1,6 +1,6 @@
 ---
 name: edit-timeline-studio-browser
-description: Use native WebMCP tools to edit the project open in Timeline Studio. Inspect clips and available assets, preview and apply multi-track, caption style/position and project framing edits; sample rendered media; run local voiceover/transcription jobs; insert media; undo; save; or export video with progress and cancellation. Use for the live browser editor, not local project-file editing.
+description: Use native WebMCP tools to edit the project open in Timeline Studio. Inspect clips and available assets, preview and apply multi-track, caption style/position and project framing edits; sample rendered media; run local voiceover, transcription, relighting analysis and depth-video jobs; insert media; undo; save; or export video with progress and cancellation. Use for the live browser editor, not local project-file editing.
 ---
 
 # Edit the open Timeline Studio project
@@ -51,3 +51,7 @@ Chinese and mixed Chinese/English narration uses the two built-in Hojo voices. T
 Export uses the real editor pipeline and shared progress/cancel UI. MOV requires the deterministic pipeline. Browser cancellation cannot retract an already-triggered download; a late cancellation may return a succeeded task. Export receipts are page-session data: the latest 64 jobs remain inspectable, with bounded retry-key history. Do not invent success from a job ID or restart with a new request key merely because a response is uncertain.
 
 The tool surface exposes no arbitrary JavaScript, arbitrary URL import, filesystem access, arbitrary AI/model execution, remote generation or cloud rendering. Browser agents receive metadata, caption text, and explicitly requested media samples under their own data-handling terms; ordinary inspection remains metadata-only and does not create an upload service. More detailed operation and export examples are in the [integration reference](https://github.com/MartinDelophy/ai-video-editor/blob/main/docs/webmcp.md).
+
+## Relighting and depth video
+
+Use AI kinds `relight-analysis` and `depth-map` with an inspected `clipId` and quality `fast`, `balanced` or `quality`. Follow prepare/start/inspect/cancel; require explicit download permission. Analysis alone does not enable lighting: reinspect and preview/apply `clip.set_relight` after matching analysis completes. Generated depth video returns My assets IDs without timeline insertion or replacement. See the repository workflow for parameter limits and source-time validation.

@@ -1285,6 +1285,7 @@ export function App() {
     setDepthRecords,
     updateEffect: updateSelectedCinematicDepth,
     onAssetReady: handleDepthMapAssetReady,
+    isBlocked: () => { const blocked = webMcp.isAiRunning(); if (blocked) notify(webMcp.t("busy")); return blocked; },
     notify,
     setCurrentTime,
     timelineStart: depthTimelineStart,
@@ -1296,6 +1297,7 @@ export function App() {
     setDepthRecords,
     updateEffect: updateSelectedPhotoParallax,
     effectField: "photoParallax",
+    isBlocked: () => { const blocked = webMcp.isAiRunning(); if (blocked) notify(webMcp.t("busy")); return blocked; },
     readyToastKey: "parallaxReadyToast",
     notify,
     setCurrentTime,
@@ -1389,7 +1391,7 @@ export function App() {
   // Browser agents use the live editor action and normal undo history.
   const getBrowserRuntimeProject = () => ({
     ...getProjectSnapshot(), visualSegments, visualOverlaySegments, audioSegments, musicSegments,
-    musicBlob, musicUrl, musicPeaks, sourceAudioBlob, sourceAudioUrl, audioBlob,
+    musicBlob, musicUrl, musicPeaks, sourceAudioBlob, sourceAudioUrl, audioBlob, depthRecords,
   });
   const applyBrowserReview = (review, message) => {
     if (!review.hasChanges) throw Object.assign(new Error(), { code: "NO_CHANGES" });
@@ -1461,6 +1463,15 @@ export function App() {
     exportVideo: handleExportVideo, exportSettings, exportContentDuration, ratio, exporting,
     applyReview: applyBrowserReview,
     sampleMedia: (input, options) => sampleEditorMedia(videoCompositionContext, input, options),
+    runDepthTask: (request, execution) => cinematicDepth.analyze({
+      output: request.kind === "depth-map" ? "depth-map" : "relight", quality: request.quality,
+      inverted: request.inverted ?? false, reanalyze: request.reanalyze,
+    }, { ...execution, onAssetReady: (draft) => {
+      execution.validateSource();
+      // Agent output stays in My assets until a separate reviewed insertion.
+      const asset = handleDepthMapAssetReady(draft);
+      return { id: asset.id, duration: asset.duration, width: asset.width, height: asset.height };
+    } }),
     commitAiVoiceAssets: ({ items }, { signal } = {}) => {
       if (signal?.aborted) throw Object.assign(new Error("CANCELLED"), { name: "AbortError" });
       const assets = items.map((item) => {
@@ -1479,7 +1490,7 @@ export function App() {
     seek: (time) => { pauseTimelineMedia(); setIsPlaying(false); seekTo(time, { immediate: true }); },
     isBusy: () => Boolean(projectImportProgress || exporting || timelineClipDragRef.current || pointerAssetDragRef.current ||
       isDragging || draggedAssetId || ["generating", "captioning"].includes(status) || visualSegments.some((clip) => clip.preparing) ||
-      visualOverlaySegments.some((clip) => clip.preparing) || visionJob.running || avatarJob.running || autoEdit.job.running),
+      visualOverlaySegments.some((clip) => clip.preparing) || visionJob.running || avatarJob.running || autoEdit.job.running || cinematicDepth.job.running || photoParallaxDepth.job.running),
   });
 
   const guardAgentAi = (action) => (...args) => {

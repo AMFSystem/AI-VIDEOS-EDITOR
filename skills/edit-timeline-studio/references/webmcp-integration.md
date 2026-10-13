@@ -42,3 +42,7 @@ Successful voiceover commits every group to My assets and returns IDs, durations
 The 21-tool browser surface does not expose arbitrary JavaScript, arbitrary URL import, arbitrary model execution, remote generation, or cloud jobs. Local voiceover and transcription use the bounded reviewed task contract above. The normal editor remains the route for other supported product capabilities. Do not change browser flags, install a polyfill, or claim native execution when the host does not provide it.
 
 Implementation and schema examples: [integration reference](https://github.com/MartinDelophy/ai-video-editor/blob/main/docs/webmcp.md). Canonical browser resources: [agent guide](https://video-editor.ai-creator.top/agent-guide.md) and [self-contained browser Skill](https://video-editor.ai-creator.top/.well-known/agent-skills/edit-timeline-studio-browser/SKILL.md).
+
+## Relighting and depth video
+
+The AI request kinds also include `relight-analysis` and `depth-map`; see [relighting-and-depth-video.md](relighting-and-depth-video.md) for source/quality constraints and the complete lifecycle. Analysis does not enable lighting. Use `clip.set_relight` through edit preview/apply after analysis; generated depth videos return My assets IDs and never insert or replace automatically. Reinspect after jobs finish.
