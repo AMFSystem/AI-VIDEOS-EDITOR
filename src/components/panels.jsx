@@ -1,4 +1,5 @@
 import { CaptionGroupingControl } from "./CaptionGroupingControl.jsx";
+import { getCaptionEditingCopy } from "../i18nCaptionEditing.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 
@@ -1393,12 +1394,13 @@ export function ToolPanel(props) {
           />
         </div>
         <div className="caption-style-panel">
+          <label>{getCaptionEditingCopy(uiLanguage)[0]}<select aria-label={getCaptionEditingCopy(uiLanguage)[0]} value={effectiveCaptionStyle.textAlign || "center"} onChange={(event) => updateCaptionStyleField("textAlign", event.target.value)}>{["left", "center", "right"].map((value, index) => <option key={value} value={value}>{getCaptionEditingCopy(uiLanguage)[index + 1]}</option>)}</select></label>
           <div className="caption-color-row">
             <label>{t("captionTextColor")}<input type="color" value={effectiveCaptionStyle.textColor} onChange={(event) => updateCaptionStyleField("textColor", event.target.value)} /></label>
             <label>{t("captionBackground")}<input type="color" value={effectiveCaptionStyle.backgroundColor} onChange={(event) => updateCaptionStyleField("backgroundColor", event.target.value)} /></label>
             <label>{t("captionBorderColor")}<input type="color" value={effectiveCaptionStyle.borderColor} onChange={(event) => updateCaptionStyleField("borderColor", event.target.value)} /></label>
           </div>
-          {[["backgroundOpacity", t("captionOpacity"), 0, 1, 0.05, "%"], ["textStrokeWidth", t("captionOutlineWidth"), 0, 6, 1, "px"], ["borderWidth", t("captionBorderWidth"), 0, 8, 1, "px"], ["radius", t("captionRadius"), 0, 28, 1, "px"], ["paddingX", t("captionPaddingX"), 0, 52, 1, "px"], ["paddingY", t("captionPaddingY"), 0, 32, 1, "px"], ["shadowOpacity", t("captionShadow"), 0, 1, 0.05, "%"]].map(([key, label, min, max, step, unit]) => (
+          {[["backgroundOpacity", t("captionOpacity"), 0, 1, 0.05, "%"], ["textStrokeWidth", t("captionOutlineWidth"), 0, 6, 1, "px"], ["borderWidth", t("captionBorderWidth"), 0, 8, 1, "px"], ["radius", t("captionRadius"), 0, 28, 1, "px"], ["paddingX", getCaptionEditingCopy(uiLanguage)[4], 0, 52, 1, "px"], ["paddingY", getCaptionEditingCopy(uiLanguage)[5], 0, 32, 1, "px"], ["shadowOpacity", t("captionShadow"), 0, 1, 0.05, "%"]].map(([key, label, min, max, step, unit]) => (
             <div className="slider-field compact-slider" key={key}><div><label>{label}</label><span>{unit === "%" ? `${Math.round(effectiveCaptionStyle[key] * 100)}%` : `${effectiveCaptionStyle[key]}${unit}`}</span></div><input type="range" min={min} max={max} step={step} value={effectiveCaptionStyle[key]} onChange={(event) => updateCaptionStyleField(key, Number(event.target.value))} /></div>
           ))}
           <button className="caption-save-style-button" type="button" onClick={saveCurrentCaptionStyle}><Plus size={15} weight="bold" />{t("captionSaveAsStyle")}</button>

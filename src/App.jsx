@@ -1074,6 +1074,7 @@ export function App() {
   });
 
   const adjustSelectedSegmentWeight = createTimelineDurationActions({
+    uiLanguage,
     captionSegments, commitCaptionSegments, commitStickerSegments,
     commitVisualSegments, currentStickerSegmentIndex, currentVisualSegmentIndex,
     focusedSegmentIndex, getCurrentVisualAssetSnapshot, imageDuration, imageSrc,
