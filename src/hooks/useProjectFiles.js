@@ -185,7 +185,7 @@ export function useProjectFiles(deps) {
             if (!blob) continue;
             try {
               const decoded = await decodeImportedAudio(blob);
-              restoredAudio[index] = { ...segment, blob, url: createImportedUrl(blob), peaks: decoded.peaks };
+              restoredAudio[index] = { ...segment, ...(audioSegmentMedia?.get(segment.id)?.originalBlob ? { processingOriginalBlob: audioSegmentMedia.get(segment.id).originalBlob } : {}), blob, url: createImportedUrl(blob), peaks: decoded.peaks };
             } catch (error) { decodeFailure = error; throw error; }
           }
         }));
