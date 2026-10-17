@@ -47,6 +47,7 @@ export function createAudioTrackActions(d) {
       cloneVoiceProfileId: options.cloneVoiceProfileId || "",
       cloneVoiceProfileName: options.cloneVoiceProfileName || "",
       assetId: options.assetId || "",
+      ...(options.visualSegmentId ? { visualSegmentId: options.visualSegmentId } : {}),
     };
     if (options.replaceSegmentId) {
       const replaced = d.audioSegments.find((item) => item.id === options.replaceSegmentId);
@@ -223,6 +224,7 @@ export function createAudioTrackActions(d) {
       script: options.script || captionSegment.text,
       replaceSegmentId: captionSegment.audioSegmentId || captionSegment.detachedAudioSegmentId || "",
       ...identity,
+      ...(captionSegment.visualSegmentId ? { visualSegmentId: captionSegment.visualSegmentId } : {}),
     } : {
       ...options,
       start: options.start ?? appendStart,
@@ -307,6 +309,7 @@ export function createAudioTrackActions(d) {
         replaceSegmentId: index === 0 && captionSegment
           ? captionSegment.audioSegmentId || captionSegment.detachedAudioSegmentId || ""
           : "",
+        ...(captionSegment?.visualSegmentId ? { visualSegmentId: captionSegment.visualSegmentId } : {}),
         sourceKind: options.sourceKind || "ai-voice",
         voiceId: d.selectedVoiceId,
         voiceName: options.cloneVoiceProfileName

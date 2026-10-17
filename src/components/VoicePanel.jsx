@@ -1,3 +1,4 @@
+import { getCaptionVisualLinkCopy } from "../i18nCaptionEditing.js";
 import { CaptionGroupingControl } from "./CaptionGroupingControl.jsx";
 import { AudioInspectorTabs } from "./AudioInspectorTabs.jsx";
 import { AudioProcessingPanel } from "./AudioProcessingPanel.jsx";
@@ -970,7 +971,7 @@ function AudioVoiceColorSection({ t, segment, voiceProfiles = [], onAssetReady, 
   </div>;
 }
 
-function AudioClipContextPanel({ t, language, processingDisabled, registerProcessingUrl, segment, updateAudioSegment, toggleAudioSegmentReverse, deleteAudioSegment, downloadBlob, requestedSection = "", voiceProfiles, onVoiceColorAssetReady, onApplyVoiceColor, onRestoreVoiceColor }) {
+function AudioClipContextPanel({ t, language, visualAssociation, processingDisabled, registerProcessingUrl, segment, updateAudioSegment, toggleAudioSegmentReverse, deleteAudioSegment, downloadBlob, requestedSection = "", voiceProfiles, onVoiceColorAssetReady, onApplyVoiceColor, onRestoreVoiceColor }) {
   const [activeTab, setActiveTab] = useState("audio");
   const tabBodyRef = useRef(null);
   const isVoiceClip = segment.track === "audio";
@@ -991,6 +992,7 @@ function AudioClipContextPanel({ t, language, processingDisabled, registerProces
         items={[{id:"audio",label:t("mobileClipAudio")},...(canFade?[{id:"fade",label:t("mobileClipFade")}]:[]),...(canSpatial?[{id:"spatial",label:t("audioSpaceTab")}]:[]),...(canVoiceColor?[{id:"voice-color",label:t("voiceColorTab", "音色")}]:[]),{id:"processing",label:processingCopy.processing}]}
         value={shownTab} onChange={setActiveTab} label={t("audioClipProperties")} previous={processingCopy.previous} next={processingCopy.next}
       /> : null}
+      {visualAssociation && <button className="panel-secondary timed-visual-link" type="button" disabled={visualAssociation.disabled} onClick={visualAssociation.toggle}>{getCaptionVisualLinkCopy(language)[visualAssociation.linked ? 1 : 0]}</button>}
       <div ref={tabBodyRef} className={`audio-context-tab-body${shownTab === "processing" ? " is-processing" : ""}`}>
       {shownTab === "processing" ? <AudioProcessingPanel segment={segment} language={language} disabled={processingDisabled} updateAudioSegment={updateAudioSegment} registerUrl={registerProcessingUrl} /> : null}
       {shownTab === "audio" ? <div className="audio-context-section">
@@ -1476,7 +1478,7 @@ export function VoicePanel({
   selectedTrack,
   selectedAudioSegment,
   selectedTrackAudioSegment,
-  audioProcessingDisabled, registerAudioProcessingUrl,
+  audioProcessingDisabled, registerAudioProcessingUrl, captionVisualLinkDisabled, toggleCaptionVisualLink, audioVisualAssociation, stickerVisualAssociation,
   mobileInspectorOrigin = "",
   mobileInspectorSection = "",
   onCloseMobileInspector,
@@ -1757,12 +1759,15 @@ export function VoicePanel({
         {isSmartFrameContext ? <SmartFramePanel t={t} smartFrame={smartFrame} /> : null}
         {isAiMusicContext ? <AiMusicGenerator language={uiLanguage} music={aiMusic} embedded /> : null}
         {isSilenceRemovalContext ? <SilenceRemovalPanel t={t} tool={silenceRemoval} /> : null}
-        {isStickerContext ? <StickerContextPanel t={t} segment={selectedStickerSegment} updateStickerSegment={updateStickerSegment} deleteStickerSegment={deleteStickerSegment} /> : null}
+        {isStickerContext ? <>
+          {stickerVisualAssociation && <button className="panel-secondary timed-visual-link" type="button" disabled={stickerVisualAssociation.disabled} onClick={stickerVisualAssociation.toggle}>{getCaptionVisualLinkCopy(uiLanguage)[stickerVisualAssociation.linked ? 1 : 0]}</button>}
+          <StickerContextPanel t={t} segment={selectedStickerSegment} updateStickerSegment={updateStickerSegment} deleteStickerSegment={deleteStickerSegment} />
+        </> : null}
         {isOverlayContext ? <div className="visual-overlay-inspector">
           {!mobileInspectorSection ? <div className={`sticker-properties-preview ${isVectorOverlay ? "is-vector" : ""}`}>{selectedVisualOverlay.type === "video" ? <video src={selectedVisualOverlay.src} muted playsInline /> : <img src={selectedVisualOverlay.src} alt="" style={isVectorOverlay ? { filter: vectorOverlayAppearance.filter, opacity: vectorOverlayAppearance.opacity, mixBlendMode: vectorOverlayAppearance.cssBlendMode } : undefined} />}</div> : null}
           <VisualEffectsPanel
             contextMode
-            audioEditor={selectedTrackAudioSegment?.embeddedVideo ? <AudioClipContextPanel t={t} language={uiLanguage} segment={{ ...selectedTrackAudioSegment, id: selectedTrackAudioSegment.segmentId }} updateAudioSegment={updateSelectedTrackAudioSegment} /> : null}
+            audioEditor={selectedTrackAudioSegment?.embeddedVideo ? <AudioClipContextPanel t={t} language={uiLanguage} visualAssociation={audioVisualAssociation} segment={{ ...selectedTrackAudioSegment, id: selectedTrackAudioSegment.segmentId }} updateAudioSegment={updateSelectedTrackAudioSegment} /> : null}
             mode="overlay"
             t={t}
             segment={selectedVisualOverlay}
@@ -1783,7 +1788,7 @@ export function VoicePanel({
         {isVisualContext && selectedVisualSegment ? (
           <VisualEffectsPanel
             contextMode
-            audioEditor={selectedTrackAudioSegment?.embeddedVideo ? <AudioClipContextPanel t={t} language={uiLanguage} segment={{ ...selectedTrackAudioSegment, id: selectedTrackAudioSegment.segmentId }} updateAudioSegment={updateSelectedTrackAudioSegment} /> : null}
+            audioEditor={selectedTrackAudioSegment?.embeddedVideo ? <AudioClipContextPanel t={t} language={uiLanguage} visualAssociation={audioVisualAssociation} segment={{ ...selectedTrackAudioSegment, id: selectedTrackAudioSegment.segmentId }} updateAudioSegment={updateSelectedTrackAudioSegment} /> : null}
             t={t}
             segment={selectedVisualSegment}
             localTime={visualLocalTime}
@@ -1825,6 +1830,8 @@ export function VoicePanel({
           />
         ) : null}
         {isCaptionContext && captionPanelTab === "caption" && mobileInspectorSection !== "font" ? (
+          <>
+          {selectedCaptionSegment && <button className="panel-secondary caption-visual-link" type="button" disabled={captionVisualLinkDisabled} onClick={toggleCaptionVisualLink}>{getCaptionVisualLinkCopy(uiLanguage)[selectedCaptionSegment.visualSegmentId ? 1 : 0]}</button>}
           <CaptionContextPanel
             t={t}
             captionSegments={captionSegments}
@@ -1849,6 +1856,7 @@ export function VoicePanel({
             isGeneratingCaptions={isGeneratingCaptions}
             automaticCaptionProgress={automaticCaptionProgress}
           />
+          </>
         ) : null}
 
         {isCaptionContext && captionPanelTab === "voice" ? (
@@ -1895,7 +1903,7 @@ export function VoicePanel({
 
         {isAvatarContext ? <AvatarContextPanel t={t} hasVisual={hasVisual} visualType={visualType} audioBlob={audioBlob} audioDuration={audioDuration} captionSegments={captionSegments} selectedVoice={selectedVoice} avatarJob={avatarJob} generateAvatarAcceptanceFrame={generateAvatarAcceptanceFrame} /> : null}
 
-        {isAudioClipContext ? <AudioClipContextPanel t={t} language={uiLanguage} processingDisabled={audioProcessingDisabled} registerProcessingUrl={registerAudioProcessingUrl} segment={{ ...audioPropertySegment, id: audioPropertySegment.id || audioPropertySegment.segmentId, track: audioPropertySegment.track || selectedTrack }} updateAudioSegment={selectedTrack === "audio" ? updateAudioSegment : updateSelectedTrackAudioSegment} toggleAudioSegmentReverse={toggleAudioSegmentReverse} deleteAudioSegment={selectedTrack === "audio" ? deleteAudioSegment : deleteSelectedTrackAudioSegment} downloadBlob={downloadBlob} requestedSection={mobileInspectorSection} voiceProfiles={voiceProfiles} onVoiceColorAssetReady={onVoiceColorAssetReady} onApplyVoiceColor={onApplyVoiceColor} onRestoreVoiceColor={onRestoreVoiceColor} /> : null}
+        {isAudioClipContext ? <AudioClipContextPanel t={t} language={uiLanguage} visualAssociation={audioVisualAssociation} processingDisabled={audioProcessingDisabled} registerProcessingUrl={registerAudioProcessingUrl} segment={{ ...audioPropertySegment, id: audioPropertySegment.id || audioPropertySegment.segmentId, track: audioPropertySegment.track || selectedTrack }} updateAudioSegment={selectedTrack === "audio" ? updateAudioSegment : updateSelectedTrackAudioSegment} toggleAudioSegmentReverse={toggleAudioSegmentReverse} deleteAudioSegment={selectedTrack === "audio" ? deleteAudioSegment : deleteSelectedTrackAudioSegment} downloadBlob={downloadBlob} requestedSection={mobileInspectorSection} voiceProfiles={voiceProfiles} onVoiceColorAssetReady={onVoiceColorAssetReady} onApplyVoiceColor={onApplyVoiceColor} onRestoreVoiceColor={onRestoreVoiceColor} /> : null}
 
         {!isSmartContext && !isPluginsContext && !isEffectsContext && !isCaptionContext && !isAvatarContext && !isAudioClipContext && !isVisualContext && !isStickerContext && !isOverlayContext && voiceTab === "synthesis" ? (
           <VoiceSynthesisPanel

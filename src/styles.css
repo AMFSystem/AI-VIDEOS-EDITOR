@@ -12766,3 +12766,22 @@ canvas.relight-position { width:100%; height:auto; display:block; }
 .source-audio-identity > div { display:grid; gap:7px; min-width:0; }
 .source-audio-identity strong { font-size:14px; font-weight:650; color:#ede4c7; }
 .source-audio-identity > div > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#a5a496; font-size:12px; }
+
+.audio-summary-list { display:grid; gap:0; margin:0 0 14px; padding:0 10px; border:1px solid rgba(255,255,255,.065); border-radius:10px; background:rgba(255,255,255,.015); }
+.audio-summary-row { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; padding:9px 0; box-sizing:border-box; }
+.audio-summary-row + .audio-summary-row { border-top:1px solid rgba(255,255,255,.055); }
+.audio-summary-row > span { color:#8d9aa5; font-size:12px; flex:0 0 auto; }
+.audio-summary-row > div { display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:baseline; gap:5px 9px; min-width:0; max-width:68%; }
+.audio-summary-row strong { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#dce8eb; font-size:12px; font-weight:550; }
+.audio-summary-row small { color:#80949e; font-size:11px; font-variant-numeric:tabular-nums; }
+.audio-tool-panel > .audio-entry-card { min-height:70px; padding:12px; margin-bottom:14px; border-radius:10px; }
+.audio-tool-panel > .audio-entry-card > svg { width:34px; height:34px; padding:7px; box-sizing:content-box; }
+.audio-tool-panel > .slider-field:has(input:disabled) { display:none; }
+.audio-tool-panel .audio-download-actions > button:disabled,
+.audio-tool-panel .audio-delete-actions > button:disabled { display:none; }
+.audio-tool-panel .audio-download-actions:not(:has(button:not(:disabled))),
+.audio-tool-panel .audio-delete-actions:not(:has(button:not(:disabled))) { display:none; }
+.caption-visual-link { margin:0 0 10px; min-height:32px; font-size:12px; cursor:pointer; }
+.caption-visual-link:disabled { cursor:not-allowed; }
+.timed-visual-link { flex:0 0 auto; min-height:32px; font-size:12px; cursor:pointer; }
+.timed-visual-link:disabled { cursor:not-allowed; }

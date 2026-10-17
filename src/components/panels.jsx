@@ -1510,34 +1510,20 @@ export function ToolPanel(props) {
             </span>
           ) : null}
         </button>
-        <div className="metric-list">
-          {!sourceSelected && <>
-          <div>
+        <div className="audio-summary-list">
+          {!sourceSelected && <div className="audio-summary-row">
             <span>{t("currentVoice")}</span>
-            <strong>{selectedVoice.name}</strong>
-          </div>
-          <div>
-            <span>{t("voiceDuration")}</span>
-            <strong>{formatTime(audioBlob ? audioDuration : 0)}</strong>
-          </div>
-          </>}
-          {!sourceSelected && <div>
-            <span>{t("sourceAudio")}</span>
-            <strong>{sourceAudioBlob ? sourceAudioName : t("notSeparated")}</strong>
+            <div><strong>{selectedVoice.name}</strong>{audioBlob && <small>{formatTime(audioDuration)}</small>}</div>
           </div>}
-          <div>
-            <span>{t("sourceDuration")}</span>
-            <strong>{formatTime(sourceAudioBlob ? sourceAudioDuration : 0)}</strong>
-          </div>
-          {!sourceSelected && <>
-          <div>
-            <span>{t("bgm")}</span>
-            <strong>{musicBlob ? musicName : t("notAdded")}</strong>
-          </div>
-          <div>
-            <span>{t("musicDuration")}</span>
-            <strong>{formatTime(musicBlob ? musicDuration : 0)}</strong>
-          </div>
+          {sourceSelected ? <div className="audio-summary-row"><span>{t("sourceDuration")}</span><strong>{formatTime(sourceAudioBlob ? sourceAudioDuration : 0)}</strong></div> : <>
+            <div className="audio-summary-row">
+              <span>{t("sourceAudio")}</span>
+              <div><strong title={sourceAudioName}>{sourceAudioBlob ? sourceAudioName : t("notSeparated")}</strong>{sourceAudioBlob && <small>{formatTime(sourceAudioDuration)}</small>}</div>
+            </div>
+            <div className="audio-summary-row">
+              <span>{t("bgm")}</span>
+              <div><strong title={musicName}>{musicBlob ? musicName : t("notAdded")}</strong>{musicBlob && <small>{formatTime(musicDuration)}</small>}</div>
+            </div>
           </>}
         </div>
         <div className="slider-field compact-slider">
@@ -1557,7 +1543,7 @@ export function ToolPanel(props) {
             onChange={(event) => setSourceAudioVolume(Number(event.target.value))}
           />
         </div>
-        {!sourceSelected && <div className="slider-field compact-slider">
+        {!sourceSelected && musicBlob && <div className="slider-field compact-slider">
           <div>
             <label htmlFor="music-volume">{t("bgm")} {t("volume")}</label>
             <span>{Math.round(musicVolume * 100)}%</span>

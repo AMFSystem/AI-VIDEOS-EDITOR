@@ -59,3 +59,8 @@ const keywordCopy = {
   id: ['Sorotan kata kunci', 'Warna sorotan', 'Pisahkan kata atau frasa dengan koma atau baris baru. Kosongkan untuk menonaktifkan. Huruf besar/kecil diabaikan.'],
 };
 export const getCaptionKeywordCopy = language => keywordCopy[language] || keywordCopy.en;
+
+const visualLinkCopy = {
+ zh:["关联对应画面","解除画面关联"],en:["Link to matching visual","Unlink visual"],ja:["対応する映像にリンク","映像のリンクを解除"],ko:["해당 화면에 연결","화면 연결 해제"],es:["Vincular al clip correspondiente","Desvincular imagen"],fr:["Lier au plan correspondant","Dissocier le plan"],de:["Mit passendem Bildclip verknüpfen","Bildverknüpfung lösen"],pt:["Vincular ao clipe correspondente","Desvincular imagem"],th:["เชื่อมกับภาพที่ตรงกัน","ยกเลิกการเชื่อมภาพ"],vi:["Liên kết với cảnh tương ứng","Bỏ liên kết cảnh"],ru:["Связать с соответствующим кадром","Отвязать изображение"],it:["Collega alla clip corrispondente","Scollega immagine"],id:["Tautkan ke klip yang sesuai","Lepas tautan gambar"]
+};
+export const getCaptionVisualLinkCopy = language => visualLinkCopy[language] || visualLinkCopy.en;

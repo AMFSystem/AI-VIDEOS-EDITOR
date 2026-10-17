@@ -84,7 +84,7 @@ import { useMiganRepair } from "./hooks/useMiganRepair.js";
 import { useNanoVsrRestoration } from "./hooks/useNanoVsrRestoration.js";
 import { useSmartDenoise } from "./hooks/useSmartDenoise.js";
 import { useGenerationPlugins } from "./hooks/useGenerationPlugins.js";
-import { getVisualAssetPayload, getImageThumbnailCount, getVisualSegmentsTotal, normalizeTimedSegmentIds } from "./lib/timeline.js";
+import { getVisualAssetPayload, getVisualSegmentTimeline, getImageThumbnailCount, getVisualSegmentsTotal, normalizeTimedSegmentIds } from "./lib/timeline.js";
 import { getVisualSourceTime, normalizeVisualTransform, removeVisualPropertyKeyframe, updateVisualSegmentPlaybackRate, upsertVisualKeyframe, upsertVisualPropertyKeyframe } from "./lib/visualEffects.js";
 import { getVisualSpeedCurveTimelineProgress, updateVisualSegmentSpeedCurve } from "./lib/visualSpeedCurve.js";
 import { getLinkedSourceAudioEnd, getLinkedSourceAudioSegments, shouldMuteEmbeddedVideoAudio, sliceSourceAudioPeaks } from "./lib/sourceAudioSync.js";
@@ -718,6 +718,26 @@ export function App() {
     setScript, setSelectedSegmentId, setSelectedTrack,
     setVisionRecords, t, trackLocks,
   });
+  const captionVisualTarget = selectedCaptionSegment && getVisualSegmentTimeline(visualSegments).find(range => selectedCaptionSegment.start >= range.start - 0.000001 && selectedCaptionSegment.end <= range.end + 0.000001);
+  const toggleCaptionVisualLink = () => {
+    if (!selectedCaptionSegment || trackLocks.caption) return;
+    const id=selectedCaptionSegment.id, owner=captionVisualTarget?.id;
+    if (!selectedCaptionSegment.visualSegmentId && !owner) return;
+    setCaptionSegments(items=>items.map(item=>{
+      if(item.id!==id)return item;
+      const {visualSegmentId:previous,...rest}=item;
+      return previous ? rest : {...item,visualSegmentId:owner};
+    }));
+  };
+  const makeTimedVisualAssociation = (segment, setter, locked) => {
+    if (!segment) return null;
+    const owner=getVisualSegmentTimeline(visualSegments).find(range=>segment.start>=range.start-0.000001 && segment.start+segment.duration<=range.end+0.000001);
+    return {linked:Boolean(segment.visualSegmentId),disabled:Boolean(locked||(!segment.visualSegmentId&&!owner)),toggle:()=>{
+      if(locked||(!segment.visualSegmentId&&!owner))return;
+      setter(current=>current.map(item=>{if(item.id!==segment.id)return item;const {visualSegmentId:previous,...rest}=item;return previous?rest:{...item,visualSegmentId:owner.id};}));
+    }};
+  };
+  const audioVisualAssociation = selectedTrack === "audio" ? makeTimedVisualAssociation(selectedAudioSegment,setAudioSegments,isTimedSegmentLaneLocked(audioSegments,selectedAudioSegment?.id,trackLocks)) : null;
   const importCaptionSegments = (importedSegments, mode, skipped = 0) => {
     const nextSegments = mode === "append"
       ? appendImportedCaptions(captionSegments, importedSegments)
@@ -792,6 +812,7 @@ export function App() {
       assetId: linkedPiece?.assetId || sourceAudioAssetId || "",
       sourceVisualSegmentId: linkedPiece?.id || "",
       sourceAudioWasLinked: Boolean(linkedPiece),
+      ...(linkedPiece && Math.abs((Number(start) || 0) - linkedPiece.start) < 0.000001 ? { visualSegmentId: linkedPiece.id } : {}),
     };
 
     if (processingPatch) {
@@ -908,9 +929,10 @@ export function App() {
   } = createStickerTimelineActions({
     estimatedDuration, notify, seekTo: (...args) => seekTo(...args), setActiveTool,
     setSelectedStickerId, setSelectedStickerSegmentId, setSelectedTrack,
-    setStickerSegments, stickerSegments, t, timelineDurationRef, trackLocks,
+    setStickerSegments, stickerSegments, t, timelineDurationRef, trackLocks, visualSegments,
   });
   const selectedStickerSegment = stickerSegments.find((segment) => segment.id === selectedStickerSegmentId) ?? currentStickerSegment;
+  const stickerVisualAssociation = makeTimedVisualAssociation(selectedStickerSegment,setStickerSegments,trackLocks.sticker);
   useEffect(() => {
     const normalized = normalizeTimedSegmentIds(stickerSegments, "sticker");
     if (normalized !== stickerSegments) setStickerSegments(normalized);
@@ -1405,7 +1427,7 @@ export function App() {
   const handleExportVideo = useVideoExport(videoCompositionContext);
   const { startCaptionResize, startTimelineClipDrag } = createTimelineReorderControls({
     timelineMarkers,
-    audioSegments, captionSegments, captionTargetDuration, commitCaptionSegments, commitVisualSegments,
+    audioSegments, captionSegments, captionTargetDuration, commitCaptionSegments, commitVisualSegments, setAudioSegments,
     notify, renderedVisualSegments, seekTo, setSelectedSegmentId, setSelectedTrack,
     setSelectedVisualSegmentId, setTimelineClipDrag, suppressTimelineClipClickRef,
     timelineClipDragRef, timelineDuration, trackLocks, visualSegments, pauseForTimelineEdit,
@@ -1796,6 +1818,10 @@ export function App() {
           musicUrl={musicUrl}
           captionSegments={captionSegments}
           selectedCaptionSegment={selectedCaptionSegment}
+          captionVisualLinkDisabled={Boolean(trackLocks.caption || (!selectedCaptionSegment?.visualSegmentId && !captionVisualTarget))}
+          toggleCaptionVisualLink={toggleCaptionVisualLink}
+          audioVisualAssociation={audioVisualAssociation}
+          stickerVisualAssociation={stickerVisualAssociation}
           selectedSegmentId={selectedSegmentId}
           setSelectedSegmentId={setSelectedSegmentId}
           currentSegmentIndex={currentSegmentIndex}
