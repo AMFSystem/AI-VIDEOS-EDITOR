@@ -246,7 +246,7 @@ export function getCaptionTextLayout({
     height,
     contentWidth,
     lines,
-    keywordRanges: getCaptionLineKeywordRanges(text, lines, captionStyle.highlightWords),
+    keywordRanges: getCaptionLineKeywordRanges(text, lines, captionStyle.highlightWords, captionStyle.highlightRanges),
     style: captionStyle,
   };
 }

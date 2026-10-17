@@ -12785,3 +12785,10 @@ canvas.relight-position { width:100%; height:auto; display:block; }
 .caption-visual-link:disabled { cursor:not-allowed; }
 .timed-visual-link { flex:0 0 auto; min-height:32px; font-size:12px; cursor:pointer; }
 .timed-visual-link:disabled { cursor:not-allowed; }
+
+.caption-highlight-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:10px 12px; }
+.caption-highlight-actions button { border:1px solid #29464d; border-radius:8px; background:#10252a; color:#9cf6ed; padding:7px 10px; font:inherit; font-size:12px; cursor:pointer; }
+.caption-highlight-actions button:disabled { opacity:.4; cursor:not-allowed; }
+.caption-highlight-actions label { display:flex; align-items:center; gap:6px; margin-left:auto; font-size:12px; color:#93a4ad; }
+.caption-highlight-actions input[type=color] { width:32px; height:30px; padding:3px; border:1px solid #29464d; border-radius:7px; background:#0c181d; }
+.caption-highlight-actions small { flex-basis:100%; color:#93a4ad; font-size:11px; line-height:1.5; }

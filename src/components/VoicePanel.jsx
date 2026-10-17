@@ -1,4 +1,5 @@
-import { getCaptionVisualLinkCopy } from "../i18nCaptionEditing.js";
+import { normalizeCaptionHighlightRanges, getCaptionKeywordRanges } from "../lib/captionKeywords.js";
+import { getCaptionKeywordCopy, getCaptionSelectionHighlightCopy, getCaptionVisualLinkCopy } from "../i18nCaptionEditing.js";
 import { CaptionGroupingControl } from "./CaptionGroupingControl.jsx";
 import { AudioInspectorTabs } from "./AudioInspectorTabs.jsx";
 import { AudioProcessingPanel } from "./AudioProcessingPanel.jsx";
@@ -564,6 +565,8 @@ function VectorControls({ t, segment, onUpdate }) {
 }
 
 function CaptionContextPanel({
+  language,
+  highlightDisabled,
   t,
   captionSegments,
   selectedCaptionSegment,
@@ -588,6 +591,31 @@ function CaptionContextPanel({
   setCaptionSegments,
 }) {
   const [captionGrouping, setCaptionGrouping] = useState("phrases");
+  const selectionRef = useRef(null);
+  const [selection, setSelection] = useState(null);
+  const highlightCopy = getCaptionSelectionHighlightCopy(language);
+  const keywordCopy = getCaptionKeywordCopy(language);
+  const rememberSelection = event => {
+    const { selectionStart: start, selectionEnd: end } = event.currentTarget;
+    const next = { id: selectedCaptionSegment.id, start, end };
+    selectionRef.current = next;
+    setSelection(next);
+  };
+  const patchHighlight = patch => {
+    if (highlightDisabled || !selectedCaptionSegment) return;
+    setCaptionSegments(items => items.map(segment => segment.id === selectedCaptionSegment.id ? patch(segment) : segment));
+  };
+  const highlightSelection = () => {
+    const range = selectionRef.current;
+    if (!range || range.id !== selectedCaptionSegment?.id || range.end <= range.start) return;
+    patchHighlight(segment => ({ ...segment,
+      highlightRanges: normalizeCaptionHighlightRanges([
+        ...(segment.highlightRanges || []),
+        ...getCaptionKeywordRanges(segment.text, segment.styleOverrides?.highlightWords), range,
+      ], segment.text.length),
+      styleOverrides: { ...segment.styleOverrides, highlightWords: "", highlightColor: segment.styleOverrides?.highlightColor || "#ffe066" },
+    }));
+  };
   const srtInputRef = useRef(null);
   const focusNewCaptionRef = useRef(false);
   const [pendingSrt, setPendingSrt] = useState(null);
@@ -695,9 +723,20 @@ function CaptionContextPanel({
         <div className="script-box caption-sync-box">
           <textarea
             id="caption-context-input"
+            onSelect={rememberSelection}
+            disabled={highlightDisabled}
             value={selectedCaptionSegment.text}
             onChange={(event) => updateCaptionSegmentText(selectedCaptionSegment.id, event.target.value)}
           />
+          <div className="caption-highlight-actions">
+            <button type="button" disabled={highlightDisabled || selection?.id !== selectedCaptionSegment.id || !(selection.end > selection.start)}
+              onMouseDown={event => event.preventDefault()} onClick={highlightSelection}>{highlightCopy[0]}</button>
+            <label><span>{keywordCopy[1]}</span><input type="color" aria-label={keywordCopy[1]} disabled={highlightDisabled}
+              value={selectedCaptionSegment.styleOverrides?.highlightColor || "#ffe066"}
+              onChange={event => { const color = event.target.value; patchHighlight(segment => ({ ...segment, styleOverrides: { ...segment.styleOverrides, highlightColor: color } })); }} /></label>
+            <button type="button" disabled={highlightDisabled} onClick={() => patchHighlight(segment => ({ ...segment, highlightRanges: [], styleOverrides: { ...segment.styleOverrides, highlightWords: "" } }))}>{highlightCopy[1]}</button>
+            <small>{highlightCopy[2]}</small>
+          </div>
           <div className="script-meta">
             <button type="button" onClick={() => seekTo(selectedStart)}>
               <ClosedCaptioning size={14} />
@@ -1390,6 +1429,7 @@ function CaptionFontSheet({
 }
 
 export function VoicePanel({
+  captionHighlightDisabled = false,
   t,
   activeTool,
   captionVoiceFocusRequest = 0,
@@ -1833,6 +1873,8 @@ export function VoicePanel({
           <>
           {selectedCaptionSegment && <button className="panel-secondary caption-visual-link" type="button" disabled={captionVisualLinkDisabled} onClick={toggleCaptionVisualLink}>{getCaptionVisualLinkCopy(uiLanguage)[selectedCaptionSegment.visualSegmentId ? 1 : 0]}</button>}
           <CaptionContextPanel
+            language={uiLanguage}
+            highlightDisabled={captionHighlightDisabled}
             t={t}
             captionSegments={captionSegments}
             selectedCaptionSegment={selectedCaptionSegment}

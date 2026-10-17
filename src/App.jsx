@@ -1766,6 +1766,7 @@ export function App() {
         />
 
         <VoicePanel
+          captionHighlightDisabled={trackLocks.caption}
           t={t}
           activeTool={activeTool}
           captionVoiceFocusRequest={captionVoiceFocusRequest}

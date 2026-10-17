@@ -1,5 +1,5 @@
 import { CaptionGroupingControl } from "./CaptionGroupingControl.jsx";
-import { getCaptionEditingCopy, getCaptionSpacingCopy, getCaptionKeywordCopy } from "../i18nCaptionEditing.js";
+import { getCaptionEditingCopy, getCaptionSpacingCopy } from "../i18nCaptionEditing.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 
@@ -1403,11 +1403,6 @@ export function ToolPanel(props) {
               <CaretDown size={16} aria-hidden="true" />
             </span>
           </label>
-          <div className="caption-keyword-controls">
-            <label className="caption-keyword-words">{getCaptionKeywordCopy(uiLanguage)[0]}<textarea rows={2} maxLength={2000} value={effectiveCaptionStyle.highlightWords || ""} onChange={event => updateCaptionStyleField("highlightWords", event.target.value)} aria-describedby="caption-keyword-help" /></label>
-            <label className="caption-keyword-color">{getCaptionKeywordCopy(uiLanguage)[1]}<input type="color" value={effectiveCaptionStyle.highlightColor || "#ffe066"} onChange={event => updateCaptionStyleField("highlightColor", event.target.value)} /></label>
-            <small id="caption-keyword-help">{getCaptionKeywordCopy(uiLanguage)[2]}</small>
-          </div>
           <div className="caption-color-row">
             <label>{t("captionTextColor")}<input type="color" value={effectiveCaptionStyle.textColor} onChange={(event) => updateCaptionStyleField("textColor", event.target.value)} /></label>
             <label>{t("captionBackground")}<input type="color" value={effectiveCaptionStyle.backgroundColor} onChange={(event) => updateCaptionStyleField("backgroundColor", event.target.value)} /></label>

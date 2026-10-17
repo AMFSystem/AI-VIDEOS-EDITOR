@@ -1,3 +1,4 @@
+import { remapCaptionHighlights } from "./captionKeywords.js";
 import { getCaptionScript } from "./timeline.js";
 
 export function setCaptionSegmentPlacement(segments, segmentId, placement) {
@@ -52,7 +53,7 @@ export function createCaptionEditingActions(d) {
     }
     d.setCaptionSegments((items) => {
       const nextSegments = items.map((segment) =>
-        segment.id === segmentId ? { ...segment, text } : segment,
+        segment.id === segmentId ? { ...segment, text, ...(segment.highlightRanges ? { highlightRanges: remapCaptionHighlights(segment.text || "", text, segment.highlightRanges) } : {}) } : segment,
       );
       d.setScript(getCaptionScript(nextSegments));
       return nextSegments;
