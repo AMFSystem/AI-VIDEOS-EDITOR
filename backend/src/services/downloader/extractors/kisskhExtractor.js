@@ -50,20 +50,45 @@ export class KisskhExtractor {
 
   static parseIds(url) {
     const parsed = new URL(url);
-    const dramaId = parsed.searchParams.get("id");
+    let dramaId = parsed.searchParams.get("id");
     const epId = parsed.searchParams.get("ep");
 
     // Match Episode number from pathname e.g. /Drama/.../Episode-220
     const epMatch = parsed.pathname.match(/\/Episode-(\d+)/i);
     const epNumber = epMatch ? parseInt(epMatch[1], 10) : null;
 
-    return { dramaId, epId, epNumber };
+    // Drama slug from pathname /Drama/{slug}/Episode-... or /Drama/{slug}
+    const slugMatch = parsed.pathname.match(/\/Drama\/([^\/?#]+)/i);
+    const dramaSlug = slugMatch ? slugMatch[1] : null;
+
+    return { dramaId, epId, epNumber, dramaSlug };
   }
 
   static async resolveMedia(url) {
     const cleanUrl = url.trim();
     const origin = this.getOrigin(cleanUrl);
-    const { dramaId, epId, epNumber } = this.parseIds(cleanUrl);
+    let { dramaId, epId, epNumber, dramaSlug } = this.parseIds(cleanUrl);
+
+    const headers = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Referer": `${origin}/`,
+      "Accept": "application/json, text/plain, */*",
+    };
+
+    if (!dramaId && !epId && dramaSlug) {
+      try {
+        const query = dramaSlug.replace(/-/g, " ").replace(/\s*Season\s*[\d+]+/i, "").trim();
+        const searchRes = await fetch(`${origin}/api/DramaList/Search?q=${encodeURIComponent(query)}`, { headers });
+        if (searchRes.ok) {
+          const list = await searchRes.json();
+          if (Array.isArray(list) && list.length > 0) {
+            dramaId = list[0].id;
+          }
+        }
+      } catch (err) {
+        logger.warn("Failed to search drama ID from slug:", err.message);
+      }
+    }
 
     if (!dramaId && !epId) {
       throw new Error("Could not find Drama ID (id=...) or Episode ID (ep=...) in the KissKH link.");
@@ -73,43 +98,80 @@ export class KisskhExtractor {
     let thumbnail = null;
     let targetEpisodeId = epId;
     let episodeDisplay = epNumber ? `Episode ${epNumber}` : "Episode";
+    let dramaEpisodes = [];
+    let resolvedDramaId = dramaId;
 
-    const headers = {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Referer": `${origin}/`,
-      "Accept": "application/json, text/plain, */*",
+    // Helper to fetch drama details
+    const fetchDramaById = async (id) => {
+      try {
+        const res = await fetch(`${origin}/api/DramaList/Drama/${id}?isq=false`, { headers });
+        if (res.ok) {
+          const d = await res.json();
+          if (d && (d.title || d.episodes)) return d;
+        }
+      } catch (err) {
+        logger.warn(`Failed to fetch drama by ID ${id}:`, err.message);
+      }
+      return null;
     };
 
-    // 1. Fetch Drama Details if dramaId is present
-    if (dramaId) {
-      try {
-        const dramaRes = await fetch(`${origin}/api/DramaList/Drama/${dramaId}?isq=false`, { headers });
-        if (dramaRes.ok) {
-          const dramaData = await dramaRes.json();
-          if (dramaData.title) dramaTitle = dramaData.title;
-          if (dramaData.thumbnail) thumbnail = dramaData.thumbnail;
+    let dramaData = dramaId ? await fetchDramaById(dramaId) : null;
 
-          // If episode ID is missing or we want to match by number
-          if (Array.isArray(dramaData.episodes) && dramaData.episodes.length > 0) {
-            if (!targetEpisodeId && epNumber) {
-              const found = dramaData.episodes.find((ep) => ep.number === epNumber);
-              if (found) targetEpisodeId = found.id;
-            }
-            if (!targetEpisodeId) {
-              // Default to the first or latest available episode
-              const defaultEp = dramaData.episodes[0];
-              targetEpisodeId = defaultEp.id;
-              episodeDisplay = `Episode ${defaultEp.number || 1}`;
-            } else {
-              const matched = dramaData.episodes.find((ep) => String(ep.id) === String(targetEpisodeId));
-              if (matched?.number) {
-                episodeDisplay = `Episode ${matched.number}`;
+    // If dramaData wasn't found (e.g. invalid ID or 400), search by slug or title
+    if ((!dramaData || !dramaData.thumbnail) && dramaSlug) {
+      try {
+        const query = dramaSlug.replace(/-/g, " ").replace(/\s*Season\s*[\d+]+/i, "").trim();
+        const searchRes = await fetch(`${origin}/api/DramaList/Search?q=${encodeURIComponent(query)}&type=0`, { headers });
+        if (searchRes.ok) {
+          const list = await searchRes.json();
+          if (Array.isArray(list) && list.length > 0) {
+            const cleanSlug = dramaSlug.toLowerCase().replace(/[^a-z0-9]/g, "");
+            const bestMatch = list.find((item) => {
+              const itemSlug = (item.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+              return itemSlug.includes(cleanSlug) || cleanSlug.includes(itemSlug);
+            }) || list[0];
+
+            if (bestMatch?.id) {
+              resolvedDramaId = bestMatch.id;
+              if (bestMatch.thumbnail) {
+                thumbnail = bestMatch.thumbnail.includes("serveproxy.com/?url=")
+                  ? decodeURIComponent(bestMatch.thumbnail.split("serveproxy.com/?url=")[1])
+                  : bestMatch.thumbnail;
               }
+              if (bestMatch.title) dramaTitle = bestMatch.title;
+              const fetched = await fetchDramaById(bestMatch.id);
+              if (fetched) dramaData = fetched;
             }
           }
         }
       } catch (err) {
-        logger.warn("Failed to fetch KissKH drama details:", err.message);
+        logger.warn("Failed to search drama by slug:", err.message);
+      }
+    }
+
+    if (dramaData) {
+      if (dramaData.title) dramaTitle = dramaData.title;
+      if (dramaData.thumbnail) {
+        thumbnail = dramaData.thumbnail.includes("serveproxy.com/?url=")
+          ? decodeURIComponent(dramaData.thumbnail.split("serveproxy.com/?url=")[1])
+          : dramaData.thumbnail;
+      }
+      if (Array.isArray(dramaData.episodes) && dramaData.episodes.length > 0) {
+        dramaEpisodes = dramaData.episodes;
+        if (!targetEpisodeId && epNumber) {
+          const found = dramaData.episodes.find((ep) => ep.number === epNumber);
+          if (found) targetEpisodeId = found.id;
+        }
+        if (!targetEpisodeId) {
+          const defaultEp = dramaData.episodes[0];
+          targetEpisodeId = defaultEp.id;
+          episodeDisplay = `Episode ${defaultEp.number || 1}`;
+        } else {
+          const matched = dramaData.episodes.find((ep) => String(ep.id) === String(targetEpisodeId));
+          if (matched?.number) {
+            episodeDisplay = `Episode ${matched.number}`;
+          }
+        }
       }
     }
 
@@ -150,13 +212,27 @@ export class KisskhExtractor {
 
     const fullTitle = `${dramaTitle} - ${episodeDisplay}`;
 
+    const episodesList = Array.isArray(dramaEpisodes) && dramaEpisodes.length > 0
+      ? dramaEpisodes.map((ep) => ({
+          id: ep.id,
+          number: ep.number,
+          title: `Episode ${ep.number}`,
+          thumbnail: thumbnail,
+          url: `${origin}/Drama/${dramaSlug || "drama"}/Episode-${ep.number}?id=${resolvedDramaId || dramaId}&ep=${ep.id}`,
+        }))
+      : [];
+
     return {
       title: fullTitle,
+      dramaTitle,
       thumbnail,
       platform: "KissKH (Asian Drama & Anime)",
       streamUrl,
       referer: `${origin}/`,
       episodeId: targetEpisodeId,
+      currentEpisode: epNumber || 1,
+      totalEpisodes: episodesList.length,
+      episodes: episodesList,
     };
   }
 }

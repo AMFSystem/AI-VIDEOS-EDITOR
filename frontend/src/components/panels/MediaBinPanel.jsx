@@ -1,10 +1,12 @@
 import React from "react";
 
-export function MediaBinPanel({ mediaList = [], onUpload, onSelectMedia, onOpenUrlDownloader }) {
+export function MediaBinPanel({ mediaList = [], onUpload, onSelectMedia, onOpenUrlDownloader, t }) {
   return (
     <div className="flex flex-col h-full bg-[#101622] text-slate-200">
       <div className="p-3 border-b border-slate-800 flex items-center justify-between">
-        <span className="font-semibold text-xs tracking-wider uppercase text-slate-400">Media Bin</span>
+        <span className="font-semibold text-xs tracking-wider uppercase text-slate-400">
+          {t ? t("mediaBinTitle", "ប្រអប់មេឌៀ") : "Media Bin"}
+        </span>
         <div className="flex items-center gap-2">
           {onOpenUrlDownloader && (
             <button
@@ -12,7 +14,7 @@ export function MediaBinPanel({ mediaList = [], onUpload, onSelectMedia, onOpenU
               onClick={onOpenUrlDownloader}
               className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 rounded text-xs font-medium cursor-pointer transition-colors flex items-center gap-1"
             >
-              <span>📥</span> URL
+              <span>📥</span> {t ? t("downloadFromUrlShort", "ទាញយក") : "ទាញយក"}
             </button>
           )}
           <label className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium cursor-pointer transition-colors">

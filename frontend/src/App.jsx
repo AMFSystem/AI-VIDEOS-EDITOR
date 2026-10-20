@@ -17,7 +17,7 @@ import { NanoVsrRestorationDialog } from "./components/NanoVsrRestorationDialog.
 import { SmartDenoiseDialog } from "./components/SmartDenoiseDialog.jsx";
 import { WebMcpReview, WebMcpAiStatus } from "./components/WebMcpReview.jsx";
 import ProjectImportOverlay from "./components/ProjectImportOverlay.jsx";
-import { UrlDownloaderModal } from "./components/modals/UrlDownloaderModal.jsx";
+import { UrlDownloaderPage } from "./components/pages/UrlDownloaderPage.jsx";
 import { downloaderService } from "./services/downloaderService.js";
 import {
   canShowFirstVisualGuide,
@@ -1239,7 +1239,7 @@ export function App() {
     onFirstVisualAutoAdded: requestFirstVisualGuide,
   });
 
-  const [showUrlDownloader, setShowUrlDownloader] = useState(false);
+  const [activePageView, setActivePageView] = useState("editor");
   const handleDownloadedMedia = useCallback(async (fileOrData) => {
     try {
       let file = fileOrData;
@@ -1640,7 +1640,7 @@ export function App() {
         handleExportProject={handleExportProject}
         handleImportProject={handleImportProject}
         projectFileInputRef={projectFileInputRef}
-        onOpenUrlDownloader={() => setShowUrlDownloader(true)}
+        onOpenUrlDownloader={() => setActivePageView("url-downloader")}
       />
 
       <WebMcpReview agent={webMcp} language={activeLanguage} />
@@ -1659,7 +1659,7 @@ export function App() {
           imageSrc, isDragging, mediaTab, musicBlob, musicDuration, musicName, musicVolume,
           libraryType, libraryQuery, setLibraryQuery, selectLibraryType, libraryStatus, libraryError, libraryProvider,
           assetDownloadStates, prefetchLibraryAsset,
-          onOpenUrlDownloader: () => setShowUrlDownloader(true),
+          onOpenUrlDownloader: () => setActivePageView("url-downloader"),
           notify, openAvatarPanel, previewVisionAnalysis, previewVisionKey, smartMode, setSmartMode,
           previewVisionOptions, previewVisualSrc, previewVisualType, progress, script,
           seekTo, segments, selectTool, selectedCaptionSegment, selectedFilterId,
@@ -2146,12 +2146,19 @@ export function App() {
         t={t}
         onApplied={() => changeMobilePanel("")}
       />
-      <UrlDownloaderModal
-        isOpen={showUrlDownloader}
-        onClose={() => setShowUrlDownloader(false)}
-        onMediaDownloaded={handleDownloadedMedia}
-        t={t}
-      />
+      {activePageView === "url-downloader" && (
+        <UrlDownloaderPage
+          onBack={() => setActivePageView("editor")}
+          onMediaDownloaded={async (file, options = {}) => {
+            await handleDownloadedMedia(file);
+            if (options.closePage) {
+              setActivePageView("editor");
+            }
+          }}
+          language={activeLanguage}
+          notify={notify}
+        />
+      )}
       <ExportProgressOverlay
         exporting={exporting}
         error={exportError}

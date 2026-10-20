@@ -56,12 +56,12 @@ export const WEBMCP_MEDIA_COPY = {
     "mediaSampleUnavailable": "As amostras de mídia não estão disponíveis para este projeto ou navegador.",
     "toolPreviewDescription": "Pré-visualiza edições de clipes, transformações de sobreposições, texto/estilo/posição das legendas, proporção/ajuste do projeto, áudio, marcadores e inserções de mídia. Exige o stateToken atual; retorna a revisão e previewId sem aplicar alterações."
   },
-  "th": {
-    "toolMediaSampleTitle": "ตรวจตัวอย่างภาพและเสียงที่เรนเดอร์",
-    "toolMediaSampleDescription": "ใช้ stateToken ปัจจุบันเรนเดอร์เฟรมและเสียงมิกซ์ช่วงสั้นที่ขออย่างชัดเจน ส่งข้อมูล JPEG และ WAV ให้ตรวจสอบโดยไม่ย้ายหัวเล่น เอเจนต์จะได้รับข้อมูลสื่อนี้",
-    "mediaSampleFailed": "เรนเดอร์ตัวอย่างสื่อไม่สำเร็จ โปรดตรวจสอบโปรเจกต์ปัจจุบันแล้วลองอีกครั้ง",
-    "mediaSampleUnavailable": "โปรเจกต์หรือเบราว์เซอร์นี้ไม่รองรับการสร้างตัวอย่างสื่อ",
-    "toolPreviewDescription": "แสดงตัวอย่างการแก้ไขคลิป การแปลงภาพซ้อน ข้อความ/รูปแบบ/ตำแหน่งคำบรรยาย อัตราส่วน/การปรับพอดีของโปรเจกต์ เสียง เครื่องหมาย และการแทรกสื่อ ต้องใช้ stateToken ปัจจุบัน ส่งรายการการเปลี่ยนแปลงและ previewId โดยยังไม่ใช้การแก้ไข"
+  "km": {
+    "toolMediaSampleTitle": "ពិនិត្យគំរូរូបភាព និងសំឡេងដែលបាន Render",
+    "toolMediaSampleDescription": "ប្រើ stateToken បច្ចុប្បន្នដើម្បី render ហ្វ្រេម និងការលាយសំឡេងខ្លីៗដែលបានស្នើសុំ។ ផ្តល់ទិន្នន័យ JPEG និង WAV សម្រាប់ការត្រួតពិនិត្យដោយមិនរំកិលក្បាលចាក់ (Playhead)។ ភ្នាក់ងារនឹងទទួលបានទិន្នន័យមេឌៀនេះ។",
+    "mediaSampleFailed": "មិនអាចបង្កើតគំរូមេឌៀបានទេ។ សូមពិនិត្យគម្រោងបច្ចុប្បន្ន រួចព្យាយាមម្តងទៀត។",
+    "mediaSampleUnavailable": "គម្រោង ឬកម្មវិធីរុករកនេះមិនគាំទ្រការយកគំរូមេឌៀឡើយ។",
+    "toolPreviewDescription": "មើលគំរូជាមុននៃការកែសម្រួលឃ្លីប ការបម្លែងស្រទាប់លើ អត្ថបទ/ស្ទីល/ទីតាំងចំណងជើងរង សមាមាត្រ/ការតម្រូវទំហំគម្រោង សំឡេង សញ្ញាសម្គាល់ និងការបញ្ចូលមេឌៀ។ ទាមទារ stateToken បច្ចុប្បន្ន ផ្តល់នូវការពិនិត្យឡើងវិញ និង previewId ដោយមិនទាន់អនុវត្តការផ្លាស់ប្តូរផ្ទាល់។"
   },
   "vi": {
     "toolMediaSampleTitle": "Xem mẫu hình và tiếng đã dựng",

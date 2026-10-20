@@ -11,6 +11,10 @@ export const app = express();
 await fileManager.init();
 
 app.use(cors(corsConfig));
+app.use((_req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 

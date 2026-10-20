@@ -92,16 +92,16 @@ export const CAPTION_FONT_CATALOG = [
   font("comfortaa", "Comfortaa", "Comfortaa", { weight: 700, category: "rounded", sample: "Мягкие субтитры" }),
   font("cormorant-garamond", "Cormorant Garamond", "Cormorant Garamond", { weight: 700, category: "serif", sample: "Элегантные титры" }),
 
-  font("noto-sans-thai", "Noto Sans Thai", "Noto Sans Thai", { weight: 700, category: "sans", sample: "คำบรรยายภาษาไทย" }),
-  font("noto-serif-thai", "Noto Serif Thai", "Noto Serif Thai", { weight: 700, category: "serif", sample: "คำบรรยายภาพยนตร์" }),
-  font("ibm-plex-sans-thai", "IBM Plex Sans Thai", "IBM Plex Sans Thai", { weight: 700, category: "sans", sample: "คำบรรยายชัดเจน" }),
-  font("ibm-plex-sans-thai-looped", "IBM Plex Sans Thai Looped", "IBM Plex Thai Looped", { weight: 700, category: "sans", sample: "คำบรรยายร่วมสมัย" }),
-  font("bai-jamjuree", "Bai Jamjuree", "Bai Jamjuree", { weight: 700, category: "sans", sample: "คำบรรยายทันสมัย" }),
-  font("kanit", "Kanit", "Kanit", { weight: 700, category: "display", sample: "คำบรรยายโดดเด่น" }),
-  font("prompt", "Prompt", "Prompt", { weight: 700, category: "sans", sample: "คำบรรยายอ่านง่าย" }),
-  font("sarabun", "Sarabun", "Sarabun", { weight: 700, category: "sans", sample: "คำบรรยายสบายตา" }),
-  font("mitr", "Mitr", "Mitr", { weight: 700, category: "rounded", sample: "คำบรรยายเป็นมิตร" }),
-  font("chonburi", "Chonburi", "Chonburi", { category: "display", sample: "คำบรรยายศิลป์" }),
+  font("noto-sans-khmer", "Noto Sans Khmer", "Noto Sans Khmer", { weight: 700, category: "sans", sample: "ចំណងជើងរឿងច្បាស់ៗ" }),
+  font("noto-serif-khmer", "Noto Serif Khmer", "Noto Serif Khmer", { weight: 700, category: "serif", sample: "ភាពយន្ត និងរឿងនិទាន" }),
+  font("kantumruy-pro", "Kantumruy Pro", "Kantumruy Pro", { weight: 700, category: "sans", sample: "អក្សររចនាទាន់សម័យ" }),
+  font("battambang", "Battambang", "Battambang", { weight: 700, category: "sans", sample: "ចំណងជើងភាពយន្តបាត់ដំបង" }),
+  font("siemreap", "Siemreap", "Siemreap", { category: "display", sample: "ទស្សនីយភាពអង្គរ" }),
+  font("moul", "Moul", "Moul", { category: "display", sample: "ចំណងជើងធំៗ មូល" }),
+  font("bayon", "Bayon", "Bayon", { category: "display", sample: "រចនាបថបាយ័ន" }),
+  font("bokor", "Bokor", "Bokor", { category: "handwriting", sample: "អក្សរឆ្លាក់ភ្នំបូកគោ" }),
+  font("koulen", "Koulen", "Koulen", { category: "display", sample: "អក្សរក្រាស់ភ្នំគូលែន" }),
+  font("preahvihear", "Preahvihear", "Preahvihear", { category: "display", sample: "ប្រាសាទព្រះវិហារ" }),
 ];
 
 CAPTION_FONT_CATALOG.push(...CAPTION_FONT_ADDITIONS.map((item) => ({ ...font(item.id, item.family, item.label, item), ...item })));
@@ -147,10 +147,10 @@ const FONT_IDS_BY_LANGUAGE = {
     "russo-one", "comfortaa", "lobster", "caveat", "cormorant-garamond",
     "lato", "raleway", "nunito-sans", "lora", "marck-script",
   ],
-  th: [
-    "noto-sans-thai", "noto-serif-thai", "ibm-plex-sans-thai",
-    "ibm-plex-sans-thai-looped", "bai-jamjuree", "kanit",
-    "prompt", "sarabun", "mitr", "chonburi", "sriracha", "charm",
+  km: [
+    "noto-sans-khmer", "noto-serif-khmer", "kantumruy-pro",
+    "battambang", "siemreap", "moul", "bayon",
+    "bokor", "koulen", "preahvihear",
   ],
 };
 

@@ -6,6 +6,7 @@ import fsSync from "node:fs";
 import { fileManager } from "../storage/fileManager.js";
 import { logger } from "../../utils/logger.js";
 import { KisskhExtractor } from "./extractors/kisskhExtractor.js";
+import { HongguoExtractor } from "./extractors/hongguoExtractor.js";
 import { GenericWebExtractor } from "./extractors/genericWebExtractor.js";
 
 const execAsync = promisify(exec);
@@ -68,22 +69,51 @@ export class DownloaderService {
       logger.info(`Extracting media info using KisskhExtractor for ${cleanUrl}`);
       const kisskhInfo = await KisskhExtractor.resolveMedia(cleanUrl);
       const formats = [
-        { formatId: "best", label: "Best Available (Highest Quality)", ext: "mp4" },
-        { formatId: "bestvideo[height<=1080]+bestaudio/best[height<=1080]", label: "1080p Full HD", ext: "mp4" },
-        { formatId: "bestvideo[height<=720]+bestaudio/best[height<=720]", label: "720p HD", ext: "mp4" },
-        { formatId: "bestvideo[height<=480]+bestaudio/best[height<=480]", label: "480p SD", ext: "mp4" },
+        { formatId: "bestvideo+bestaudio/best", label: "Best Available (Highest Quality)", ext: "mp4" },
+        { formatId: "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best", label: "1080p Full HD", ext: "mp4" },
+        { formatId: "bestvideo[height<=720]+bestaudio/best[height<=720]/best", label: "720p HD", ext: "mp4" },
+        { formatId: "bestvideo[height<=480]+bestaudio/best[height<=480]/best", label: "480p SD", ext: "mp4" },
         { formatId: "bestaudio/best", label: "Audio Only (MP3)", ext: "mp3" },
       ];
 
       return {
         isDirectMedia: false,
         title: kisskhInfo.title,
+        dramaTitle: kisskhInfo.dramaTitle,
         thumbnail: kisskhInfo.thumbnail,
         duration: null,
         platform: kisskhInfo.platform,
         formats,
         streamUrl: kisskhInfo.streamUrl,
         referer: kisskhInfo.referer,
+        currentEpisode: kisskhInfo.currentEpisode || 1,
+        totalEpisodes: kisskhInfo.totalEpisodes || (kisskhInfo.episodes ? kisskhInfo.episodes.length : 0),
+        episodes: kisskhInfo.episodes || [],
+      };
+    }
+
+    // 1b. Hongguo Short Drama Extractor (红果短剧)
+    if (HongguoExtractor.isMatch(cleanUrl)) {
+      logger.info(`Extracting media info using HongguoExtractor for ${cleanUrl}`);
+      const hgInfo = await HongguoExtractor.resolveMedia(cleanUrl);
+      const formats = [
+        { formatId: "best", label: "Best Available (360p Original)", ext: "mp4" },
+        { formatId: "bestaudio/best", label: "Audio Only (MP3)", ext: "mp3" },
+      ];
+
+      return {
+        isDirectMedia: false,
+        title: hgInfo.title,
+        dramaTitle: hgInfo.dramaTitle,
+        thumbnail: hgInfo.thumbnail,
+        duration: null,
+        platform: hgInfo.platform,
+        formats,
+        streamUrl: hgInfo.streamUrl,
+        referer: hgInfo.referer,
+        currentEpisode: hgInfo.currentEpisode || 1,
+        totalEpisodes: hgInfo.totalEpisodes || (hgInfo.episodes ? hgInfo.episodes.length : 0),
+        episodes: hgInfo.episodes || [],
       };
     }
 
@@ -142,14 +172,27 @@ export class DownloaderService {
         { formatId: "bestaudio/best", label: "Audio Only (MP3/M4A)", ext: "mp3" },
       ];
 
+      const playlistItems = Array.isArray(info.entries)
+        ? info.entries.slice(0, 50).map((entry, idx) => ({
+            id: entry.id || idx,
+            number: idx + 1,
+            title: entry.title || `Video ${idx + 1}`,
+            thumbnail: entry.thumbnail || (Array.isArray(entry.thumbnails) ? entry.thumbnails[0]?.url : null),
+            duration: entry.duration || 0,
+            url: entry.url || entry.webpage_url || cleanUrl,
+          }))
+        : [];
+
       return {
         isDirectMedia: false,
         title: info.title || "Untitled Video",
-        thumbnail: info.thumbnail || null,
+        thumbnail: info.thumbnail || (Array.isArray(info.thumbnails) ? info.thumbnails[0]?.url : null),
         duration: info.duration || 0,
         uploader: info.uploader || info.channel || platform,
         platform,
         formats,
+        episodes: playlistItems,
+        totalEpisodes: playlistItems.length,
       };
     } catch (err) {
       // 5. Fallback: Generic Web Extractor (look for embedded m3u8 or video elements)
@@ -171,7 +214,15 @@ export class DownloaderService {
         };
       }
 
-      throw err;
+      const rawMsg = err?.message || String(err);
+      if (/unsupported url|is not a valid url|not supported/i.test(rawMsg)) {
+        throw new Error("This video platform or link is currently not supported for direct extraction.");
+      }
+      const cleaned = rawMsg
+        .replace(/^Command failed:\s*["'][^"']+["']\s*--[^\n]*\n?/is, "")
+        .replace(/^ERROR:\s*/im, "")
+        .trim();
+      throw new Error(cleaned || "Failed to extract media information from this URL.");
     }
   }
 
@@ -211,6 +262,14 @@ export class DownloaderService {
       const kisskhInfo = await KisskhExtractor.resolveMedia(cleanUrl);
       targetDownloadUrl = kisskhInfo.streamUrl;
       extraHeaders = ["--add-header", `Referer: ${kisskhInfo.referer}`];
+    } else if (HongguoExtractor.isMatch(cleanUrl)) {
+      logger.info(`Resolving Hongguo media stream for download: ${cleanUrl}`);
+      const hgInfo = await HongguoExtractor.resolveMedia(cleanUrl);
+      targetDownloadUrl = hgInfo.streamUrl;
+      extraHeaders = [
+        "--add-header", "Referer: https://hongguoduanju.com/",
+        "--add-header", "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      ];
     } else if (!/\.m3u8(\?.*)?$/i.test(cleanUrl)) {
       // Check if it's a generic web page that needs extraction
       const generic = await GenericWebExtractor.extractMedia(cleanUrl);
@@ -224,10 +283,12 @@ export class DownloaderService {
 
     // Format selection
     let chosenFormat = format;
-    if (chosenFormat === "direct") chosenFormat = "best";
-    if (targetDownloadUrl.includes(".m3u8") && (chosenFormat.includes("+") || chosenFormat.includes("bestvideo"))) {
-      // For HLS m3u8 playlists, yt-dlp prefers standard quality filter
-      chosenFormat = isAudioOnly ? "bestaudio/best" : "best";
+    if (isAudioOnly) {
+      chosenFormat = "bestaudio/best";
+    } else if (!chosenFormat || chosenFormat === "direct" || chosenFormat === "best") {
+      chosenFormat = "bestvideo+bestaudio/best";
+    } else if (chosenFormat.startsWith("bestvideo[height<=") && !chosenFormat.includes("/best")) {
+      chosenFormat = `${chosenFormat}/best`;
     }
 
     const outputTemplate = path.join(fileManager.dirs.uploads, `download_${timestamp}.%(ext)s`);
@@ -235,6 +296,8 @@ export class DownloaderService {
       "--no-playlist",
       "--no-warnings",
       "--newline",
+      "--no-check-certificates",
+      "--downloader-args", "ffmpeg:-allowed_segment_extensions all",
       ...extraHeaders,
       "-f", chosenFormat,
       "--merge-output-format", "mp4",

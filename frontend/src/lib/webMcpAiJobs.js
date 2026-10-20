@@ -6,8 +6,8 @@ import { VOICE_MODEL_HUGGING_FACE_REVISION, VOICE_MODEL_MODELSCOPE_REVISION } fr
 import { DEFAULT_GENERATED_VOICE_GAP } from "./generatedVoicePlacement.js";
 import { prepareTextForVoice, splitTextAtSentenceEnd } from "./ttsText.js";
 
-const LANGUAGES = ["zh", "en", "ja", "ko", "es", "fr", "de", "pt", "th", "vi", "ru", "it", "id"];
-const VOICE_LANGUAGES = { 中文: "zh", English: "en", 日本語: "ja", 한국어: "ko", Español: "es", Français: "fr", Deutsch: "de", Português: "pt", ไทย: "th", "Tiếng Việt": "vi", Русский: "ru", Italiano: "it", "Bahasa Indonesia": "id" };
+const LANGUAGES = ["zh", "en", "ja", "ko", "es", "fr", "de", "pt", "km", "vi", "ru", "it", "id"];
+const VOICE_LANGUAGES = { 中文: "zh", English: "en", 日本語: "ja", 한국어: "ko", Español: "es", Français: "fr", Deutsch: "de", Português: "pt", ភាសាខ្មែរ: "km", "Tiếng Việt": "vi", Русский: "ru", Italiano: "it", "Bahasa Indonesia": "id" };
 const MAX_TEXT = 2000;
 const MAX_SEGMENTS = 80;
 const MAX_TRANSCRIPTION_SECONDS = 120;

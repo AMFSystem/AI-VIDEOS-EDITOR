@@ -16,7 +16,7 @@ const TEST_SENTENCES = Object.freeze({
   日本語: "こんにちは、これはクローン音声の日本語テストです。",
   "Tiếng Việt": "Xin chào, đây là bản thử giọng nhân bản bằng tiếng Việt.",
   Русский: "Здравствуйте, это проверка клонированного голоса на русском языке.",
-  ไทย: "สวัสดี นี่คือการทดสอบเสียงโคลนภาษาไทย",
+  ភាសាខ្មែរ: "សួស្តី នេះគឺជាការសាកល្បងសំឡេងក្លូនជាភាសាខ្មែរ។",
 });
 
 // UI narration, clone tests and WebMCP all share the same model sessions and
@@ -27,11 +27,46 @@ export function getVoiceCloneTestSentence(voice) {
   return TEST_SENTENCES[voice?.language] || TEST_SENTENCES.English;
 }
 
+export async function predictGoogleTtsVoice({ text, lang = "km", speed = 1 }, onProgress) {
+  onProgress?.(25);
+  try {
+    const res = await fetch("/api/ai/tts-google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, lang, speed }),
+    });
+    if (res.ok) {
+      onProgress?.(85);
+      const blob = await res.blob();
+      onProgress?.(100);
+      return blob;
+    }
+  } catch (err) {
+    console.warn("Backend Google TTS error, trying client fallback:", err);
+  }
+
+  onProgress?.(55);
+  const clean = (text || "").slice(0, 180);
+  const directUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(lang)}&client=tw-ob&q=${encodeURIComponent(clean)}`;
+  const directRes = await fetch(directUrl);
+  if (!directRes.ok) throw new Error(`Google TTS request failed: ${directRes.status}`);
+  onProgress?.(95);
+  const blob = await directRes.blob();
+  onProgress?.(100);
+  return blob;
+}
+
 async function runBaseVoiceSynthesis({ voice, text, speed = 1, onProgress, onStatus, notify, t }) {
   const prepared = prepareTextForVoice(text, voice);
   if (prepared.warningKey) notify?.(t?.(prepared.warningKey) || prepared.warningKey);
   let blob;
-  if (voice.engine === "piper") {
+  if (voice.engine === "google" || voice.id?.startsWith("km_") || voice.language === "ភាសាខ្មែរ") {
+    onStatus?.("ttsStatusPreparingModel");
+    blob = await predictGoogleTtsVoice({ text: prepared.text, lang: "km", speed }, (progress) => {
+      onStatus?.("ttsStatusGeneratingWasm");
+      if (Number.isFinite(progress)) onProgress?.(progress);
+    });
+  } else if (voice.engine === "piper") {
     const builtInPinyinVoice = isBuiltInPinyinVoice(voice.id);
     const tts = builtInPinyinVoice ? null : await import("@diffusionstudio/vits-web");
     if (tts && await clearPiperCacheIfStorageTight(tts, voice.id)) notify?.(t?.("ttsNoticePiperCacheCleared") || "ttsNoticePiperCacheCleared");

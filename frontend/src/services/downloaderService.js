@@ -12,6 +12,19 @@ export const downloaderService = {
     });
   },
 
+  getImageProxyUrl(rawUrl) {
+    if (!rawUrl) return "";
+    let clean = String(rawUrl).trim();
+    if (clean.includes("serveproxy.com/?url=")) {
+      clean = decodeURIComponent(clean.split("serveproxy.com/?url=")[1]);
+    }
+    if (clean.startsWith("data:") || clean.startsWith("blob:")) return clean;
+    const base = typeof window !== "undefined" && window.desktopAPI?.getBackendUrl
+      ? window.desktopAPI.getBackendUrl()
+      : "";
+    return `${base}/api/downloader/proxy-image?url=${encodeURIComponent(clean)}`;
+  },
+
   async startDownload(url, format = "bestvideo+bestaudio/best", isAudioOnly = false) {
     return apiRequest("/api/downloader/download", {
       method: "POST",

@@ -1,17 +1,17 @@
 const copy = {
-  zh: ['文字对齐','左对齐','居中','右对齐','背景左右留白','背景上下留白'],
-  en: ['Text alignment','Left','Center','Right','Background horizontal padding','Background vertical padding'],
-  ja: ['文字揃え','左揃え','中央揃え','右揃え','背景の左右余白','背景の上下余白'],
-  ko: ['텍스트 정렬','왼쪽','가운데','오른쪽','배경 좌우 여백','배경 상하 여백'],
-  es: ['Alineación del texto','Izquierda','Centro','Derecha','Margen horizontal del fondo','Margen vertical del fondo'],
-  fr: ['Alignement du texte','Gauche','Centré','Droite','Marge horizontale du fond','Marge verticale du fond'],
-  de: ['Textausrichtung','Links','Zentriert','Rechts','Horizontaler Hintergrundabstand','Vertikaler Hintergrundabstand'],
-  pt: ['Alinhamento do texto','Esquerda','Centro','Direita','Margem horizontal do fundo','Margem vertical do fundo'],
-  th: ['การจัดแนวข้อความ','ซ้าย','กึ่งกลาง','ขวา','ระยะขอบพื้นหลังแนวนอน','ระยะขอบพื้นหลังแนวตั้ง'],
-  vi: ['Căn chỉnh chữ','Trái','Giữa','Phải','Lề nền ngang','Lề nền dọc'],
-  ru: ['Выравнивание текста','Слева','По центру','Справа','Горизонтальные поля фона','Вертикальные поля фона'],
-  it: ['Allineamento del testo','Sinistra','Centro','Destra','Margine orizzontale dello sfondo','Margine verticale dello sfondo'],
-  id: ['Perataan teks','Kiri','Tengah','Kanan','Padding horizontal latar','Padding vertikal latar'],
+  zh: ['文字对齐', '左对齐', '居中', '右对齐', '背景左右留白', '背景上下留白'],
+  en: ['Text alignment', 'Left', 'Center', 'Right', 'Background horizontal padding', 'Background vertical padding'],
+  ja: ['文字揃え', '左揃え', '中央揃え', '右揃え', '背景の左右余白', '背景の上下余白'],
+  ko: ['텍스트 정렬', '왼쪽', '가운데', '오른쪽', '배경 좌우 여백', '배경 상하 여백'],
+  es: ['Alineación del texto', 'Izquierda', 'Centro', 'Derecha', 'Margen horizontal del fondo', 'Margen vertical del fondo'],
+  fr: ['Alignement du texte', 'Gauche', 'Centré', 'Droite', 'Marge horizontale du fond', 'Marge verticale du fond'],
+  de: ['Textausrichtung', 'Links', 'Zentriert', 'Rechts', 'Horizontaler Hintergrundabstand', 'Vertikaler Hintergrundabstand'],
+  pt: ['Alinhamento do texto', 'Esquerda', 'Centro', 'Direita', 'Margem horizontal do fundo', 'Margem vertical do fundo'],
+  km: ['តម្រឹមកថាខណ្ឌ', 'ឆ្វេង', 'កណ្តាល', 'ស្តាំ', 'គម្លាតផ្ទៃខាងក្រោយផ្តេក', 'គម្លាតផ្ទៃខាងក្រោយបញ្ឈរ'],
+  vi: ['Căn chỉnh chữ', 'Trái', 'Giữa', 'Phải', 'Lề nền ngang', 'Lề nền dọc'],
+  ru: ['Выравнивание текста', 'Слева', 'По центру', 'Справа', 'Горизонтальные поля фона', 'Вертикальные поля фона'],
+  it: ['Allineamento del testo', 'Sinistra', 'Centro', 'Destra', 'Margine orizzontale dello sfondo', 'Margine verticale dello sfondo'],
+  id: ['Perataan teks', 'Kiri', 'Tengah', 'Kanan', 'Padding horizontal latar', 'Padding vertikal latar'],
 };
 export const getCaptionEditingCopy = language => copy[language] || copy.en;
 
@@ -24,7 +24,7 @@ const sourceEnd = {
   fr: "La vidéo a atteint la fin de la source. Ajoutez des images ou ajustez la vitesse pour prolonger le mouvement.",
   de: "Das Quellvideo ist zu Ende. Für längere Bewegung weiteres Material verwenden oder die Geschwindigkeit anpassen.",
   pt: "O vídeo chegou ao fim da fonte. Adicione material ou ajuste a velocidade para prolongar o movimento.",
-  th: "วิดีโอถึงจุดสิ้นสุดของต้นฉบับแล้ว เพิ่มฟุตเทจหรือปรับความเร็วเพื่อยืดการเคลื่อนไหว",
+  km: "វីដេអូបានដល់ចុងបញ្ចប់នៃប្រភពដើមហើយ។ បន្ថែមវីដេអូ ឬកែតម្រូវល្បឿនដើម្បីពន្យារចលនា។",
   vi: "Video đã đến cuối nguồn. Thêm tư liệu hoặc chỉnh tốc độ để kéo dài chuyển động.",
   ru: "Достигнут конец исходного видео. Добавьте материал или измените скорость, чтобы продлить движение.",
   it: "Il video ha raggiunto la fine della sorgente. Aggiungi filmati o regola la velocità per prolungare il movimento.",
@@ -33,13 +33,19 @@ const sourceEnd = {
 export const getVideoSourceEndCopy = language => sourceEnd[language] || sourceEnd.en;
 
 const spacingCopy = {
-  zh: ['字间距', '行间距'], en: ['Letter spacing', 'Line spacing'],
-  ja: ['文字間隔', '行間隔'], ko: ['자간', '줄 간격'],
-  es: ['Espaciado de letras', 'Interlineado'], fr: ['Espacement des lettres', 'Interligne'],
-  de: ['Zeichenabstand', 'Zeilenabstand'], pt: ['Espaçamento entre letras', 'Entrelinha'],
-  th: ['ระยะห่างตัวอักษร', 'ระยะห่างบรรทัด'], vi: ['Giãn chữ', 'Giãn dòng'],
+  zh: ['字间距', '行间距'],
+  en: ['Letter spacing', 'Line spacing'],
+  ja: ['文字間隔', '行間隔'],
+  ko: ['자간', '줄 간격'],
+  es: ['Espaciado de letras', 'Interlineado'],
+  fr: ['Espacement des lettres', 'Interligne'],
+  de: ['Zeichenabstand', 'Zeilenabstand'],
+  pt: ['Espaçamento entre letras', 'Entrelinha'],
+  km: ['គម្លាតតួអក្សរ', 'គម្លាតបន្ទាត់'],
+  vi: ['Giãn chữ', 'Giãn dòng'],
   ru: ['Межбуквенный интервал', 'Межстрочный интервал'],
-  it: ['Spaziatura caratteri', 'Interlinea'], id: ['Jarak huruf', 'Jarak baris'],
+  it: ['Spaziatura caratteri', 'Interlinea'],
+  id: ['Jarak huruf', 'Jarak baris'],
 };
 export const getCaptionSpacingCopy = language => spacingCopy[language] || spacingCopy.en;
 
@@ -52,7 +58,7 @@ const keywordCopy = {
   fr: ['Mots-clés en couleur', 'Couleur de mise en valeur', 'Séparez les mots ou expressions par des virgules ou des retours à la ligne. Videz pour désactiver. La casse est ignorée.'],
   de: ['Schlüsselwörter hervorheben', 'Hervorhebungsfarbe', 'Wörter oder Ausdrücke mit Kommas oder Zeilenumbrüchen trennen. Leeren zum Deaktivieren. Groß-/Kleinschreibung wird ignoriert.'],
   pt: ['Destacar palavras-chave', 'Cor de destaque', 'Separe palavras ou frases por vírgulas ou quebras de linha. Apague para desativar. Não diferencia maiúsculas.'],
-  th: ['เน้นคำสำคัญ', 'สีเน้น', 'คั่นคำหรือวลีด้วยจุลภาคหรือขึ้นบรรทัดใหม่ ล้างเพื่อปิด ไม่แยกตัวพิมพ์เล็กและใหญ่'],
+  km: ['រំលេចពាក្យគន្លឹះ', 'ពណ៌រំលេច', 'ខណ្ឌពាក្យ ឬឃ្លាដោយសញ្ញាក្បៀស (,) ឬចុះបន្ទាត់ថ្មី។ លុបចេញដើម្បីបិទ។ មិនប្រកាន់អក្សរតូចធំឡើយ។'],
   vi: ['Tô nổi bật từ khóa', 'Màu nổi bật', 'Ngăn cách từ hoặc cụm từ bằng dấu phẩy hay xuống dòng. Xóa để tắt. Không phân biệt hoa thường.'],
   ru: ['Выделение ключевых слов', 'Цвет выделения', 'Разделяйте слова или фразы запятыми или переносами строк. Очистите для отключения. Регистр не учитывается.'],
   it: ['Evidenzia parole chiave', 'Colore evidenziazione', 'Separa parole o frasi con virgole o nuove righe. Svuota per disattivare. Maiuscole e minuscole sono equivalenti.'],
@@ -61,23 +67,35 @@ const keywordCopy = {
 export const getCaptionKeywordCopy = language => keywordCopy[language] || keywordCopy.en;
 
 const visualLinkCopy = {
- zh:["关联对应画面","解除画面关联"],en:["Link to matching visual","Unlink visual"],ja:["対応する映像にリンク","映像のリンクを解除"],ko:["해당 화면에 연결","화면 연결 해제"],es:["Vincular al clip correspondiente","Desvincular imagen"],fr:["Lier au plan correspondant","Dissocier le plan"],de:["Mit passendem Bildclip verknüpfen","Bildverknüpfung lösen"],pt:["Vincular ao clipe correspondente","Desvincular imagem"],th:["เชื่อมกับภาพที่ตรงกัน","ยกเลิกการเชื่อมภาพ"],vi:["Liên kết với cảnh tương ứng","Bỏ liên kết cảnh"],ru:["Связать с соответствующим кадром","Отвязать изображение"],it:["Collega alla clip corrispondente","Scollega immagine"],id:["Tautkan ke klip yang sesuai","Lepas tautan gambar"]
+  zh: ["关联对应画面", "解除画面关联"],
+  en: ["Link to matching visual", "Unlink visual"],
+  ja: ["対応する映像にリンク", "映像のリンクを解除"],
+  ko: ["해당 화면에 연결", "화면 연결 해제"],
+  es: ["Vincular al clip correspondiente", "Desvincular imagen"],
+  fr: ["Lier au plan correspondant", "Dissocier le plan"],
+  de: ["Mit passendem Bildclip verknüpfen", "Bildverknüpfung lösen"],
+  pt: ["Vincular ao clipe correspondente", "Desvincular imagem"],
+  km: ["ភ្ជាប់ជាមួយរូបភាពដែលត្រូវគ្នា", "ផ្តាច់ការភ្ជាប់រូបភាព"],
+  vi: ["Liên kết với cảnh tương ứng", "Bỏ liên kết cảnh"],
+  ru: ["Связать с соответствующим кадром", "Отвязать изображение"],
+  it: ["Collega alla clip corrispondente", "Scollega immagine"],
+  id: ["Tautkan ke klip yang sesuai", "Lepas tautan gambar"]
 };
 export const getCaptionVisualLinkCopy = language => visualLinkCopy[language] || visualLinkCopy.en;
 
 const selectionHighlightCopy = {
- zh:["高亮选中文字","清除本段高亮","选中文案中的文字，再点击高亮；仅应用于本字幕段。"],
- en:["Highlight selection","Clear this caption’s highlights","Select text, then highlight. Applies only to this caption."],
- ja:["選択文字を強調","この字幕の強調を消去","文字を選択して強調します。この字幕だけに適用されます。"],
- ko:["선택한 글자 강조","이 자막의 강조 지우기","글자를 선택한 뒤 강조하세요. 이 자막에만 적용됩니다."],
- es:["Resaltar selección","Borrar resaltado del subtítulo","Selecciona texto y resáltalo. Solo afecta a este subtítulo."],
- fr:["Surligner la sélection","Effacer le surlignage du sous-titre","Sélectionnez le texte puis surlignez-le. Uniquement pour ce sous-titre."],
- de:["Auswahl hervorheben","Hervorhebung dieses Untertitels löschen","Text auswählen und hervorheben. Gilt nur für diesen Untertitel."],
- pt:["Destacar seleção","Limpar destaque desta legenda","Selecione o texto e destaque. Aplica-se apenas a esta legenda."],
- th:["เน้นข้อความที่เลือก","ล้างการเน้นคำบรรยายนี้","เลือกข้อความแล้วกดเน้น ใช้กับคำบรรยายนี้เท่านั้น"],
- vi:["Tô nổi bật phần chọn","Xóa tô nổi bật phụ đề này","Chọn văn bản rồi tô nổi bật. Chỉ áp dụng cho phụ đề này."],
- ru:["Выделить выбранный текст","Убрать выделение в этом субтитре","Выберите текст и выделите его. Только для этого субтитра."],
- it:["Evidenzia selezione","Cancella evidenziazione del sottotitolo","Seleziona il testo e poi evidenzialo. Solo per questo sottotitolo."],
- id:["Sorot teks terpilih","Hapus sorotan subtitel ini","Pilih teks lalu sorot. Hanya berlaku untuk subtitel ini."],
+  zh: ["高亮选中文字", "清除本段高亮", "选中文案中的文字，再点击高亮；仅应用于本字幕段。"],
+  en: ["Highlight selection", "Clear this caption’s highlights", "Select text, then highlight. Applies only to this caption."],
+  ja: ["選択文字を強調", "この字幕の強調を消去", "文字を選択して強調します。この字幕だけに適用されます。"],
+  ko: ["선택한 글자 강조", "이 자막의 강조 지우기", "글자를 선택한 뒤 강조하세요. 이 자막에만 적용됩니다."],
+  es: ["Resaltar selección", "Borrar resaltado del subtítulo", "Selecciona texto y resáltalo. Solo afecta a este subtítulo."],
+  fr: ["Surligner la sélection", "Effacer le surlignage du sous-titre", "Sélectionnez le texte puis surlignez-le. Uniquement pour ce sous-titre."],
+  de: ["Auswahl hervorheben", "Hervorhebung dieses Untertitels löschen", "Text auswählen und hervorheben. Gilt nur für diesen Untertitel."],
+  pt: ["Destacar seleção", "Limpar destaque desta legenda", "Selecione o texto e destaque. Aplica-se apenas a esta legenda."],
+  km: ["រំលេចអត្ថបទដែលបានជ្រើស", "សម្អាតការរំលេចចំណងជើងរងនេះ", "ជ្រើសរើសអត្ថបទ រួចចុចរំលេច។ អនុវត្តសម្រាប់តែចំណងជើងរងនេះប៉ុណ្ណោះ។"],
+  vi: ["Tô nổi bật phần chọn", "Xóa tô nổi bật phụ đề này", "Chọn văn bản rồi tô nổi bật. Chỉ áp dụng cho phụ đề này."],
+  ru: ["Выделить выбранный текст", "Убрать выделение в этом субтитре", "Выберите текст и выделите его. Только для этого субтитра."],
+  it: ["Evidenzia selezione", "Cancella evidenziazione del sottotitolo", "Seleziona il testo e poi evidenzialo. Solo per questo sottotitolo."],
+  id: ["Sorot teks terpilih", "Hapus sorotan subtitel ini", "Pilih teks lalu sorot. Hanya berlaku untuk subtitel ini."]
 };
 export const getCaptionSelectionHighlightCopy = language => selectionHighlightCopy[language] || selectionHighlightCopy.en;

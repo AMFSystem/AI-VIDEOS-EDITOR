@@ -3,6 +3,7 @@ import { audioStemService } from "../../services/ai/audioStemService.js";
 import { visionAIService } from "../../services/ai/visionAIService.js";
 import { silenceCutService } from "../../services/ai/silenceCutService.js";
 import { externalAIBridge } from "../../services/ai/externalAIBridge.js";
+import { googleTtsService } from "../../services/ai/googleTtsService.js";
 
 export const aiController = {
   async transcribe(req, res) {
@@ -48,5 +49,25 @@ export const aiController = {
   async comfyUiStatus(_req, res) {
     const status = await externalAIBridge.checkComfyUiStatus();
     res.json(status);
+  },
+
+  async googleTts(req, res) {
+    const text = req.method === "POST" ? req.body.text : req.query.text;
+    const lang = (req.method === "POST" ? req.body.lang : req.query.lang) || "km";
+    const speed = parseFloat((req.method === "POST" ? req.body.speed : req.query.speed) || 1.0);
+
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ error: "Text is required" });
+    }
+
+    try {
+      const audioBuffer = await googleTtsService.synthesize(text, { lang, speed });
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.send(audioBuffer);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   },
 };

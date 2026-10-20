@@ -37,6 +37,7 @@ export function UrlDownloaderModal({ isOpen = false, onClose, onMediaDownloaded,
   const [downloadProgress, setDownloadProgress] = useState(null);
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState(null);
+  const [thumbFailed, setThumbFailed] = useState(false);
 
   const hasCompletedRef = useRef(false);
 
@@ -45,6 +46,7 @@ export function UrlDownloaderModal({ isOpen = false, onClose, onMediaDownloaded,
       setUrl("");
       setMediaInfo(null);
       setError(null);
+      setThumbFailed(false);
       setDownloadProgress(null);
       setIsDownloading(false);
       setStatusMessage("");
@@ -85,6 +87,7 @@ export function UrlDownloaderModal({ isOpen = false, onClose, onMediaDownloaded,
     try {
       const info = await downloaderService.fetchMediaInfo(clean);
       setMediaInfo(info);
+      setThumbFailed(false);
       if (info.formats && info.formats.length > 0) {
         setSelectedFormat(info.formats[0].formatId);
       }
@@ -251,11 +254,14 @@ export function UrlDownloaderModal({ isOpen = false, onClose, onMediaDownloaded,
         {mediaInfo && (
           <div className="url-downloader-preview-card">
             <div className="url-downloader-thumb-row">
-              {mediaInfo.thumbnail ? (
+              {mediaInfo.thumbnail && !thumbFailed ? (
                 <img
                   src={mediaInfo.thumbnail}
                   alt={mediaInfo.title}
                   className="url-downloader-thumb"
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  onError={() => setThumbFailed(true)}
                 />
               ) : (
                 <div className="url-downloader-thumb-placeholder">

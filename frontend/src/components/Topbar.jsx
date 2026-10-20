@@ -10,6 +10,7 @@ import {
   FileArrowUp,
   FilePlus,
   GearSix,
+  MicrophoneStage,
   Pause,
   Play,
   ShieldCheck,
@@ -61,6 +62,7 @@ export function Topbar({
   handleImportProject,
   projectFileInputRef,
   onOpenUrlDownloader,
+  onOpenVoiceStudio,
 }) {
   const exportAnchorRef = useRef(null);
   const ratioAnchorRef = useRef(null);
@@ -156,8 +158,8 @@ export function Topbar({
                     >
                       <span className="file-menu-icon"><DownloadSimple size={17} /></span>
                       <span className="file-menu-copy">
-                        <strong>{t("downloadFromUrl", "Download from Web URL")}</strong>
-                        <small>YouTube, TikTok, FB, IG, X, Vimeo...</small>
+                        <strong>{t("downloadFromUrl", "ទាញយកពីគេហទំព័រ")}</strong>
+                        <small>YouTube, TikTok, Facebook, KissKH...</small>
                       </span>
                       <span className="file-menu-format">URL</span>
                     </button>

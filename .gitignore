@@ -7,6 +7,8 @@ blob-report/
 
 # AI model weights are hosted externally and downloaded at runtime.
 public/models/
+backend/storage/
+storage/
 
 # local QA captures and generated media
 AGENTS.md

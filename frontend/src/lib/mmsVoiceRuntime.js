@@ -27,6 +27,12 @@ function encodeWav(samples, sampleRate) {
 }
 
 export async function predictMmsVoice(input, onProgress) {
+  if (input.voiceId === "km_KH-mms-medium" || input.voiceId?.startsWith("km_")) {
+    const { predictGoogleTtsVoice } = await import("./baseVoiceSynthesis.js");
+    return predictGoogleTtsVoice({ text: input.text, lang: "km", speed: input.speed || 1 }, (e) => {
+      if (Number.isFinite(e)) onProgress?.({ backend: "wasm", progress: e });
+    });
+  }
   const modelId = MMS_MODEL_BY_VOICE[input.voiceId];
   if (!modelId) throw new Error(`Unsupported MMS voice: ${input.voiceId}`);
   if (!runtimePromises.has(modelId)) {

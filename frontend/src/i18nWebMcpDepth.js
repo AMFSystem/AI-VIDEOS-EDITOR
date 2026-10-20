@@ -9,7 +9,7 @@ const rows = {
   fr: ["Analyser l’éclairage", "Convertir la vidéo de profondeur", "Analyse des images de profondeur", "Encodage de la vidéo de profondeur", "Analysez ce clip avec la qualité choisie avant d’activer l’éclairage."],
   de: ["Beleuchtung analysieren", "Tiefenvideo konvertieren", "Tiefenbilder werden analysiert", "Tiefenvideo wird kodiert", "Analysiere diesen Clip mit der gewählten Qualität, bevor du die Beleuchtung aktivierst."],
   pt: ["Analisar iluminação", "Converter vídeo de profundidade", "Analisando quadros de profundidade", "Codificando vídeo de profundidade", "Analise este clipe na qualidade selecionada antes de ativar a iluminação."],
-  th: ["วิเคราะห์การจัดแสง", "แปลงวิดีโอความลึก", "กำลังวิเคราะห์เฟรมความลึก", "กำลังเข้ารหัสวิดีโอความลึก", "วิเคราะห์คลิปนี้ด้วยคุณภาพที่เลือกก่อนเปิดใช้การจัดแสง"],
+  km: ["វិភាគពន្លឺ", "បម្លែងវីដេអូជម្រៅ (Depth)", "កំពុងវិភាគហ្វ្រេមជម្រៅ", "កំពុងអ៊ិនកូដវីដេអូជម្រៅ", "វិភាគឃ្លីបនេះតាមគុណភាពដែលបានជ្រើស មុនពេលបើកប្រើពន្លឺ។"],
   vi: ["Phân tích ánh sáng", "Chuyển đổi video độ sâu", "Đang phân tích khung hình độ sâu", "Đang mã hóa video độ sâu", "Hãy phân tích đoạn này ở chất lượng đã chọn trước khi bật ánh sáng."],
   ru: ["Анализ освещения", "Преобразовать видео глубины", "Анализ кадров глубины", "Кодирование видео глубины", "Перед включением освещения проанализируйте клип с выбранным качеством."],
   it: ["Analizza illuminazione", "Converti video di profondità", "Analisi dei fotogrammi di profondità", "Codifica del video di profondità", "Analizza questa clip con la qualità selezionata prima di attivare l’illuminazione."],
@@ -92,11 +92,11 @@ const descriptions = {
     "Bắt đầu aiId đã xem xét với requestId duy nhất và allowModelDownload rõ ràng. Video độ sâu vào Tài sản của tôi; thông số ánh sáng cần được xem xét riêng.",
     "Chọn nguồn đã sẵn sàng và đúng loại cho tác vụ này."
   ],
-  "th": [
-    "อ่านความสามารถด้านเสียง การถอดเสียง การวิเคราะห์แสง และวิดีโอความลึกโดยไม่เรียกใช้โมเดล",
-    "เตรียมงานเสียง ถอดเสียง แสง หรือความลึกเพื่อตรวจสอบด้วย stateToken ปัจจุบัน โดยไม่เรียกใช้หรือดาวน์โหลดโมเดล",
-    "เริ่ม aiId ที่ตรวจสอบแล้วด้วย requestId ที่ไม่ซ้ำและ allowModelDownload ที่อนุญาตชัดเจน วิดีโอความลึกจะอยู่ในสินทรัพย์ของฉัน ส่วนค่าแสงต้องตรวจสอบแยก",
-    "เลือกแหล่งข้อมูลที่พร้อมและตรงกับประเภทของงานนี้"
+  "km": [
+    "មើលសមត្ថភាពសំឡេង ការបម្លែងសំឡេងជាអក្សរ ការវិភាគពន្លឺ និងវីដេអូជម្រៅ ដោយមិនដំណើរការម៉ូដែល។",
+    "រៀបចំកិច្ចការសំឡេង ការបម្លែងជាអក្សរ ពន្លឺ ឬជម្រៅ ដើម្បីពិនិត្យមើលដោយប្រើ stateToken បច្ចុប្បន្ន ដោយមិនដំណើរការ ឬទាញយកម៉ូដែលឡើយ។",
+    "ចាប់ផ្តើម aiId ដែលបានពិនិត្យដោយមាន requestId មិនជាន់គ្នា និង allowModelDownload ច្បាស់លាស់។ វីដេអូជម្រៅត្រូវបានរក្សាទុកក្នុងធនធានរបស់ខ្ញុំ ចំណែកប៉ារ៉ាម៉ែត្រពន្លឺត្រូវការពិនិត្យដាច់ដោយឡែក។",
+    "ជ្រើសរើសប្រភពដែលរួចរាល់ និងត្រូវតាមប្រភេទសម្រាប់កិច្ចការនេះ។"
   ]
 };
 for (const [locale, values] of Object.entries(descriptions)) Object.assign(WEBMCP_DEPTH_COPY[locale], Object.fromEntries(["toolAiCapabilitiesDescription", "toolAiPrepareDescription", "toolAiStartDescription", "aiInvalidSource"].map((key, index) => [key, values[index]])));
@@ -108,7 +108,7 @@ const qualityLabels = {
   ja: ["解析品質", "高速", "標準", "精細"], ko: ["분석 품질", "빠르게", "표준", "정밀"],
   es: ["Calidad del análisis", "Rápida", "Estándar", "Fina"], fr: ["Qualité d’analyse", "Rapide", "Standard", "Fine"],
   de: ["Analysequalität", "Schnell", "Standard", "Fein"], pt: ["Qualidade da análise", "Rápida", "Padrão", "Fina"],
-  th: ["คุณภาพการวิเคราะห์", "เร็ว", "มาตรฐาน", "ละเอียด"], vi: ["Chất lượng phân tích", "Nhanh", "Tiêu chuẩn", "Chi tiết"],
+  km: ["គុណភាពវិភាគ", "លឿន", "ស្តង់ដារ", "លម្អិត"], vi: ["Chất lượng phân tích", "Nhanh", "Tiêu chuẩn", "Chi tiết"],
   ru: ["Качество анализа", "Быстрое", "Стандартное", "Точное"], it: ["Qualità dell’analisi", "Rapida", "Standard", "Fine"],
   id: ["Kualitas analisis", "Cepat", "Standar", "Rinci"],
 };

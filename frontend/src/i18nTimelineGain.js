@@ -55,12 +55,12 @@ export const TIMELINE_GAIN_COPY = {
     "videoWaveformUnavailable": "Forma de onda indisponível",
     "returnToPlayhead": "Voltar ao cursor"
   },
-  "th": {
-    "timelineGain": "ระดับเสียง (เดซิเบล)",
-    "timelineGainHint": "ลากขึ้นลงเพื่อปรับเสียง ดับเบิลคลิกเพื่อรีเซ็ตเป็น 0 dB",
-    "videoWaveformLoading": "กำลังสร้างรูปคลื่น…",
-    "videoWaveformUnavailable": "ไม่มีรูปคลื่นต้นฉบับ",
-    "returnToPlayhead": "กลับไปยังหัวเล่น"
+  "km": {
+    "timelineGain": "កម្រិតសំឡេង (ដេស៊ីបែល)",
+    "timelineGainHint": "អូសឡើងចុះដើម្បីកែតម្រូវកម្រិតសំឡេង ចុចពីរដងដើម្បីកំណត់ឡើងវិញជា 0 dB",
+    "videoWaveformLoading": "កំពុងរៀបចំទម្រង់រលកសំឡេង…",
+    "videoWaveformUnavailable": "គ្មានទម្រង់រលកសំឡេងដើមទេ",
+    "returnToPlayhead": "ត្រឡប់ទៅក្បាលចាក់ (Playhead)"
   },
   "vi": {
     "timelineGain": "Âm lượng (decibel)",

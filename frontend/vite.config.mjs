@@ -35,12 +35,32 @@ export default defineConfig({
   },
   server: {
     headers: isolationHeaders,
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:3001",
+        changeOrigin: true,
+      },
+      "/storage": {
+        target: "http://127.0.0.1:3001",
+        changeOrigin: true,
+      },
+    },
     warmup: {
       clientFiles: ["./src/main.jsx"],
     },
   },
   preview: {
     headers: isolationHeaders,
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:3001",
+        changeOrigin: true,
+      },
+      "/storage": {
+        target: "http://127.0.0.1:3001",
+        changeOrigin: true,
+      },
+    },
   },
   plugins: [agentDiscoveryPlugin(), react()],
 });
