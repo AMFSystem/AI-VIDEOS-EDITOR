@@ -1431,6 +1431,7 @@ function CaptionFontSheet({
 export function VoicePanel({
   captionHighlightDisabled = false,
   t,
+  onOpenVoiceStudio,
   activeTool,
   captionVoiceFocusRequest = 0,
   status,
@@ -1711,7 +1712,36 @@ export function VoicePanel({
       </div>
 
       {!isSmartContext && !isPluginsContext && !isEffectsContext && !isCaptionContext && !isAvatarContext && !isAudioClipContext && !isVisualContext && !isStickerContext && !isOverlayContext ? (
-        <div className="tabs compact">
+        <>
+          {onOpenVoiceStudio && (
+            <div style={{ marginBottom: 10 }}>
+              <button
+                type="button"
+                className="ghost-action"
+                onClick={onOpenVoiceStudio}
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(168, 85, 247, 0.45)",
+                  background: "linear-gradient(135deg, rgba(168, 85, 247, 0.16) 0%, rgba(56, 189, 248, 0.16) 100%)",
+                  color: "#e2e8f0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  fontSize: "12.5px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                <span>🎙️</span>
+                <span>{t("openFullVoiceStudio", "បើកស្ទូឌីយោ Clone សំឡេង (Open AI Voice Studio)")}</span>
+              </button>
+            </div>
+          )}
+          <div className="tabs compact">
           {[
             ["synthesis", t("voiceSynthesis")],
             ["mine", t("myVoices")],
@@ -1727,7 +1757,8 @@ export function VoicePanel({
               {label}
             </button>
           ))}
-        </div>
+          </div>
+        </>
       ) : null}
 
       {isCaptionContext && !mobileInspectorSection ? (

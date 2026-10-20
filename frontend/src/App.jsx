@@ -18,6 +18,7 @@ import { SmartDenoiseDialog } from "./components/SmartDenoiseDialog.jsx";
 import { WebMcpReview, WebMcpAiStatus } from "./components/WebMcpReview.jsx";
 import ProjectImportOverlay from "./components/ProjectImportOverlay.jsx";
 import { UrlDownloaderPage } from "./components/pages/UrlDownloaderPage.jsx";
+import { VoiceCloneStudioPage } from "./components/pages/VoiceCloneStudioPage.jsx";
 import { downloaderService } from "./services/downloaderService.js";
 import {
   canShowFirstVisualGuide,
@@ -1257,6 +1258,41 @@ export function App() {
     }
   }, [handleFiles, notify, t]);
 
+  const handleInsertClonedVoiceToTimeline = useCallback(async ({ blob, name, script, duration, peaks, options = {} }) => {
+    try {
+      if (!blob) {
+        notify(t("noAudioToInsert", "មិនមានទិន្នន័យសំឡេងសម្រាប់បញ្ចូលទេ"));
+        return;
+      }
+      notify(t("insertingVoiceToTimeline", "កំពុងបញ្ចូលសំឡេង Clone ទៅកាន់ Timeline..."));
+
+      const safeName = (name || "Voice_Clone").trim();
+      const fileName = `${safeName.replace(/\s+/g, "_")}_${Date.now()}.wav`;
+      const file = new File([blob], fileName, { type: "audio/wav" });
+
+      // 1. Add to project media bin / assets
+      handleFiles([file]);
+
+      // 2. Commit directly onto audio track
+      await commitAudio(blob, `${safeName} · ${t("ttsGenerated", "បង្កើតរួចរាល់")}`, {
+        name: safeName,
+        script: script || "",
+        sourceKind: "cloned-voiceover",
+        cloneVoiceProfileName: safeName,
+        start: Number.isFinite(options.start) ? options.start : undefined,
+      });
+
+      notify(t("voiceInsertedSuccess", `បានបញ្ចូល "${safeName}" ទៅកាន់ Timeline ជោគជ័យ!`));
+
+      if (options.closePage !== false) {
+        setActivePageView("editor");
+      }
+    } catch (err) {
+      console.error("Failed to insert cloned voice to timeline:", err);
+      notify(`Insert failed: ${err.message}`);
+    }
+  }, [commitAudio, handleFiles, notify, t]);
+
   const { deleteUserAsset, selectAsset } = createAssetLibraryActions({
     clearImageTrack, clearMusicTrack, clearSourceAudioTrack, commitVisualSegments,
     extractVideoSourceAudio, getVisualDurationForAsset, imageSrc, imageUrlRefs,
@@ -1641,6 +1677,7 @@ export function App() {
         handleImportProject={handleImportProject}
         projectFileInputRef={projectFileInputRef}
         onOpenUrlDownloader={() => setActivePageView("url-downloader")}
+        onOpenVoiceStudio={() => setActivePageView("voice-clone-studio")}
       />
 
       <WebMcpReview agent={webMcp} language={activeLanguage} />
@@ -1660,6 +1697,7 @@ export function App() {
           libraryType, libraryQuery, setLibraryQuery, selectLibraryType, libraryStatus, libraryError, libraryProvider,
           assetDownloadStates, prefetchLibraryAsset,
           onOpenUrlDownloader: () => setActivePageView("url-downloader"),
+          onOpenVoiceStudio: () => setActivePageView("voice-clone-studio"),
           notify, openAvatarPanel, previewVisionAnalysis, previewVisionKey, smartMode, setSmartMode,
           previewVisionOptions, previewVisualSrc, previewVisualType, progress, script,
           seekTo, segments, selectTool, selectedCaptionSegment, selectedFilterId,
@@ -1790,6 +1828,7 @@ export function App() {
         <VoicePanel
           captionHighlightDisabled={trackLocks.caption}
           t={t}
+          onOpenVoiceStudio={() => setActivePageView("voice-clone-studio")}
           activeTool={activeTool}
           captionVoiceFocusRequest={captionVoiceFocusRequest}
           status={status}
@@ -2157,6 +2196,23 @@ export function App() {
           }}
           language={activeLanguage}
           notify={notify}
+        />
+      )}
+      {activePageView === "voice-clone-studio" && (
+        <VoiceCloneStudioPage
+          onBack={() => setActivePageView("editor")}
+          onInsertToTimeline={async ({ blob, name, script, duration, peaks, options = {} }) => {
+            await handleInsertClonedVoiceToTimeline({ blob, name, script, duration, peaks, options });
+          }}
+          voiceProfiles={voiceProfiles}
+          addVoiceProfile={addVoiceProfile}
+          removeVoiceProfile={removeVoiceProfile}
+          selectedVoiceProfileId={selectedVoiceProfileId}
+          setSelectedVoiceProfileId={setSelectedVoiceProfileId}
+          selectedVoice={selectedVoice}
+          language={activeLanguage}
+          notify={notify}
+          t={t}
         />
       )}
       <ExportProgressOverlay

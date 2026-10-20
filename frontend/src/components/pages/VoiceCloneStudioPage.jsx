@@ -23,6 +23,7 @@ import {
   X,
   FloppyDisk,
   Lightning,
+  Key,
 } from "@phosphor-icons/react";
 import {
   listVoiceProfiles,
@@ -36,6 +37,20 @@ import {
   applyVoiceOutputGain,
   OPENVOICE_EMBEDDING_VERSION,
 } from "../../lib/openVoiceRuntime.js";
+import {
+  getStoredElevenLabsKey,
+  setStoredElevenLabsKey,
+  verifyElevenLabsKey,
+  cloneVoiceWithElevenLabs,
+  synthesizeWithElevenLabs,
+} from "../../lib/elevenlabsRuntime.js";
+import {
+  getStoredGeminiKey,
+  setStoredGeminiKey,
+  verifyGeminiKey,
+  synthesizeWithGemini,
+  generateScriptWithGemini,
+} from "../../lib/geminiRuntime.js";
 import { synthesizeBaseVoice } from "../../lib/baseVoiceSynthesis.js";
 import { VOICES } from "../../config/editor.js";
 import { decodeWaveform, getAudioRecordingFormat } from "../../lib/media.js";
@@ -58,6 +73,12 @@ async function base64ToBlob(base64Data, contentType = "audio/wav") {
   return res.blob();
 }
 
+// Helper to format current time string for default profile names
+function formatSavedTime() {
+  const d = new Date();
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+}
+
 export function VoiceCloneStudioPage({
   onBack,
   onInsertToTimeline,
@@ -72,7 +93,184 @@ export function VoiceCloneStudioPage({
   t = (key, fallback) => fallback || key,
 }) {
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState("tts"); // 'tts' | 'clone' | 'guide'
+  const [activeTab, setActiveTab] = useState("tts"); // 'tts' | 'clone'
+
+  // ElevenLabs API Integration state
+  const [apiKey, setApiKey] = useState(getStoredElevenLabsKey());
+  const [isKeyValid, setIsKeyValid] = useState(false);
+  const [keyInfo, setKeyInfo] = useState(null);
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [keyInput, setKeyInput] = useState(getStoredElevenLabsKey());
+  const [isVerifyingKey, setIsVerifyingKey] = useState(false);
+  const [keyError, setKeyError] = useState("");
+  const [extractedVoiceId, setExtractedVoiceId] = useState("");
+
+  // Validate stored ElevenLabs key on mount
+  useEffect(() => {
+    const stored = getStoredElevenLabsKey();
+    if (stored) {
+      setApiKey(stored);
+      setKeyInput(stored);
+      verifyElevenLabsKey(stored)
+        .then((res) => {
+          if (res.valid) {
+            setIsKeyValid(true);
+            setKeyInfo(res.info);
+          } else {
+            setIsKeyValid(false);
+            setKeyError(res.error || "Key មិនត្រឹមត្រូវ");
+          }
+        })
+        .catch((err) => {
+          setIsKeyValid(false);
+          setKeyError(err.message || "មិនអាចតភ្ជាប់បាន");
+        });
+    }
+  }, []);
+
+  const handleVerifyAndSaveKey = async () => {
+    const trimmed = keyInput.trim();
+    if (!trimmed) {
+      setKeyError("សូមបញ្ចូល API Key របស់ ElevenLabs");
+      return;
+    }
+    setIsVerifyingKey(true);
+    setKeyError("");
+    try {
+      const res = await verifyElevenLabsKey(trimmed);
+      if (res.valid) {
+        setStoredElevenLabsKey(trimmed);
+        setApiKey(trimmed);
+        setIsKeyValid(true);
+        setKeyInfo(res.info);
+        setShowKeyModal(false);
+        notify("បានភ្ជាប់ ElevenLabs API Key ដោយជោគជ័យ! សំឡេងក្លូននឹងមានគុណភាពដូចមនុស្ស ១០០%");
+      } else {
+        setKeyError(res.error || "Key មិនត្រឹមត្រូវ សូមពិនិត្យម្តងទៀត");
+      }
+    } catch (err) {
+      setKeyError(err.message || "មិនអាចផ្ទៀងផ្ទាត់ Key បានទេ");
+    } finally {
+      setIsVerifyingKey(false);
+    }
+  };
+
+  const handleRemoveKey = () => {
+    setStoredElevenLabsKey("");
+    setApiKey("");
+    setIsKeyValid(false);
+    setKeyInfo(null);
+    setKeyInput("");
+    notify("បានដក ElevenLabs API Key រួចរាល់។ ប្រព័ន្ធនឹងប្តូរមកប្រើ Local Mode ធម្មតា។");
+  };
+
+  // -------------------------------------------------------------------------
+  // Google Gemini API Integration state
+  // -------------------------------------------------------------------------
+  const [geminiKey, setGeminiKey] = useState(getStoredGeminiKey());
+  const [isGeminiValid, setIsGeminiValid] = useState(false);
+  const [geminiInfo, setGeminiInfo] = useState(null);
+  const [geminiKeyInput, setGeminiKeyInput] = useState(getStoredGeminiKey());
+  const [isVerifyingGemini, setIsVerifyingGemini] = useState(false);
+  const [geminiError, setGeminiError] = useState("");
+  const [activeKeyTab, setActiveKeyTab] = useState("elevenlabs"); // 'elevenlabs' | 'gemini'
+
+  // Script Generator modal state (Gemini powered)
+  const [showScriptModal, setShowScriptModal] = useState(false);
+  const [scriptTopic, setScriptTopic] = useState("");
+  const [scriptTone, setScriptTone] = useState("ធម្មជាតិ");
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+
+  // Validate stored Gemini key on mount
+  useEffect(() => {
+    const stored = getStoredGeminiKey();
+    if (stored) {
+      setGeminiKey(stored);
+      setGeminiKeyInput(stored);
+      verifyGeminiKey(stored)
+        .then((res) => {
+          if (res.valid) {
+            setIsGeminiValid(true);
+            setGeminiInfo(res);
+          } else {
+            setIsGeminiValid(false);
+            setGeminiError(res.error || "Key មិនត្រឹមត្រូវ");
+          }
+        })
+        .catch((err) => {
+          setIsGeminiValid(false);
+          setGeminiError(err.message || "មិនអាចតភ្ជាប់បាន");
+        });
+    }
+  }, []);
+
+  const handleVerifyAndSaveGeminiKey = async () => {
+    const trimmed = geminiKeyInput.trim();
+    if (!trimmed) {
+      setGeminiError("សូមបញ្ចូល Google Gemini API Key");
+      return;
+    }
+    setIsVerifyingGemini(true);
+    setGeminiError("");
+    try {
+      const res = await verifyGeminiKey(trimmed);
+      if (res.valid) {
+        setStoredGeminiKey(trimmed);
+        setGeminiKey(trimmed);
+        setIsGeminiValid(true);
+        setGeminiInfo(res);
+        setShowKeyModal(false);
+        notify("បានភ្ជាប់ Google Gemini API Key ដោយជោគជ័យ! អ្នកអាចប្រើប្រាស់សំឡេង Gemini 2.0 Flash និងមុខងារសរសេរអត្ថបទ AI");
+      } else {
+        setGeminiError(res.error || "Key មិនត្រឹមត្រូវ សូមពិនិត្យម្តងទៀត");
+      }
+    } catch (err) {
+      setGeminiError(err.message || "មិនអាចផ្ទៀងផ្ទាត់ Key បានទេ");
+    } finally {
+      setIsVerifyingGemini(false);
+    }
+  };
+
+  const handleRemoveGeminiKey = () => {
+    setStoredGeminiKey("");
+    setGeminiKey("");
+    setIsGeminiValid(false);
+    setGeminiInfo(null);
+    setGeminiKeyInput("");
+    notify("បានដក Google Gemini API Key រួចរាល់");
+  };
+
+  const handleGenerateScriptWithGemini = async (presetTopic = null) => {
+    const topicToUse = presetTopic || scriptTopic.trim();
+    if (!topicToUse) {
+      notify("សូមបញ្ចូលប្រធានបទដែលចង់សរសេរ");
+      return;
+    }
+    if (!geminiKey) {
+      setActiveKeyTab("gemini");
+      setShowKeyModal(true);
+      notify("សូមភ្ជាប់ Google Gemini API Key ជាមុនសិនដើម្បីប្រើមុខងារសរសេរអត្ថបទ AI");
+      return;
+    }
+    setIsGeneratingScript(true);
+    try {
+      const script = await generateScriptWithGemini({
+        apiKey: geminiKey,
+        topic: topicToUse,
+        tone: scriptTone,
+      });
+      if (script) {
+        setTtsText(script);
+        setShowScriptModal(false);
+        notify("Gemini បានបង្កើតអត្ថបទជូនរួចរាល់!");
+      }
+    } catch (err) {
+      console.error(err);
+      notify(`ការបង្កើតអត្ថបទបរាជ័យ៖ ${err.message}`);
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  };
 
   // Local Voice Profiles state
   const [profiles, setProfiles] = useState(propVoiceProfiles || []);
@@ -111,8 +309,9 @@ export function VoiceCloneStudioPage({
   // TTS State
   // -------------------------------------------------------------------------
   const [ttsText, setTtsText] = useState(
-    "សួស្តីបងប្អូនទាំងអស់គ្នា! នេះគឺជាការសាកល្បងសំឡេង Clone របស់ខ្ញុំ ដំណើរការយ៉ាងរលូន និងពិរោះ។"
+    "សួស្តីបងប្អូនទាំងអស់គ្នា! នេះគឺជាការសាកល្បងសំឡេងក្លូនរបស់ខ្ញុំ ដំណើរការយ៉ាងរលូន និងពិរោះរណ្តំ។"
   );
+
   // Default to Khmer Sophea or first matching voice
   const defaultBaseVoice = useMemo(() => {
     return (
@@ -192,7 +391,7 @@ export function VoiceCloneStudioPage({
   const startRecording = async () => {
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        notify("ឧបករណ៍ថតសំឡេងមិនត្រូវបានគាំទ្រលើកម្មវិធីរុករកនេះទេ / Microphone unsupported");
+        notify("ឧបករណ៍ថតសំឡេងមិនត្រូវបានគាំទ្រលើកម្មវិធីរុករកនេះទេ");
         return;
       }
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -239,7 +438,7 @@ export function VoiceCloneStudioPage({
       }, 200);
     } catch (err) {
       console.error(err);
-      notify(`Microphone error: ${err.message}`);
+      notify(`បញ្ហាមេក្រូ៖ ${err.message}`);
       setIsRecording(false);
     }
   };
@@ -263,10 +462,10 @@ export function VoiceCloneStudioPage({
       if (referenceUrl) URL.revokeObjectURL(referenceUrl);
       setReferenceUrl(URL.createObjectURL(file));
       if (!cloneName) setCloneName(file.name.replace(/\.[^.]+$/, ""));
-      notify(`បានផ្ទុកឡើងឯកសារ: ${file.name} (${formatTime(decoded.duration)})`);
+      notify(`បានផ្ទុកឡើងឯកសារ៖ ${file.name} (${formatTime(decoded.duration)})`);
     } catch (err) {
       console.error(err);
-      notify(`Error reading audio file: ${err.message}`);
+      notify(`បញ្ហាក្នុងការអានឯកសារសំឡេង៖ ${err.message}`);
     }
     e.target.value = "";
   };
@@ -281,57 +480,96 @@ export function VoiceCloneStudioPage({
     }
     setIsExtracting(true);
     setExtractProgress(5);
-    setExtractPhase("កំពុងរៀបចំ និងឌីកូដសំឡេង (Decoding audio)...");
+    setExtractPhase("កំពុងរៀបចំ និងវិភាគទម្រង់សំឡេង...");
 
     try {
-      // 1. Extract speaker embedding
-      const embedding = await extractVoiceEmbedding(referenceBlob, (evt) => {
-        if (evt.phase) setExtractPhase(evt.phase);
-        if (Number.isFinite(evt.progress)) {
-          setExtractProgress(Math.min(60, Math.round(evt.progress * 0.6)));
-        }
-      });
-      setExtractedEmbedding(embedding);
-      setExtractProgress(65);
-      setExtractPhase("កំពុងបង្កើតសំឡេងសាកល្បង (Generating test clone)...");
+      if (apiKey && isKeyValid) {
+        // ElevenLabs Neural Cloning (100% human-like voice)
+        setExtractPhase("កំពុងផ្ញើសំឡេងគំរូទៅ ElevenLabs Neural Cloner...");
+        setExtractProgress(25);
 
-      // 2. Synthesize test sentence with base voice
-      const baseVoice = VOICES.find((v) => v.id === baseVoiceId) || defaultBaseVoice;
-      const testSentence =
-        cloneLanguage === "km"
-          ? "សួស្តី នេះគឺជាការសាកល្បងសំឡេងក្លូនជាភាសាខ្មែរ។"
-          : "Hello, this is a test of your newly cloned voice.";
+        const cloneRes = await cloneVoiceWithElevenLabs({
+          apiKey,
+          name: cloneName.trim() || `សំឡេង ${Date.now()}`,
+          audioBlob: referenceBlob,
+          description: `Cloned voice created in AI Video Editor Studio (${cloneLanguage})`,
+        });
 
-      const { blob: baseBlob } = await synthesizeBaseVoice({
-        voice: baseVoice,
-        text: testSentence,
-        speed: 1,
-        notify,
-        t,
-        onProgress: (p) => setExtractProgress(65 + Math.round(p * 0.15)),
-      });
+        const vId = cloneRes.voiceId;
+        setExtractedVoiceId(vId);
+        setExtractProgress(60);
+        setExtractPhase("កំពុងសំយោគសំឡេងសាកល្បងដោយ ElevenLabs...");
 
-      // 3. Convert with extracted embedding
-      setExtractPhase("កំពុងបម្លែង音色 (Applying Tone Color Transfer)...");
-      const converted = await convertVoiceBlob(baseBlob, embedding, {
-        onProgress: (evt) => {
+        const testSentence =
+          cloneLanguage === "km"
+            ? "សួស្តីបងប្អូនទាំងអស់គ្នា! នេះគឺជាការសាកល្បងសំឡេងក្លូនរបស់ខ្ញុំតាមរយៈ ElevenLabs ពិរោះ និងដូចមនុស្ស ១០០%។"
+            : "Hello, this is a test of your new voice cloned with ElevenLabs.";
+
+        const testAudioBlob = await synthesizeWithElevenLabs({
+          apiKey,
+          voiceId: vId,
+          text: testSentence,
+          modelId: "eleven_multilingual_v2",
+          onProgress: (p) => setExtractProgress(60 + Math.round(p * 0.35)),
+        });
+
+        setTestBlob(testAudioBlob);
+        if (testUrl) URL.revokeObjectURL(testUrl);
+        setTestUrl(URL.createObjectURL(testAudioBlob));
+
+        setExtractProgress(100);
+        setExtractPhase("ក្លូនសំឡេងតាម ElevenLabs ជោគជ័យ ១០០%!");
+        notify("ក្លូនសំឡេងតាម ElevenLabs បានជោគជ័យ! សំឡេងដូចមនុស្ស ១០០%។ អ្នកអាចស្តាប់សាកល្បង ឬរក្សាទុក។");
+      } else {
+        // 1. Extract speaker embedding (Local Fallback)
+        const embedding = await extractVoiceEmbedding(referenceBlob, (evt) => {
           if (evt.phase) setExtractPhase(evt.phase);
           if (Number.isFinite(evt.progress)) {
-            setExtractProgress(80 + Math.round(evt.progress * 0.2));
+            setExtractProgress(Math.min(60, Math.round(evt.progress * 0.6)));
           }
-        },
-      });
+        });
+        setExtractedEmbedding(embedding);
+        setExtractProgress(65);
+        setExtractPhase("កំពុងបង្កើតសំឡេងសាកល្បង...");
 
-      setTestBlob(converted);
-      if (testUrl) URL.revokeObjectURL(testUrl);
-      setTestUrl(URL.createObjectURL(converted));
+        // 2. Synthesize test sentence with base voice
+        const baseVoice = VOICES.find((v) => v.id === baseVoiceId) || defaultBaseVoice;
+        const testSentence =
+          cloneLanguage === "km"
+            ? "សួស្តី នេះគឺជាការសាកល្បងសំឡេងក្លូនជាភាសាខ្មែរ។"
+            : "Hello, this is a test of your newly cloned voice.";
 
-      setExtractProgress(100);
-      setExtractPhase("ការស្រង់យកម៉ូដែលបានជោគជ័យ 100%!");
-      notify("ស្រង់យកម៉ូដែលសំឡេងបានជោគជ័យ! អ្នកអាចសាកល្បងស្តាប់ ឬរក្សាទុកបាន។");
+        const { blob: baseBlob } = await synthesizeBaseVoice({
+          voice: baseVoice,
+          text: testSentence,
+          speed: 1,
+          notify,
+          t,
+          onProgress: (p) => setExtractProgress(65 + Math.round(p * 0.15)),
+        });
+
+        // 3. Convert with extracted embedding
+        setExtractPhase("កំពុងបម្លែងទឹកដមសំឡេងក្លូន...");
+        const converted = await convertVoiceBlob(baseBlob, embedding, {
+          onProgress: (evt) => {
+            if (evt.phase) setExtractPhase(evt.phase);
+            if (Number.isFinite(evt.progress)) {
+              setExtractProgress(80 + Math.round(evt.progress * 0.2));
+            }
+          },
+        });
+
+        setTestBlob(converted);
+        if (testUrl) URL.revokeObjectURL(testUrl);
+        setTestUrl(URL.createObjectURL(converted));
+
+        setExtractProgress(100);
+        setExtractPhase("ស្រង់យកម៉ូដែលសំឡេងបានជោគជ័យ ១០០%!");
+        notify("ស្រង់យកម៉ូដែលសំឡេងបានជោគជ័យ! អ្នកអាចសាកល្បងស្តាប់ ឬចុចរក្សាទុក។");
+      }
     } catch (err) {
       console.error("Extraction error:", err);
-      notify(`Model extraction failed: ${err.message}`);
+      notify(`ការស្រង់យកម៉ូដែលបានបរាជ័យ៖ ${err.message}`);
     } finally {
       setIsExtracting(false);
     }
@@ -341,11 +579,11 @@ export function VoiceCloneStudioPage({
   // Save Cloned Profile to Local Storage (IndexedDB)
   // -------------------------------------------------------------------------
   const handleSaveProfile = async () => {
-    if (!extractedEmbedding) {
+    if (!extractedEmbedding && !extractedVoiceId) {
       notify("សូមស្រង់យកម៉ូដែលសំឡេងជាមុនសិន");
       return;
     }
-    const finalName = cloneName.trim() || `Cloned Voice ${formatSavedTime()}`;
+    const finalName = cloneName.trim() || `សំឡេងក្លូន ${formatSavedTime()}`;
     const now = new Date().toISOString();
     const newProfile = {
       id: crypto.randomUUID(),
@@ -355,7 +593,9 @@ export function VoiceCloneStudioPage({
       sourceKind: cloneInputMode === "record" ? "recording" : "upload",
       referenceBlob,
       testBlob,
-      embedding: Float32Array.from(extractedEmbedding),
+      engine: extractedVoiceId ? "elevenlabs" : "local",
+      elevenlabsVoiceId: extractedVoiceId || null,
+      embedding: extractedEmbedding ? Float32Array.from(extractedEmbedding) : null,
       embeddingVersion: OPENVOICE_EMBEDDING_VERSION,
       favorite: false,
       authorized: true,
@@ -372,16 +612,17 @@ export function VoiceCloneStudioPage({
       setProfiles((prev) => [newProfile, ...prev.filter((p) => p.id !== newProfile.id)]);
       selectProfile(newProfile.id);
 
-      notify(`បានរក្សាទុក "${finalName}" ក្នុងកុំព្យូទ័ររបស់អ្នកដោយជោគជ័យ!`);
+      notify(`បានរក្សាទុកសំឡេង "${finalName}" ក្នុងកុំព្យូទ័ររបស់អ្នកដោយជោគជ័យ!`);
       // Reset clone form and switch to TTS
       setReferenceBlob(null);
       setExtractedEmbedding(null);
+      setExtractedVoiceId("");
       setTestBlob(null);
       setCloneName("");
       setActiveTab("tts");
     } catch (err) {
       console.error(err);
-      notify(`Save error: ${err.message}`);
+      notify(`បញ្ហាក្នុងការរក្សាទុក៖ ${err.message}`);
     }
   };
 
@@ -408,7 +649,7 @@ export function VoiceCloneStudioPage({
       notify("បានលុបសំឡេងគំរូរួចរាល់");
     } catch (err) {
       console.error(err);
-      notify(`Delete error: ${err.message}`);
+      notify(`បញ្ហាក្នុងការលុប៖ ${err.message}`);
     }
   };
 
@@ -427,6 +668,8 @@ export function VoiceCloneStudioPage({
         name: profile.name,
         language: profile.language,
         gender: profile.gender,
+        engine: profile.engine || (profile.elevenlabsVoiceId ? "elevenlabs" : "local"),
+        elevenlabsVoiceId: profile.elevenlabsVoiceId || null,
         embedding: profile.embedding ? Array.from(profile.embedding) : null,
         embeddingVersion: profile.embeddingVersion || 2,
         referenceBase64: refBase64,
@@ -441,10 +684,10 @@ export function VoiceCloneStudioPage({
       a.download = `${profile.name.replace(/[/\\?%*:|"<>]/g, "_")}.voiceprofile.json`;
       a.click();
       URL.revokeObjectURL(url);
-      notify(`បាននាំចេញកញ្ចប់ម៉ូដែល: ${profile.name}`);
+      notify(`បាននាំចេញកញ្ចប់ឯកសារសំឡេង៖ ${profile.name}`);
     } catch (err) {
       console.error(err);
-      notify(`Export failed: ${err.message}`);
+      notify(`ការនាំចេញបានបរាជ័យ៖ ${err.message}`);
     }
   };
 
@@ -454,8 +697,8 @@ export function VoiceCloneStudioPage({
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      if (!data.name || !data.embedding) {
-        throw new Error("ទម្រង់ឯកសារមិនត្រឹមត្រូវ / Invalid voice profile JSON");
+      if (!data.name || (!data.embedding && !data.elevenlabsVoiceId)) {
+        throw new Error("ទម្រង់ឯកសារមិនត្រឹមត្រូវ");
       }
       const refBlob = data.referenceBase64 ? await base64ToBlob(data.referenceBase64) : null;
       const testBlob = data.testBase64 ? await base64ToBlob(data.testBase64) : null;
@@ -466,7 +709,9 @@ export function VoiceCloneStudioPage({
         gender: data.gender || "female",
         referenceBlob: refBlob,
         testBlob,
-        embedding: Float32Array.from(data.embedding),
+        engine: data.engine || (data.elevenlabsVoiceId ? "elevenlabs" : "local"),
+        elevenlabsVoiceId: data.elevenlabsVoiceId || null,
+        embedding: data.embedding ? Float32Array.from(data.embedding) : null,
         embeddingVersion: data.embeddingVersion || OPENVOICE_EMBEDDING_VERSION,
         favorite: false,
         authorized: true,
@@ -479,7 +724,7 @@ export function VoiceCloneStudioPage({
       notify(`បាននាំចូលម៉ូដែលសំឡេង "${imported.name}" ដោយជោគជ័យ!`);
     } catch (err) {
       console.error(err);
-      notify(`Import error: ${err.message}`);
+      notify(`បញ្ហានាំចូល៖ ${err.message}`);
     }
     e.target.value = "";
   };
@@ -495,55 +740,95 @@ export function VoiceCloneStudioPage({
     }
     setIsGenerating(true);
     setGenProgress(8);
-    setGenPhase("កំពុងរៀបចំម៉ូដែលសំឡេង (Preparing model)...");
+    setGenPhase("កំពុងរៀបចំម៉ូដែលសំឡេង...");
 
     try {
-      const baseVoice = VOICES.find((v) => v.id === baseVoiceId) || defaultBaseVoice;
+      let finalBlob = null;
 
-      // 1. Synthesize base phonetics
-      setGenPhase(
-        baseVoice.language === "ភាសាខ្មែរ"
-          ? "កំពុងសំយោគសំឡេងមូលដ្ឋានជាភាសាខ្មែរ (Google AI Sophea)..."
-          : "កំពុងសំយោគសំឡេងមូលដ្ឋាន (Synthesizing phonetics)..."
-      );
-      const { blob: baseBlob } = await synthesizeBaseVoice({
-        voice: baseVoice,
-        text: cleanText,
-        speed: ttsSpeed,
-        notify,
-        t,
-        onProgress: (p) => setGenProgress(8 + Math.round(p * 0.45)),
-      });
+      // 1. Check if active profile has ElevenLabs Voice ID and API key is present
+      if (activeProfile?.elevenlabsVoiceId && apiKey) {
+        setGenPhase("កំពុងសំយោគសំឡេងមនុស្សពិត ១០០% តាមរយៈ ElevenLabs...");
+        setGenProgress(25);
+        finalBlob = await synthesizeWithElevenLabs({
+          apiKey,
+          voiceId: activeProfile.elevenlabsVoiceId,
+          text: cleanText,
+          speed: ttsSpeed,
+          modelId: "eleven_multilingual_v2",
+          onProgress: (p) => setGenProgress(25 + Math.round(p * 0.65)),
+        });
+      } else if (baseVoiceId.startsWith("gemini_") && geminiKey) {
+        // 2. Google Gemini 2.0 Flash Audio Studio Voice
+        const voiceName = baseVoiceId.replace("gemini_", "");
+        setGenPhase(`កំពុងសំយោគសំឡេង Google Gemini (${voiceName})...`);
+        setGenProgress(25);
+        finalBlob = await synthesizeWithGemini({
+          apiKey: geminiKey,
+          text: cleanText,
+          voiceName,
+          onProgress: (p) => setGenProgress(25 + Math.round(p * 0.65)),
+        });
 
-      let finalBlob = baseBlob;
+        // Layer tone conversion if user selected a custom cloned embedding profile
+        if (activeProfile?.embedding) {
+          setGenProgress(80);
+          setGenPhase(`កំពុងបម្លែងទឹកដមទៅជា "${activeProfile.name}"...`);
+          try {
+            finalBlob = await convertVoiceBlob(finalBlob, activeProfile.embedding, {
+              seed: 2026,
+            });
+          } catch (convErr) {
+            console.warn("Tone conversion warning over Gemini voice:", convErr);
+          }
+        }
+      } else {
+        const baseVoice = VOICES.find((v) => v.id === baseVoiceId) || defaultBaseVoice;
 
-      // 2. Apply Voice Clone embedding if available
-      if (activeProfile?.embedding) {
-        setGenProgress(58);
-        setGenPhase(`កំពុងបម្លែងទៅជាសំឡេង Clone "${activeProfile.name}" (OpenVoice v2)...`);
-        try {
-          finalBlob = await convertVoiceBlob(baseBlob, activeProfile.embedding, {
-            seed: 2026,
-            onProgress: (evt) => {
-              if (evt.phase) setGenPhase(evt.phase);
-              if (Number.isFinite(evt.progress)) {
-                setGenProgress(58 + Math.round(evt.progress * 0.35));
-              }
-            },
-          });
-        } catch (convErr) {
-          console.warn("Tone conversion warning, using enhanced base output:", convErr);
+        // 1. Synthesize base phonetics
+        setGenPhase(
+          baseVoice.language === "ភាសាខ្មែរ"
+            ? "កំពុងសំយោគសំឡេងមូលដ្ឋានជាភាសាខ្មែរ..."
+            : "កំពុងសំយោគសំឡេងមូលដ្ឋាន..."
+        );
+        const { blob: baseBlob } = await synthesizeBaseVoice({
+          voice: baseVoice,
+          text: cleanText,
+          speed: ttsSpeed,
+          notify,
+          t,
+          onProgress: (p) => setGenProgress(8 + Math.round(p * 0.45)),
+        });
+
+        finalBlob = baseBlob;
+
+        // 2. Apply Voice Clone embedding if available
+        if (activeProfile?.embedding) {
+          setGenProgress(58);
+          setGenPhase(`កំពុងបម្លែងទៅជាសំឡេងក្លូន "${activeProfile.name}"...`);
+          try {
+            finalBlob = await convertVoiceBlob(baseBlob, activeProfile.embedding, {
+              seed: 2026,
+              onProgress: (evt) => {
+                if (evt.phase) setGenPhase(evt.phase);
+                if (Number.isFinite(evt.progress)) {
+                  setGenProgress(58 + Math.round(evt.progress * 0.35));
+                }
+              },
+            });
+          } catch (convErr) {
+            console.warn("Tone conversion warning, using enhanced base output:", convErr);
+          }
         }
       }
 
       // 3. Apply volume output gain
-      if (ttsVolume !== 1) {
+      if (ttsVolume !== 1 && finalBlob) {
         finalBlob = await applyVoiceOutputGain(finalBlob, ttsVolume);
       }
 
       // 4. Decode waveform for visualizer & timeline
       setGenProgress(95);
-      setGenPhase("កំពុងបង្កើត Waveform និងរួចរាល់...");
+      setGenPhase("កំពុងរៀបចំទម្រង់រលកសំឡេង...");
       const decoded = await decodeWaveform(finalBlob);
 
       setGeneratedBlob(finalBlob);
@@ -556,10 +841,10 @@ export function VoiceCloneStudioPage({
 
       setGenProgress(100);
       setGenPhase("បង្កើតសំឡេងបានជោគជ័យ!");
-      notify(`បង្កើតសំឡេងបានជោគជ័យ! រយៈពេល: ${formatTime(decoded.duration)}`);
+      notify(`បង្កើតសំឡេងបានជោគជ័យ! រយៈពេល៖ ${formatTime(decoded.duration)}`);
     } catch (err) {
       console.error("TTS generation error:", err);
-      notify(`Speech synthesis failed: ${err.message}`);
+      notify(`ការបង្កើតសំឡេងបានបរាជ័យ៖ ${err.message}`);
     } finally {
       setIsGenerating(false);
     }
@@ -606,7 +891,7 @@ export function VoiceCloneStudioPage({
       notify("មិនមានសំឡេងដែលបានបង្កើតទេ");
       return;
     }
-    const voiceLabel = activeProfile?.name || "Cloned Voice";
+    const voiceLabel = activeProfile?.name || "សំឡេងក្លូន";
     onInsertToTimeline?.({
       blob: generatedBlob,
       name: voiceLabel,
@@ -622,7 +907,7 @@ export function VoiceCloneStudioPage({
     if (!generatedBlob) return;
     const a = document.createElement("a");
     a.href = generatedUrl;
-    a.download = `${activeProfile?.name || "voice_clone"}_${Date.now()}.wav`;
+    a.download = `${activeProfile?.name || "cloned_voice"}_${Date.now()}.wav`;
     a.click();
   };
 
@@ -664,35 +949,56 @@ export function VoiceCloneStudioPage({
             className="voice-studio-back-btn"
             type="button"
             onClick={onBack}
-            title="ត្រឡប់ទៅកម្មវិធីកាត់ត (Back to Editor)"
+            title="ត្រឡប់ទៅកាន់ផ្ទាំងកាត់តវីដេអូវិញ"
           >
             <ArrowLeft size={16} weight="bold" />
-            <span>ត្រឡប់ទៅកាត់ត (Editor)</span>
+            <span>ត្រឡប់ទៅផ្ទាំងកាត់ត</span>
           </button>
           <div className="voice-studio-nav-divider" />
           <div className="voice-studio-brand">
             <div className="voice-studio-brand-icon">
               <Sparkle size={18} weight="fill" />
             </div>
-            <span className="voice-studio-title">AI Voice Clone Studio</span>
-            <span className="voice-studio-badge">Local-First AI</span>
+            <span className="voice-studio-title">ស្ទូឌីយោក្លូនសំឡេង AI</span>
           </div>
         </div>
 
         <div className="voice-studio-nav-right">
-          <div className="voice-studio-stat-pill">
-            <span className="voice-studio-stat-dot" />
-            <span>ម៉ូដែលក្នុងកុំព្យូទ័រ: {profiles.length} សំឡេង</span>
-          </div>
           {activeProfile && (
             <div
               className="voice-studio-stat-pill"
               style={{ borderColor: "rgba(56, 189, 248, 0.4)", color: "#38bdf8" }}
             >
               <User size={13} weight="bold" />
-              <span>សកម្ម: {activeProfile.name}</span>
+              <span>កំពុងប្រើ៖ {activeProfile.name}</span>
             </div>
           )}
+
+          <button
+            className={`elevenlabs-nav-btn ${isKeyValid || isGeminiValid ? "is-active" : ""}`}
+            type="button"
+            onClick={() => {
+              setKeyInput(apiKey);
+              setGeminiKeyInput(geminiKey);
+              setKeyError("");
+              setGeminiError("");
+              setShowKeyModal(true);
+            }}
+            title="កំណត់ API Keys (ElevenLabs & Google Gemini)"
+          >
+            <Key size={15} weight={isKeyValid || isGeminiValid ? "fill" : "bold"} />
+            <span>
+              {isKeyValid && isGeminiValid
+                ? "API Keys: សកម្មទាំងពីរ"
+                : isKeyValid
+                ? "ElevenLabs: សកម្ម"
+                : isGeminiValid
+                ? "Gemini: សកម្ម"
+                : "ភ្ជាប់ API Key"}
+            </span>
+            {isKeyValid && <span className="elevenlabs-tag">ElevenLabs</span>}
+            {isGeminiValid && <span className="gemini-tag">Gemini</span>}
+          </button>
         </div>
       </header>
 
@@ -704,7 +1010,7 @@ export function VoiceCloneStudioPage({
             <div className="voice-sidebar-title-row">
               <span className="voice-sidebar-title">
                 <FloppyDisk size={17} weight="fill" color="#38bdf8" />
-                <span>សំឡេងក្នុងកុំព្យូទ័រ</span>
+                <span>សំឡេងក្នុងម៉ាស៊ីន</span>
               </span>
               <span className="voice-count-badge">{profiles.length}</span>
             </div>
@@ -725,8 +1031,8 @@ export function VoiceCloneStudioPage({
               <div className="voice-empty-state">
                 <span className="voice-empty-icon">🎙️</span>
                 <strong>មិនទាន់មានសំឡេងទេ</strong>
-                <p style={{ fontSize: "12px", margin: 0 }}>
-                  ចុចប៊ូតុង "Clone សំឡេងថ្មី" ដើម្បីបង្កើតសំឡេងផ្ទាល់ខ្លួន
+                <p style={{ fontSize: "12px", margin: 0, lineHeight: 1.6 }}>
+                  ចុចប៊ូតុង "ក្លូនសំឡេងថ្មី" ដើម្បីបង្កើតសំឡេងផ្ទាល់ខ្លួនរបស់អ្នក
                 </p>
               </div>
             ) : (
@@ -739,7 +1045,7 @@ export function VoiceCloneStudioPage({
                     onClick={() => selectProfile(p.id)}
                   >
                     <div className={`voice-avatar-disc ${isActive ? "is-active" : ""}`}>
-                      {p.name ? p.name.charAt(0).toUpperCase() : "V"}
+                      {p.name ? p.name.charAt(0).toUpperCase() : "សំ"}
                     </div>
                     <div className="voice-profile-info">
                       <div className="voice-profile-name" title={p.name}>
@@ -747,18 +1053,22 @@ export function VoiceCloneStudioPage({
                       </div>
                       <div className="voice-profile-meta">
                         <span className="voice-profile-tag">
-                          {p.language === "km" ? "ភាសាខ្មែរ" : "English"}
+                          {p.language === "km" ? "ភាសាខ្មែរ" : "អន្តរជាតិ"}
                         </span>
-                        <span style={{ fontSize: "10.5px" }}>
-                          {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "Local"}
-                        </span>
+                        {p.elevenlabsVoiceId ? (
+                          <span className="elevenlabs-tag" style={{ marginLeft: 4 }}>100% ដូចពិត</span>
+                        ) : (
+                          <span style={{ fontSize: "11px" }}>
+                            {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "ក្នុងម៉ាស៊ីន"}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="voice-profile-actions">
                       <button
                         className="voice-card-btn btn-export"
                         type="button"
-                        title="នាំចេញកញ្ចប់ Backup"
+                        title="នាំចេញឯកសារបម្រុងទុក"
                         onClick={(e) => handleExportProfile(p, e)}
                       >
                         <DownloadSimple size={13} />
@@ -785,16 +1095,16 @@ export function VoiceCloneStudioPage({
               onClick={() => setActiveTab("clone")}
             >
               <Plus size={16} weight="bold" />
-              <span>Clone សំឡេងថ្មី (+ New Clone)</span>
+              <span>ក្លូនសំឡេងថ្មី</span>
             </button>
             <div className="voice-btn-secondary-row">
               <label
                 className="voice-btn-secondary"
                 style={{ cursor: "pointer", margin: 0 }}
-                title="នាំចូលកញ្ចប់សំឡេង .voiceprofile.json"
+                title="នាំចូលកញ្ចប់សំឡេងដែលបានរក្សាទុក"
               >
                 <UploadSimple size={14} />
-                <span>នាំចូល (Import)</span>
+                <span>នាំចូលសំឡេង</span>
                 <input
                   type="file"
                   accept=".json,.voiceprofile.json"
@@ -816,7 +1126,7 @@ export function VoiceCloneStudioPage({
               onClick={() => setActiveTab("tts")}
             >
               <SpeakerHigh size={17} weight="bold" />
-              <span>1. Text to Speech (បញ្ចេញសំឡេង)</span>
+              <span>១. បម្លែងអត្ថបទទៅជាសំឡេង</span>
             </button>
             <button
               className={`voice-tab-button ${activeTab === "clone" ? "is-active" : ""}`}
@@ -824,14 +1134,7 @@ export function VoiceCloneStudioPage({
               onClick={() => setActiveTab("clone")}
             >
               <MicrophoneStage size={17} weight="bold" />
-              <span>2. Clone សំឡេងថ្មី (Clone New Voice)</span>
-            </button>
-            <button
-              className={`voice-tab-button ${activeTab === "guide" ? "is-active" : ""}`}
-              type="button"
-              onClick={() => setActiveTab("guide")}
-            >
-              <span>3. ការណែនាំ & បច្ចេកវិទ្យា (Guide)</span>
+              <span>២. ក្លូនសំឡេងថ្មី</span>
             </button>
           </div>
 
@@ -842,23 +1145,27 @@ export function VoiceCloneStudioPage({
               <div className="tts-active-voice-banner">
                 <div className="tts-voice-lead">
                   <div className="voice-avatar-disc is-active" style={{ width: 44, height: 44 }}>
-                    {activeProfile?.name ? activeProfile.name.charAt(0).toUpperCase() : "AI"}
+                    {activeProfile?.name ? activeProfile.name.charAt(0).toUpperCase() : "សំ"}
                   </div>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span className="tts-voice-title">
-                        {activeProfile ? activeProfile.name : "មិនទាន់បានជ្រើសរើសសំឡេង Clone"}
+                        {activeProfile ? activeProfile.name : "មិនទាន់បានជ្រើសរើសសំឡេងក្លូន"}
                       </span>
-                      <span className="tts-voice-badge">
-                        {activeProfile ? "Local Cloned Voice" : "Base Engine"}
-                      </span>
+                      {activeProfile?.elevenlabsVoiceId && (
+                        <span className="elevenlabs-tag">ElevenLabs Neural 100%</span>
+                      )}
                     </div>
                     <span className="tts-voice-sub">
                       {activeProfile
-                        ? `សំឡេងនេះត្រូវបានរក្សាទុកក្នុងកុំព្យូទ័ររបស់អ្នក · ភាសា: ${
-                            activeProfile.language === "km" ? "ខ្មែរ" : "English"
-                          }`
-                        : "ជ្រើសរើសសំឡេងពីបញ្ជីខាងឆ្វេង ឬចុច Clone សំឡេងថ្មី"}
+                        ? activeProfile.elevenlabsVoiceId
+                          ? `ម៉ូដែល ElevenLabs Neural Voice (សំឡេងមនុស្សពិត ១០០%) · ភាសា៖ ${
+                              activeProfile.language === "km" ? "ខ្មែរ" : "អន្តរជាតិ"
+                            }`
+                          : `សំឡេងនេះត្រូវបានរក្សាទុកក្នុងកុំព្យូទ័ររបស់អ្នក · ភាសា៖ ${
+                              activeProfile.language === "km" ? "ខ្មែរ" : "អន្តរជាតិ"
+                            }`
+                        : "ជ្រើសរើសសំឡេងពីបញ្ជីខាងឆ្វេង ឬចុចក្លូនសំឡេងថ្មី"}
                     </span>
                   </div>
                 </div>
@@ -870,7 +1177,7 @@ export function VoiceCloneStudioPage({
                   style={{ whiteSpace: "nowrap" }}
                 >
                   <Plus size={14} />
-                  <span>Clone សំឡេងមួយទៀត</span>
+                  <span>ក្លូនសំឡេងមួយទៀត</span>
                 </button>
               </div>
 
@@ -879,22 +1186,42 @@ export function VoiceCloneStudioPage({
                 <div className="tts-input-header">
                   <label className="tts-input-label">
                     <Waveform size={17} color="#38bdf8" />
-                    <span>បញ្ចូលអត្ថបទដែលត្រូវនិយាយ (Script)</span>
+                    <span>បញ្ចូលអត្ថបទដែលត្រូវនិយាយ</span>
                   </label>
-                  <span className="tts-char-count">{ttsText.length} តួអក្សរ</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <button
+                      className="gemini-script-gen-btn"
+                      type="button"
+                      onClick={() => {
+                        if (!isGeminiValid && !geminiKey) {
+                          setActiveKeyTab("gemini");
+                          setGeminiKeyInput(geminiKey);
+                          setShowKeyModal(true);
+                          notify("សូមភ្ជាប់ Google Gemini API Key ដើម្បីប្រើមុខងារសរសេរអត្ថបទ AI");
+                          return;
+                        }
+                        setShowScriptModal(true);
+                      }}
+                      title="ប្រើ Google Gemini AI ជួយបង្កើត ឬកែលម្អអត្ថបទនិយាយ"
+                    >
+                      <Sparkle size={14} weight="fill" color="#38bdf8" />
+                      <span>Gemini AI សរសេរអត្ថបទ</span>
+                    </button>
+                    <span className="tts-char-count">{ttsText.length} តួអក្សរ</span>
+                  </div>
                 </div>
 
                 <textarea
                   className="tts-textarea"
                   rows={4}
-                  placeholder="វាយបញ្ចូលអត្ថបទជាភាសាខ្មែរ ឬអង់គ្លេសនៅទីនេះ..."
+                  placeholder="វាយបញ្ចូលអត្ថបទជាភាសាខ្មែរនៅទីនេះ..."
                   value={ttsText}
                   onChange={(e) => setTtsText(e.target.value)}
                 />
 
                 {/* Quick Templates */}
                 <div className="tts-templates-row">
-                  <span className="tts-template-label">គំរូអត្ថបទរហ័ស:</span>
+                  <span className="tts-template-label">អត្ថបទគំរូ៖</span>
                   <button
                     className="tts-template-chip"
                     type="button"
@@ -902,25 +1229,25 @@ export function VoiceCloneStudioPage({
                       setTtsText("សួស្តីបងប្អូនទាំងអស់គ្នា! សូមស្វាគមន៍មកកាន់វីដេអូថ្មីរបស់យើងខ្ញុំ។")
                     }
                   >
-                    👋 ស្វាគមន៍ (Greeting)
+                    👋 ស្វាគមន៍
                   </button>
                   <button
                     className="tts-template-chip"
                     type="button"
                     onClick={() =>
-                      setTtsText("សូមជួយចុច Like, Share និង Subscribe ដើម្បីទទួលបានចំណេះដឹងថ្មីៗ!")
+                      setTtsText("សូមជួយចុចគាំទ្រ ចុចចែករំលែក និងតាមដានដើម្បីទទួលបានវីដេអូថ្មីៗ!")
                     }
                   >
-                    ⭐ Like & Subscribe
+                    ⭐ គាំទ្រ និងចែករំលែក
                   </button>
                   <button
                     className="tts-template-chip"
                     type="button"
                     onClick={() =>
-                      setTtsText("រឿងនិទាននេះនិយាយអំពីការតស៊ូព្យាយាម និងភាពជោគជ័យដ៏អស្ចារ្យ។")
+                      setTtsText("រឿងនិទាននេះនិយាយអំពីការតស៊ូព្យាយាម និងភាពជោគជ័យដ៏អស្ចារ្យក្នុងជីវិត។")
                     }
                   >
-                    📖 និទានរឿង (Story)
+                    📖 និទានរឿង
                   </button>
                 </div>
               </div>
@@ -929,19 +1256,30 @@ export function VoiceCloneStudioPage({
               <div className="tts-controls-grid">
                 <div className="tts-control-item">
                   <label>
-                    <span>ម៉ាស៊ីនមូលដ្ឋាន (Base Engine)</span>
+                    <span>ម៉ាស៊ីនសំឡេងដើម</span>
                   </label>
                   <select value={baseVoiceId} onChange={(e) => setBaseVoiceId(e.target.value)}>
-                    <option value="km_KH-mms-medium">🇰🇭 Google Khmer AI (Sophea)</option>
-                    <option value="af_heart">🇺🇸 Kokoro English (Heart)</option>
-                    <option value="am_fenrir">🇺🇸 Kokoro English (Fenrir)</option>
-                    <option value="zh_f_qinglan">🇨🇳 Hojo Chinese (Qinglan)</option>
+                    {isGeminiValid && (
+                      <optgroup label="🌟 សំឡេង Google Gemini 2.0 Flash (Studio AI)">
+                        <option value="gemini_Aoede">🌟 Gemini Aoede (នារី ស្រទន់ពិរោះ)</option>
+                        <option value="gemini_Kore">🌟 Gemini Kore (នារី រស់រវើក)</option>
+                        <option value="gemini_Fenrir">🌟 Gemini Fenrir (បុរស ម៉ឺងម៉ាត់)</option>
+                        <option value="gemini_Puck">🌟 Gemini Puck (បុរស រួសរាយ)</option>
+                        <option value="gemini_Charon">🌟 Gemini Charon (បុរស ទន់ភ្លន់)</option>
+                      </optgroup>
+                    )}
+                    <optgroup label="🇰🇭 សំឡេងមូលដ្ឋាន (Local / Web)">
+                      <option value="km_KH-mms-medium">🇰🇭 សំឡេងខ្មែរ (សុភា)</option>
+                      <option value="af_heart">🇺🇸 សំឡេងអង់គ្លេស (នារី)</option>
+                      <option value="am_fenrir">🇺🇸 សំឡេងអង់គ្លេស (បុរស)</option>
+                      <option value="zh_f_qinglan">🇨🇳 សំឡេងចិន (នារី)</option>
+                    </optgroup>
                   </select>
                 </div>
 
                 <div className="tts-control-item">
                   <label>
-                    <span>ល្បឿននិយាយ (Speed)</span>
+                    <span>ល្បឿននិយាយ</span>
                     <span style={{ color: "#38bdf8" }}>{ttsSpeed.toFixed(2)}x</span>
                   </label>
                   <input
@@ -956,7 +1294,7 @@ export function VoiceCloneStudioPage({
 
                 <div className="tts-control-item">
                   <label>
-                    <span>កម្រិតសម្លេង (Volume)</span>
+                    <span>កម្រិតសម្លេង</span>
                     <span style={{ color: "#38bdf8" }}>{Math.round(ttsVolume * 100)}%</span>
                   </label>
                   <input
@@ -985,7 +1323,7 @@ export function VoiceCloneStudioPage({
                 ) : (
                   <>
                     <Lightning size={19} weight="fill" />
-                    <span>បង្កើតសំឡេងជាមួយ Voice Clone (Generate Speech)</span>
+                    <span>បង្កើតសំឡេងក្លូន</span>
                   </>
                 )}
               </button>
@@ -1009,10 +1347,10 @@ export function VoiceCloneStudioPage({
                   <div className="tts-output-header">
                     <div className="tts-output-title">
                       <CheckCircle size={18} weight="fill" color="#10b981" />
-                      <span>សំឡេងបានបង្កើតរួចរាល់ ({formatTime(generatedDuration)})</span>
+                      <span>សំឡេងបានបង្កើតរួចរាល់ · {formatTime(generatedDuration)}</span>
                     </div>
                     <span style={{ fontSize: "12px", color: "#64748b" }}>
-                      WAV 22kHz · Stereo
+                      គុណភាពច្បាស់កម្រិតខ្ពស់
                     </span>
                   </div>
 
@@ -1022,7 +1360,7 @@ export function VoiceCloneStudioPage({
                       className="tts-play-btn"
                       type="button"
                       onClick={togglePlayAudio}
-                      title={isPlaying ? "ផ្អាក (Pause)" : "ចាក់ស្តាប់ (Play)"}
+                      title={isPlaying ? "ផ្អាក" : "ចាក់ស្តាប់"}
                     >
                       {isPlaying ? (
                         <Pause size={20} weight="fill" />
@@ -1056,13 +1394,13 @@ export function VoiceCloneStudioPage({
                       onClick={() => handleInsert(true)}
                     >
                       <Plus size={18} weight="bold" />
-                      <span>បញ្ចូលទៅកាន់ Timeline & បើកកាត់ត (Insert & Go to Editor)</span>
+                      <span>បញ្ចូលទៅក្នុង Timeline</span>
                     </button>
 
                     <button
                       className="tts-btn-insert-assets"
                       type="button"
-                      title="រក្សាទុកក្នុង Media Bin ដោយមិនបិទទំព័រនេះ"
+                      title="រក្សាទុកក្នុង Media Bin ដោយមិនទាន់បិទទំព័រនេះ"
                       onClick={() => handleInsert(false)}
                     >
                       <FloppyDisk size={16} />
@@ -1072,11 +1410,11 @@ export function VoiceCloneStudioPage({
                     <button
                       className="tts-btn-download-audio"
                       type="button"
-                      title="ទាញយកឯកសារជា WAV"
+                      title="ទាញយកឯកសារសំឡេង"
                       onClick={handleDownloadFile}
                     >
                       <DownloadSimple size={16} />
-                      <span>ទាញយក WAV</span>
+                      <span>ទាញយកសំឡេង</span>
                     </button>
                   </div>
                 </div>
@@ -1091,8 +1429,8 @@ export function VoiceCloneStudioPage({
                 {/* Step 1: Input source */}
                 <div className="clone-section-step">
                   <div className="clone-step-title">
-                    <span className="clone-step-num">1</span>
-                    <span>ជ្រើសរើសប្រភពសំឡេងគំរូ (Sample Audio Reference)</span>
+                    <span className="clone-step-num">១</span>
+                    <span>ជ្រើសរើសសំឡេងគំរូ</span>
                   </div>
 
                   <div className="clone-source-choices">
@@ -1108,9 +1446,9 @@ export function VoiceCloneStudioPage({
                       >
                         <Microphone size={24} weight={isRecording ? "fill" : "bold"} />
                       </div>
-                      <span className="clone-choice-title">ថតសំឡេងផ្ទាល់ (Record Mic)</span>
+                      <span className="clone-choice-title">ថតសំឡេងផ្ទាល់</span>
                       <span className="clone-choice-desc">
-                        ថតសំឡេងនិយាយរបស់អ្នកផ្ទាល់តាមរយៈ Microphone ចន្លោះពី 5 ទៅ 30 វិនាទី
+                        ថតសំឡេងនិយាយរបស់អ្នកផ្ទាល់តាមរយៈមេក្រូ ចន្លោះពី ៥ ដល់ ៣០ វិនាទី
                       </span>
                     </div>
 
@@ -1127,9 +1465,9 @@ export function VoiceCloneStudioPage({
                       <div className="clone-choice-icon">
                         <UploadSimple size={24} weight="bold" />
                       </div>
-                      <span className="clone-choice-title">ផ្ទុកឡើងឯកសារ (Upload Audio)</span>
+                      <span className="clone-choice-title">ផ្ទុកឡើងឯកសារសំឡេង</span>
                       <span className="clone-choice-desc">
-                        ជ្រើសរើសឯកសារសំឡេងច្បាស់ល្អ (.mp3, .wav, .m4a) ពីកុំព្យូទ័ររបស់អ្នក
+                        ជ្រើសរើសឯកសារសំឡេងដែលមានគុណភាពច្បាស់ល្អចេញពីកុំព្យូទ័ររបស់អ្នក
                       </span>
                       <input
                         ref={fileInputRef}
@@ -1147,10 +1485,10 @@ export function VoiceCloneStudioPage({
                       <div className="live-recorder-timer">
                         {isRecording ? formatClock(recordingElapsed) : "00:00"}
                       </div>
-                      <span style={{ fontSize: "12.5px", color: isRecording ? "#ef4444" : "#94a3b8" }}>
+                      <span style={{ fontSize: "13px", color: isRecording ? "#ef4444" : "#94a3b8", lineHeight: 1.6 }}>
                         {isRecording
-                          ? "កំពុងថតសំឡេង... សូមនិយាយឱ្យច្បាស់ និងកុំឱ្យមានសម្លេងរំខាន"
-                          : "ចុចប៊ូតុងខាងក្រោមដើម្បីចាប់ផ្តើមថត (5 ទៅ 30 វិនាទី)"}
+                          ? "កំពុងថតសំឡេង... សូមនិយាយឱ្យច្បាស់ និងជៀសវាងសម្លេងរំខាន"
+                          : "ចុចប៊ូតុងខាងក្រោមដើម្បីចាប់ផ្តើមថត (រយៈពេល ៥ ដល់ ៣០ វិនាទី)"}
                       </span>
                       <div className="live-recorder-btns-row">
                         {!isRecording ? (
@@ -1161,7 +1499,7 @@ export function VoiceCloneStudioPage({
                             style={{ padding: "10px 22px" }}
                           >
                             <Microphone size={18} weight="fill" />
-                            <span>ចាប់ផ្តើមថត (Start Recording)</span>
+                            <span>ចាប់ផ្តើមថត</span>
                           </button>
                         ) : (
                           <button
@@ -1170,7 +1508,7 @@ export function VoiceCloneStudioPage({
                             onClick={stopRecording}
                           >
                             <Pause size={18} weight="fill" />
-                            <span>បញ្ឈប់ការថត (Stop & Save Sample)</span>
+                            <span>បញ្ឈប់ និងរក្សាទុក</span>
                           </button>
                         )}
                       </div>
@@ -1209,10 +1547,10 @@ export function VoiceCloneStudioPage({
                         </button>
                         <div>
                           <strong style={{ fontSize: "13.5px", color: "#f8fafc" }}>
-                            សំឡេងគំរូបានជ្រើសរើស ({formatTime(referenceDuration)})
+                            សំឡេងគំរូដែលបានជ្រើសរើស · {formatTime(referenceDuration)}
                           </strong>
                           <div style={{ fontSize: "11px", color: "#94a3b8" }}>
-                            ត្រៀមខ្លួនសម្រាប់ស្រង់យក Voice Timbre
+                            ត្រៀមខ្លួនសម្រាប់ស្រង់យកទម្រង់សំឡេង
                           </div>
                         </div>
                       </div>
@@ -1235,32 +1573,32 @@ export function VoiceCloneStudioPage({
                 {/* Step 2: Profile Details */}
                 <div className="clone-section-step">
                   <div className="clone-step-title">
-                    <span className="clone-step-num">2</span>
-                    <span>កំណត់ព័ត៌មានសំឡេង (Profile Details)</span>
+                    <span className="clone-step-num">២</span>
+                    <span>កំណត់ព័ត៌មានសំឡេង</span>
                   </div>
 
                   <div className="clone-form-grid">
                     <div className="clone-form-field">
-                      <label>ឈ្មោះសំឡេង (Voice Name)</label>
+                      <label>ឈ្មោះសំឡេង</label>
                       <input
                         className="clone-form-input"
                         type="text"
-                        placeholder="ឧទាហរណ៍៖ សំឡេងកញ្ញា សុភា, សំឡេងរបស់ខ្ញុំ..."
+                        placeholder="ឧទាហរណ៍៖ សំឡេងកញ្ញា សុភា, សំឡេងផ្ទាល់ខ្លួន..."
                         value={cloneName}
                         onChange={(e) => setCloneName(e.target.value)}
                       />
                     </div>
 
                     <div className="clone-form-field">
-                      <label>ភាសាគោលដៅ (Target Language)</label>
+                      <label>ភាសាគោលដៅ</label>
                       <select
                         className="clone-form-select"
                         value={cloneLanguage}
                         onChange={(e) => setCloneLanguage(e.target.value)}
                       >
-                        <option value="km">ភាសាខ្មែរ (Khmer)</option>
-                        <option value="en">English (អង់គ្លេស)</option>
-                        <option value="zh">中文 (Chinese)</option>
+                        <option value="km">ភាសាខ្មែរ</option>
+                        <option value="en">ភាសាអង់គ្លេស</option>
+                        <option value="zh">ភាសាចិន</option>
                       </select>
                     </div>
                   </div>
@@ -1269,9 +1607,50 @@ export function VoiceCloneStudioPage({
                 {/* Step 3: Extract & Test */}
                 <div className="clone-section-step">
                   <div className="clone-step-title">
-                    <span className="clone-step-num">3</span>
-                    <span>ស្រង់យកម៉ូដែល & រក្សាទុកក្នុងកុំព្យូទ័រ (Train & Save)</span>
+                    <span className="clone-step-num">៣</span>
+                    <span>ស្រង់យកម៉ូដែល និងរក្សាទុក</span>
                   </div>
+
+                  {/* ElevenLabs High-Fidelity Tip or Status Banner */}
+                  {!isKeyValid ? (
+                    <div className="elevenlabs-tip-card">
+                      <div className="elevenlabs-tip-title">
+                        <Sparkle size={18} weight="fill" color="#38bdf8" />
+                        <span>ចង់បានសំឡេងក្លូនដូចមនុស្ស ១០០% ទេ?</span>
+                      </div>
+                      <p className="elevenlabs-tip-desc">
+                        ការក្លូនក្នុងកុំព្យូទ័រ (Local Converter) អាចមានសំឡេងមិនទាន់ដូចមនុស្ស ១០០%។ អ្នកអាចភ្ជាប់ ElevenLabs API Key ដើម្បីទទួលបានសំឡេងពិរោះ និងដូចសំឡេងដើមរបស់អ្នក ១០០%។
+                      </p>
+                      <button
+                        className="elevenlabs-tip-action"
+                        type="button"
+                        onClick={() => {
+                          setKeyInput(apiKey);
+                          setKeyError("");
+                          setShowKeyModal(true);
+                        }}
+                      >
+                        <Key size={15} weight="bold" />
+                        <span>ភ្ជាប់ ElevenLabs API Key ឥឡូវនេះ</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      className="elevenlabs-tip-card"
+                      style={{
+                        borderColor: "rgba(16, 185, 129, 0.4)",
+                        background: "rgba(16, 185, 129, 0.08)",
+                      }}
+                    >
+                      <div className="elevenlabs-tip-title" style={{ color: "#34d399" }}>
+                        <CheckCircle size={18} weight="fill" color="#10b981" />
+                        <span>កំពុងដំណើរការម៉ាស៊ីន ElevenLabs Neural (គុណភាពដូចមនុស្ស ១០០%)</span>
+                      </div>
+                      <p className="elevenlabs-tip-desc">
+                        សំឡេងគំរូរបស់អ្នកនឹងត្រូវបានក្លូនដោយ ElevenLabs ជាមួយនឹងបច្ចេកវិទ្យា neural voice cloning លំដាប់កំពូលពិភពលោក។
+                      </p>
+                    </div>
+                  )}
 
                   <div className="clone-action-bar">
                     <button
@@ -1289,22 +1668,24 @@ export function VoiceCloneStudioPage({
                         <>
                           <Lightning size={18} weight="fill" />
                           <span>
-                            {extractedEmbedding
-                              ? "ស្រង់យកម៉ូដែលម្តងទៀត (Re-extract)"
-                              : "ស្រង់យកម៉ូដែលសំឡេង (Extract Voice Model)"}
+                            {extractedEmbedding || extractedVoiceId
+                              ? "ស្រង់យកម៉ូដែលម្តងទៀត"
+                              : isKeyValid
+                              ? "ក្លូនសំឡេងជាមួយ ElevenLabs (100% ដូចពិត)"
+                              : "ស្រង់យកម៉ូដែលសំឡេង (Local)"}
                           </span>
                         </>
                       )}
                     </button>
 
-                    {extractedEmbedding && (
+                    {(extractedEmbedding || extractedVoiceId) && (
                       <button
                         className="btn-save-clone-local"
                         type="button"
                         onClick={handleSaveProfile}
                       >
                         <FloppyDisk size={18} weight="fill" />
-                        <span>រក្សាទុកក្នុងកុំព្យូទ័រ (Save to Local Storage)</span>
+                        <span>រក្សាទុកក្នុងកុំព្យូទ័រ</span>
                       </button>
                     )}
                   </div>
@@ -1359,7 +1740,7 @@ export function VoiceCloneStudioPage({
                         </button>
                         <div>
                           <strong style={{ fontSize: "13.5px", color: "#10b981" }}>
-                            សាកល្បងស្តាប់សំឡេង Clone (Test Sample)
+                            សាកល្បងស្តាប់សំឡេងដែលបានក្លូន
                           </strong>
                           <div style={{ fontSize: "11.5px", color: "#94a3b8" }}>
                             ស្តាប់ដើម្បីផ្ទៀងផ្ទាត់គុណភាព មុនពេលរក្សាទុក
@@ -1382,65 +1763,410 @@ export function VoiceCloneStudioPage({
               </div>
             </div>
           )}
-
-          {/* TAB 3: GUIDE & TECH INFO */}
-          {activeTab === "guide" && (
-            <div className="voice-tab-content">
-              <div className="guide-card">
-                <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 10px 0" }}>
-                  💡 គន្លឹះដើម្បី Clone សំឡេងបានដូចមនុស្ស 100% និងច្បាស់ល្អ
-                </h3>
-
-                <div className="guide-step-row">
-                  <div className="guide-icon-badge">1</div>
-                  <div className="guide-text">
-                    <h4>ថតក្នុងបន្ទប់ស្ងប់ស្ងាត់ (Quiet Environment)</h4>
-                    <p>
-                      សូមថតសំឡេងនៅក្នុងបន្ទប់ដែលគ្មានសម្លេងរំខាន គ្មានកង្ហារ ឬម៉ាស៊ីនត្រជាក់បន្លឺខ្លាំង
-                      និងគ្មានសម្លេងអេកូ (Echo)។
-                    </p>
-                  </div>
-                </div>
-
-                <div className="guide-step-row">
-                  <div className="guide-icon-badge">2</div>
-                  <div className="guide-text">
-                    <h4>រយៈពេលសមស្របចន្លោះពី 10 ទៅ 30 វិនាទី</h4>
-                    <p>
-                      មិនចាំបាច់ថតយូរពេកទេ ចន្លោះពី 10 ទៅ 25 វិនាទីគឺគ្រប់គ្រាន់ឱ្យ AI ស្រង់យក
-                      Tone Color (Timbre) របស់សំឡេងអ្នកបានយ៉ាងច្បាស់។
-                    </p>
-                  </div>
-                </div>
-
-                <div className="guide-step-row">
-                  <div className="guide-icon-badge">3</div>
-                  <div className="guide-text">
-                    <h4>រក្សាទុកក្នុង Local Computer 100% (Offline & Privacy)</h4>
-                    <p>
-                      រាល់ម៉ូដែល និងសំឡេងដែលអ្នក Clone ត្រូវបានរក្សាទុកដោយផ្ទាល់ក្នុង Browser
-                      IndexedDB លើកុំព្យូទ័ររបស់អ្នក មិនមានការ Upload ទៅ Server ក្រៅឡើយ
-                      អ្នកអាចប្រើប្រាស់បានជារៀងរហូត។
-                    </p>
-                  </div>
-                </div>
-
-                <div className="guide-step-row">
-                  <div className="guide-icon-badge">4</div>
-                  <div className="guide-text">
-                    <h4>ការទាញបញ្ចូលទៅកាន់ Timeline</h4>
-                    <p>
-                      បន្ទាប់ពីអ្នកវាយអត្ថបទ និងចុច "បង្កើតសំឡេង" រួច អ្នកគ្រាន់តែចុចប៊ូតុង "បញ្ចូលទៅកាន់
-                      Timeline" នោះសំឡេងនឹងលោតចូលទៅក្នុងបន្ទាត់សំឡេង (Audio Track)
-                      នៃគម្រោងវីដេអូរបស់អ្នកដោយស្វ័យប្រវត្តិ!
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </main>
       </div>
+
+      {/* Unified API Keys Setup Modal (ElevenLabs & Google Gemini) */}
+      {showKeyModal && (
+        <div className="elevenlabs-modal-backdrop" onClick={() => setShowKeyModal(false)}>
+          <div className="elevenlabs-modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="elevenlabs-modal-header">
+              <div className="elevenlabs-modal-title">
+                <Key size={20} weight="fill" color="#38bdf8" />
+                <span>កំណត់ API Keys (ElevenLabs & Gemini)</span>
+              </div>
+              <button
+                className="elevenlabs-modal-close"
+                type="button"
+                onClick={() => setShowKeyModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Provider Switch Tabs */}
+            <div className="api-modal-tabs">
+              <button
+                className={`api-modal-tab tab-elevenlabs ${activeKeyTab === "elevenlabs" ? "is-active" : ""}`}
+                type="button"
+                onClick={() => {
+                  setActiveKeyTab("elevenlabs");
+                  setKeyError("");
+                }}
+              >
+                <span>🟣 ElevenLabs</span>
+                {isKeyValid && <span className="elevenlabs-tag">សកម្ម</span>}
+              </button>
+              <button
+                className={`api-modal-tab tab-gemini ${activeKeyTab === "gemini" ? "is-active" : ""}`}
+                type="button"
+                onClick={() => {
+                  setActiveKeyTab("gemini");
+                  setGeminiError("");
+                }}
+              >
+                <span>🔵 Google Gemini</span>
+                {isGeminiValid && <span className="gemini-tag">សកម្ម</span>}
+              </button>
+            </div>
+
+            {/* TAB 1: ElevenLabs */}
+            {activeKeyTab === "elevenlabs" && (
+              <>
+                <div className="elevenlabs-modal-body">
+                  <p className="elevenlabs-modal-desc">
+                    ElevenLabs គឺជាបច្ចេកវិទ្យា Voice Cloning លំដាប់លេខ ១ ពិភពលោក។ សំឡេងដែលបានក្លូនតាមរយៈ ElevenLabs មានភាពរលូន ធម្មជាតិ និងដូចសំឡេងមនុស្សពិត ១០០% ទាំងការដកដង្ហើម និងទឹកដមសំឡេង។
+                  </p>
+
+                  <div className="elevenlabs-key-input-row">
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, color: "#cbd5e1" }}>
+                      ElevenLabs API Key របស់អ្នក៖
+                    </label>
+                    <input
+                      className="elevenlabs-key-input"
+                      type="password"
+                      placeholder="sk_..."
+                      value={keyInput}
+                      onChange={(e) => {
+                        setKeyInput(e.target.value);
+                        setKeyError("");
+                      }}
+                    />
+                    <span style={{ fontSize: "11.5px", color: "#64748b" }}>
+                      អ្នកអាចបង្កើត API Key ដោយឥតគិតថ្លៃនៅ{" "}
+                      <a
+                        href="https://elevenlabs.io"
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: "#38bdf8", textDecoration: "underline" }}
+                      >
+                        elevenlabs.io
+                      </a>
+                    </span>
+                  </div>
+
+                  {keyError && (
+                    <div
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: "8px",
+                        background: "rgba(239, 68, 68, 0.12)",
+                        border: "1px solid rgba(239, 68, 68, 0.3)",
+                        color: "#f87171",
+                        fontSize: "12.5px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <WarningCircle size={16} weight="fill" />
+                      <span>{keyError}</span>
+                    </div>
+                  )}
+
+                  {isKeyValid && keyInfo && (
+                    <div className="elevenlabs-status-box">
+                      <CheckCircle size={18} weight="fill" color="#10b981" />
+                      <div>
+                        <strong>ភ្ជាប់បានជោគជ័យ (គណនី {keyInfo.tier || "Active"})</strong>
+                        <div style={{ fontSize: "11.5px", opacity: 0.85 }}>
+                          កូតាដែលបានប្រើ៖ {keyInfo.character_count?.toLocaleString()} / {keyInfo.character_limit?.toLocaleString()} តួអក្សរ ({keyInfo.percent_used}%)
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="elevenlabs-modal-footer">
+                  <div>
+                    {apiKey && (
+                      <button
+                        className="elevenlabs-modal-btn-remove"
+                        type="button"
+                        onClick={handleRemoveKey}
+                      >
+                        <Trash size={14} />
+                        <span>ដក Key ចេញ</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <button
+                      className="elevenlabs-modal-btn-cancel"
+                      type="button"
+                      onClick={() => setShowKeyModal(false)}
+                    >
+                      បោះបង់
+                    </button>
+                    <button
+                      className="elevenlabs-modal-btn-save"
+                      type="button"
+                      disabled={isVerifyingKey || !keyInput.trim()}
+                      onClick={handleVerifyAndSaveKey}
+                    >
+                      {isVerifyingKey ? (
+                        <>
+                          <Sparkle size={15} className="animate-spin" />
+                          <span>កំពុងផ្ទៀងផ្ទាត់...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check size={15} weight="bold" />
+                          <span>ផ្ទៀងផ្ទាត់ និងរក្សាទុក</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* TAB 2: Google Gemini */}
+            {activeKeyTab === "gemini" && (
+              <>
+                <div className="elevenlabs-modal-body">
+                  <p className="elevenlabs-modal-desc">
+                    Google Gemini ផ្តល់ជូននូវម៉ូដែល Gemini 2.0 Flash ជាមួយ Studio AI Voices គុណភាពខ្ពស់ និងជំនួយការសរសេរអត្ថបទវីដេអូជាភាសាខ្មែរ (AI Scriptwriter) ដោយឥតគិតថ្លៃ (Free Quota)។
+                  </p>
+
+                  <div className="elevenlabs-key-input-row">
+                    <label style={{ fontSize: "12.5px", fontWeight: 600, color: "#cbd5e1" }}>
+                      Google Gemini API Key របស់អ្នក៖
+                    </label>
+                    <input
+                      className="elevenlabs-key-input"
+                      type="password"
+                      placeholder="AIzaSy..."
+                      style={{ borderColor: "rgba(56, 189, 248, 0.4)" }}
+                      value={geminiKeyInput}
+                      onChange={(e) => {
+                        setGeminiKeyInput(e.target.value);
+                        setGeminiError("");
+                      }}
+                    />
+                    <span style={{ fontSize: "11.5px", color: "#64748b" }}>
+                      អ្នកអាចបង្កើត API Key ដោយឥតគិតថ្លៃនៅ{" "}
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: "#38bdf8", textDecoration: "underline" }}
+                      >
+                        Google AI Studio
+                      </a>
+                    </span>
+                  </div>
+
+                  {geminiError && (
+                    <div
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: "8px",
+                        background: "rgba(239, 68, 68, 0.12)",
+                        border: "1px solid rgba(239, 68, 68, 0.3)",
+                        color: "#f87171",
+                        fontSize: "12.5px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <WarningCircle size={16} weight="fill" />
+                      <span>{geminiError}</span>
+                    </div>
+                  )}
+
+                  {isGeminiValid && (
+                    <div
+                      className="elevenlabs-status-box"
+                      style={{ background: "rgba(56, 189, 248, 0.1)", borderColor: "rgba(56, 189, 248, 0.3)", color: "#38bdf8" }}
+                    >
+                      <CheckCircle size={18} weight="fill" color="#38bdf8" />
+                      <div>
+                        <strong>ភ្ជាប់បានជោគជ័យ (Google Gemini 2.0 Active)</strong>
+                        <div style={{ fontSize: "11.5px", opacity: 0.85 }}>
+                          គាំទ្រ Gemini Studio Voices (Aoede, Kore, Fenrir, Puck, Charon) & AI Scriptwriter
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="elevenlabs-modal-footer">
+                  <div>
+                    {geminiKey && (
+                      <button
+                        className="elevenlabs-modal-btn-remove"
+                        type="button"
+                        onClick={handleRemoveGeminiKey}
+                      >
+                        <Trash size={14} />
+                        <span>ដក Key ចេញ</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <button
+                      className="elevenlabs-modal-btn-cancel"
+                      type="button"
+                      onClick={() => setShowKeyModal(false)}
+                    >
+                      បោះបង់
+                    </button>
+                    <button
+                      className="gemini-modal-btn-save"
+                      type="button"
+                      disabled={isVerifyingGemini || !geminiKeyInput.trim()}
+                      onClick={handleVerifyAndSaveGeminiKey}
+                    >
+                      {isVerifyingGemini ? (
+                        <>
+                          <Sparkle size={15} className="animate-spin" />
+                          <span>កំពុងផ្ទៀងផ្ទាត់...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check size={15} weight="bold" />
+                          <span>ផ្ទៀងផ្ទាត់ និងរក្សាទុក</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Gemini AI Script Generator Modal */}
+      {showScriptModal && (
+        <div className="gemini-script-modal-backdrop" onClick={() => setShowScriptModal(false)}>
+          <div className="gemini-script-modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="elevenlabs-modal-header">
+              <div className="elevenlabs-modal-title">
+                <Sparkle size={20} weight="fill" color="#38bdf8" />
+                <span>Gemini AI សរសេរអត្ថបទវីដេអូ</span>
+              </div>
+              <button
+                className="elevenlabs-modal-close"
+                type="button"
+                onClick={() => setShowScriptModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="elevenlabs-modal-body">
+              <p style={{ fontSize: "13px", color: "#94a3b8", margin: 0, lineHeight: 1.6 }}>
+                ជ្រើសរើសប្រធានបទគំរូ ឬវាយបញ្ចូលគំនិតរបស់អ្នក ដើម្បីឱ្យ Google Gemini សរសេរអត្ថបទនិយាយជាភាសាខ្មែរយ៉ាងពិរោះ និងទាក់ទាញ៖
+              </p>
+
+              {/* Preset Topic Buttons */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <button
+                  className="gemini-script-preset-btn"
+                  type="button"
+                  onClick={() => setScriptTopic("រឿងនិទានខ្លីអំពីការតស៊ូ និងជោគជ័យ")}
+                >
+                  📖 និទានរឿងខ្លី
+                </button>
+                <button
+                  className="gemini-script-preset-btn"
+                  type="button"
+                  onClick={() => setScriptTopic("ផ្សាយពាណិជ្ជកម្មលក់ផលិតផលអនឡាញទាក់ទាញ")}
+                >
+                  🛍️ ផ្សាយពាណិជ្ជកម្ម
+                </button>
+                <button
+                  className="gemini-script-preset-btn"
+                  type="button"
+                  onClick={() => setScriptTopic("ចំណេះដឹងទូទៅ និងបច្ចេកវិទ្យាគួរឱ្យចាប់អារម្មណ៍")}
+                >
+                  💡 ចំណេះដឹងបច្ចេកវិទ្យា
+                </button>
+                <button
+                  className="gemini-script-preset-btn"
+                  type="button"
+                  onClick={() => setScriptTopic("ពាក្យពេចន៍ស្វាគមន៍បើកឆាកវីដេអូ YouTube / TikTok")}
+                >
+                  🎬 បើកឆាកវីដេអូ
+                </button>
+              </div>
+
+              {/* Custom Topic Input */}
+              <div className="elevenlabs-key-input-row">
+                <label style={{ fontSize: "12.5px", fontWeight: 600, color: "#cbd5e1" }}>
+                  ប្រធានបទ ឬគំនិតដែលចង់សរសេរ៖
+                </label>
+                <textarea
+                  className="tts-textarea"
+                  rows={3}
+                  placeholder="ឧទាហរណ៍៖ សរសេរការរៀបរាប់អំពីដំណើរដើរលេងកម្សាន្តនៅតំបន់ភ្នំគូលែន..."
+                  value={scriptTopic}
+                  onChange={(e) => setScriptTopic(e.target.value)}
+                />
+              </div>
+
+              {/* Tone Selection */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <label style={{ fontSize: "12.5px", fontWeight: 600, color: "#94a3b8" }}>
+                  ទឹកដមសម្លេង៖
+                </label>
+                <select
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "6px",
+                    background: "rgba(15, 23, 42, 0.9)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
+                    color: "#f1f5f9",
+                    fontSize: "12.5px",
+                    outline: "none",
+                  }}
+                  value={scriptTone}
+                  onChange={(e) => setScriptTone(e.target.value)}
+                >
+                  <option value="ធម្មជាតិ និងរួសរាយ">ធម្មជាតិ និងរួសរាយ</option>
+                  <option value="រស់រវើក និងទាក់ទាញ">រស់រវើក និងទាក់ទាញ</option>
+                  <option value="ម៉ឺងម៉ាត់ និងវិជ្ជាជីវៈ">ម៉ឺងម៉ាត់ និងវិជ្ជាជីវៈ</option>
+                  <option value="កំប្លែង និងសប្បាយ">កំប្លែង និងសប្បាយ</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="elevenlabs-modal-footer">
+              <button
+                className="elevenlabs-modal-btn-cancel"
+                type="button"
+                onClick={() => setShowScriptModal(false)}
+              >
+                បោះបង់
+              </button>
+
+              <button
+                className="gemini-modal-btn-save"
+                type="button"
+                disabled={isGeneratingScript || !scriptTopic.trim()}
+                onClick={() => handleGenerateScriptWithGemini()}
+              >
+                {isGeneratingScript ? (
+                  <>
+                    <Sparkle size={15} className="animate-spin" />
+                    <span>Gemini កំពុងសរសេរ...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkle size={15} weight="fill" />
+                    <span>បង្កើតអត្ថបទឥឡូវនេះ</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

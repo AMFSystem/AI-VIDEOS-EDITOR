@@ -163,6 +163,21 @@ export function Topbar({
                       </span>
                       <span className="file-menu-format">URL</span>
                     </button>
+                    <button
+                      className="file-menu-action"
+                      type="button"
+                      onClick={() => {
+                        setShowFileMenu(false);
+                        onOpenVoiceStudio?.();
+                      }}
+                    >
+                      <span className="file-menu-icon"><MicrophoneStage size={17} /></span>
+                      <span className="file-menu-copy">
+                        <strong>{t("voiceCloneStudio", "ក្លូនសំឡេង AI")}</strong>
+                        <small>{t("voiceCloneStudioHint", "ស្ទូឌីយោក្លូនសំឡេង និងបម្លែងអត្ថបទទៅជាសំឡេង")}</small>
+                      </span>
+                      <span className="file-menu-format">VOICE</span>
+                    </button>
                     <div className="file-menu-divider" />
                     <nav className="file-menu-resources" aria-label={t("resourceLinks")}>
                       <a href="/features/">{t("resourceFeatures")}</a>
@@ -253,6 +268,32 @@ export function Topbar({
         >
           <DownloadSimple size={15} weight="bold" />
           <span>{t("downloadUrlTool", "URL Download")}</span>
+        </button>
+        <button
+          className="ghost-action"
+          type="button"
+          title={t("voiceCloneStudioHint", "ស្ទូឌីយោក្លូនសំឡេង និងបម្លែងអត្ថបទទៅជាសំឡេង")}
+          onClick={(event) => {
+            onOpenVoiceStudio?.();
+            releasePointerActivatedFocus(event);
+          }}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "5px 11px",
+            borderRadius: "7px",
+            border: "1px solid rgba(168, 85, 247, 0.4)",
+            background: "rgba(168, 85, 247, 0.1)",
+            color: "#c084fc",
+            fontWeight: "550",
+            fontSize: "12px",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+        >
+          <MicrophoneStage size={15} weight="bold" />
+          <span>{t("voiceCloneStudio", "ក្លូនសំឡេង AI")}</span>
         </button>
         <button className="preview-button" type="button" title={`${t("shortcutPlayPause")} · Space`} onClick={(event) => { handlePlayToggle(); releasePointerActivatedFocus(event); }}>
           {isPlaying ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}

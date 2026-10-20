@@ -10,3 +10,13 @@ aiRouter.post("/cut-silence", aiController.cutSilence);
 aiRouter.get("/comfyui-status", aiController.comfyUiStatus);
 aiRouter.get("/tts-google", aiController.googleTts);
 aiRouter.post("/tts-google", aiController.googleTts);
+
+// ElevenLabs Professional Voice Cloning & TTS
+aiRouter.post("/elevenlabs/clone-voice", aiController.elevenLabsCloneVoice);
+aiRouter.post("/elevenlabs/tts", aiController.elevenLabsTts);
+aiRouter.post("/elevenlabs/verify", aiController.elevenLabsVerifyKey);
+
+// Google Gemini 2.0 Flash Audio & Scriptwriting
+aiRouter.post("/gemini/verify", aiController.geminiVerifyKey);
+aiRouter.post("/gemini/tts", aiController.geminiTts);
+aiRouter.post("/gemini/generate-script", aiController.geminiGenerateScript);
