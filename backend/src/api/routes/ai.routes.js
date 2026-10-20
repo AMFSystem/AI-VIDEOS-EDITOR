@@ -20,3 +20,8 @@ aiRouter.post("/elevenlabs/verify", aiController.elevenLabsVerifyKey);
 aiRouter.post("/gemini/verify", aiController.geminiVerifyKey);
 aiRouter.post("/gemini/tts", aiController.geminiTts);
 aiRouter.post("/gemini/generate-script", aiController.geminiGenerateScript);
+
+// VoxCPM2 OpenBMB 48kHz Neural Diffusion Cloner & TTS
+aiRouter.get("/voxcpm/status", aiController.voxcpmStatus);
+aiRouter.post("/voxcpm/clone", aiController.voxcpmClone);
+aiRouter.post("/voxcpm/tts", aiController.voxcpmTts);

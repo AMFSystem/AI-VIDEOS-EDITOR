@@ -10,6 +10,7 @@ import {
   synthesizeGeminiSpeech,
   generateGeminiScript,
 } from "../../services/ai/geminiService.js";
+import { voxcpmService } from "../../services/ai/voxcpmService.js";
 
 export const aiController = {
   async transcribe(req, res) {
@@ -192,6 +193,57 @@ export const aiController = {
     try {
       const result = await generateGeminiScript({ apiKey, prompt, topic, tone });
       res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async voxcpmStatus(_req, res) {
+    try {
+      const status = await voxcpmService.getStatus();
+      res.json(status);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async voxcpmClone(req, res) {
+    const { name, audioBase64, mimeType = "audio/wav", language = "km" } = req.body;
+    if (!audioBase64) {
+      return res.status(400).json({ error: "ទិន្នន័យសំឡេង (audioBase64) គឺចាំបាច់" });
+    }
+
+    try {
+      const base64Clean = audioBase64.replace(/^data:[^;]+;base64,/, "");
+      const audioBuffer = Buffer.from(base64Clean, "base64");
+      const profile = await voxcpmService.extractProfile({
+        name,
+        audioBuffer,
+        mimeType,
+        language,
+      });
+      res.json({ success: true, profile });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async voxcpmTts(req, res) {
+    const { text, profile, speed = 1.0, language = "km" } = req.body;
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ error: "អត្ថបទត្រូវនិយាយគឺចាំបាច់" });
+    }
+
+    try {
+      const { buffer, mimeType } = await voxcpmService.synthesizeSpeech({
+        text,
+        profile,
+        speed: parseFloat(speed) || 1.0,
+        language,
+      });
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.send(buffer);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
