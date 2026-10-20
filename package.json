@@ -1,31 +1,27 @@
 {
-  "name": "web-player",
+  "name": "ai-video-editor-workspace",
   "version": "1.0.0",
   "private": true,
-  "description": "A local-first browser AI video editor for WebGPU AI music, AI repair, voiceovers, captions, talking avatars, and deterministic export.",
-  "license": "MIT",
-  "homepage": "https://video-editor.ai-creator.top/",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/MartinDelophy/ai-video-editor.git"
-  },
-  "bugs": {
-    "url": "https://github.com/MartinDelophy/ai-video-editor/issues"
-  },
+  "description": "AI Video Editor Monorepo with separated Frontend, Backend, and Desktop",
   "type": "module",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "desktop"
+  ],
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "agent": "node scripts/timeline-command.mjs",
-    "mcp": "node skills/edit-timeline-studio/mcp/server.mjs",
-    "skill:doctor": "node skills/edit-timeline-studio/scripts/setup-host.mjs --check",
-    "skill:setup": "node skills/edit-timeline-studio/scripts/setup-host.mjs --install",
-    "preview": "vite preview --host 0.0.0.0",
-    "lint": "eslint .",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run build"
+    "dev": "node scripts/start-dev.mjs",
+    "dev:all": "node scripts/start-dev.mjs",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "desktop": "npm run start --prefix desktop",
+    "build": "npm run build --prefix frontend",
+    "preview": "npm run preview --prefix frontend",
+    "lint": "npm run lint --prefix frontend",
+    "format": "npm run format --prefix frontend",
+    "format:check": "npm run format:check --prefix frontend",
+    "typecheck": "npm run typecheck --prefix frontend",
+    "check": "npm run check --prefix frontend"
   },
   "dependencies": {
     "@diffusionstudio/vits-web": "^1.0.3",

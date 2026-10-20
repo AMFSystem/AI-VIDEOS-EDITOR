@@ -1,0 +1,10 @@
+const { contextBridge, ipcRenderer } = require("electron");
+
+contextBridge.exposeInMainWorld("desktopAPI", {
+  isDesktop: true,
+  platform: process.platform,
+  getBackendUrl: () => "http://127.0.0.1:3001",
+  ping: () => ipcRenderer.invoke("desktop:ping"),
+  selectFile: (options) => ipcRenderer.invoke("desktop:select-file", options),
+  saveFile: (options) => ipcRenderer.invoke("desktop:save-file", options),
+});

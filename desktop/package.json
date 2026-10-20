@@ -1,0 +1,12 @@
+{
+  "name": "ai-video-editor-desktop",
+  "version": "1.0.0",
+  "description": "Desktop wrapper for AI Video Editor",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^34.2.0"
+  }
+}

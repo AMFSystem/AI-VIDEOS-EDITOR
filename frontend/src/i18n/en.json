@@ -1,0 +1,24 @@
+{
+  "app": {
+    "title": "Timeline Studio — Browser AI Video Editor",
+    "export": "Export Video",
+    "settings": "Settings",
+    "play": "Play",
+    "pause": "Pause"
+  },
+  "timeline": {
+    "tracks": "Tracks",
+    "addTrack": "Add Track",
+    "split": "Split Clip",
+    "delete": "Delete"
+  },
+  "panels": {
+    "media": "Media Bin",
+    "inspector": "Inspector",
+    "color": "Color Grade",
+    "audio": "Audio Mixer",
+    "effects": "Effects",
+    "captions": "Captions",
+    "ai": "AI Studio"
+  }
+}
