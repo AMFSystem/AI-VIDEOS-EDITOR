@@ -17,8 +17,7 @@ import { NanoVsrRestorationDialog } from "./components/NanoVsrRestorationDialog.
 import { SmartDenoiseDialog } from "./components/SmartDenoiseDialog.jsx";
 import { WebMcpReview, WebMcpAiStatus } from "./components/WebMcpReview.jsx";
 import ProjectImportOverlay from "./components/ProjectImportOverlay.jsx";
-import { UrlDownloaderPage } from "./components/pages/UrlDownloaderPage.jsx";
-import { VoiceCloneStudioPage } from "./components/pages/VoiceCloneStudioPage.jsx";
+import { UrlDownloaderPage, VoiceCloneStudioPage } from "./pages/index.js";
 import { downloaderService } from "./services/downloaderService.js";
 import {
   canShowFirstVisualGuide,
@@ -210,7 +209,7 @@ export function App() {
   const timelineMarkerEnd = useMemo(() => timelineMarkers.reduce(
     (end, marker) => Math.max(end, marker.type === "range" ? marker.endTime : marker.time), 0,
   ), [timelineMarkers]);
-  const { notify, toast } = useToast(2600, uiLanguage || "zh");
+  const { notify, toast } = useToast(2600, uiLanguage || "km");
   const [previewVideoMediaTime, setPreviewVideoMediaTime] = useState(0);
   const [sourceAudioDragTargetLane, setSourceAudioDragTargetLane] = useState(null);
   const sourceVoiceColorOriginalRef = useRef(null);
@@ -245,7 +244,7 @@ export function App() {
     voiceRecorderChunksRef, voiceRecorderRef, voiceRecorderStartedAtRef,
     voiceRecorderStreamRef, voiceRecorderTimerRef,
   } = useEditorRefs();
-  const activeLanguage = uiLanguage || "zh";
+  const activeLanguage = uiLanguage || "km";
   const aiMusic = useAiMusicGeneration({
     activeLanguage,
     imageUrlRefs,

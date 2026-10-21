@@ -1,5 +1,9 @@
 # dependencies
 node_modules/
+.venv/
+venv/
+*.egg-info/
+__pycache__/
 
 # build output
 dist/
@@ -47,3 +51,9 @@ desktop.ini
 
 # Local Netlify folder
 .netlify
+
+# Python training workdir & large model checkpoints
+backend/python/training_workdir/
+*.pth
+*.safetensors
+*.tfevents.*

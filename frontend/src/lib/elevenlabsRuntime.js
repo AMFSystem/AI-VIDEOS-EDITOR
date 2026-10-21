@@ -9,12 +9,37 @@ async function blobToBase64(blob) {
 }
 
 const STORAGE_KEY = "timeline_studio_elevenlabs_key";
+const MULTI_STORAGE_KEY = "timeline_studio_elevenlabs_keys";
 
 export function getStoredElevenLabsKey() {
   try {
+    const multi = localStorage.getItem(MULTI_STORAGE_KEY);
+    if (multi) {
+      const parsed = JSON.parse(multi);
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0]) {
+        return parsed[0].trim();
+      }
+    }
     return localStorage.getItem(STORAGE_KEY) || "";
   } catch (_) {
     return "";
+  }
+}
+
+export function getStoredElevenLabsKeys() {
+  try {
+    const multi = localStorage.getItem(MULTI_STORAGE_KEY);
+    if (multi) {
+      const parsed = JSON.parse(multi);
+      if (Array.isArray(parsed)) {
+        const clean = parsed.map((k) => (typeof k === "string" ? k.trim() : "")).filter(Boolean);
+        if (clean.length > 0) return clean;
+      }
+    }
+    const single = getStoredElevenLabsKey();
+    return single ? [single] : [];
+  } catch (_) {
+    return [];
   }
 }
 
@@ -22,6 +47,26 @@ export function setStoredElevenLabsKey(key) {
   try {
     if (key && String(key).trim()) {
       localStorage.setItem(STORAGE_KEY, String(key).trim());
+      const current = getStoredElevenLabsKeys();
+      if (!current.includes(String(key).trim())) {
+        current.unshift(String(key).trim());
+      }
+      localStorage.setItem(MULTI_STORAGE_KEY, JSON.stringify(current));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(MULTI_STORAGE_KEY);
+    }
+  } catch (_) {}
+}
+
+export function setStoredElevenLabsKeys(keys) {
+  try {
+    const clean = Array.isArray(keys)
+      ? keys.map((k) => (typeof k === "string" ? k.trim() : "")).filter(Boolean)
+      : [];
+    localStorage.setItem(MULTI_STORAGE_KEY, JSON.stringify(clean));
+    if (clean.length > 0) {
+      localStorage.setItem(STORAGE_KEY, clean[0]);
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -148,8 +193,12 @@ export async function synthesizeWithElevenLabs({
 }) {
   const cleanKey = String(apiKey || "").trim();
   if (!cleanKey) throw new Error("សូមបញ្ចូល ElevenLabs API Key");
-  if (!voiceId) throw new Error("មិនទាន់មាន Voice ID របស់ ElevenLabs ទេ");
   if (!text || !text.trim()) throw new Error("សូមបញ្ចូលអត្ថបទដែលត្រូវនិយាយ");
+
+  let safeVoiceId = String(voiceId || "").trim();
+  if (!safeVoiceId || safeVoiceId.startsWith("gemini_") || safeVoiceId.length < 10) {
+    safeVoiceId = "21m00Tcm4TlvDq8ikWAM"; // Rachel - ElevenLabs Multilingual v2 Default
+  }
 
   onProgress?.(20);
 
@@ -160,7 +209,7 @@ export async function synthesizeWithElevenLabs({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text: text.trim(),
-        voiceId,
+        voiceId: safeVoiceId,
         apiKey: cleanKey,
         modelId,
         voiceSettings,
@@ -189,7 +238,7 @@ export async function synthesizeWithElevenLabs({
     },
   };
 
-  const directRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`, {
+  let directRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(safeVoiceId)}`, {
     method: "POST",
     headers: {
       "xi-api-key": cleanKey,
@@ -198,6 +247,20 @@ export async function synthesizeWithElevenLabs({
     },
     body: JSON.stringify(payload),
   });
+
+  // If safeVoiceId returned 404 on ElevenLabs, retry once with standard Rachel voice ID
+  if (!directRes.ok && directRes.status === 404 && safeVoiceId !== "21m00Tcm4TlvDq8ikWAM") {
+    console.warn(`ElevenLabs voice "${safeVoiceId}" not found (404), retrying with Rachel default...`);
+    directRes = await fetch("https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM", {
+      method: "POST",
+      headers: {
+        "xi-api-key": cleanKey,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg",
+      },
+      body: JSON.stringify(payload),
+    });
+  }
 
   if (!directRes.ok) {
     const errText = await directRes.text();

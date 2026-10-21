@@ -30,19 +30,19 @@ const UI_LANGUAGE_TO_WHISPER_LANGUAGE = {
 };
 
 const WHISPER_LANGUAGE_NAMES = {
-  zh: "中文",
+  zh: "ចិន (Chinese)",
   en: "English",
-  ja: "日本語",
-  ko: "한국어",
-  es: "Español",
-  fr: "Français",
-  de: "Deutsch",
-  pt: "Português",
-  km: "ភាសាខ្មែរ",
-  vi: "Tiếng Việt",
-  it: "Italiano",
-  id: "Bahasa Indonesia",
-  ru: "Русский",
+  ja: "Japanese",
+  ko: "Korean",
+  es: "Spanish",
+  fr: "French",
+  de: "German",
+  pt: "Portuguese",
+  km: "ខ្មែរ (Khmer)",
+  vi: "Vietnamese",
+  it: "Italian",
+  id: "Indonesian",
+  ru: "Russian",
 };
 
 let transcriberState = null;
@@ -57,7 +57,7 @@ const throwIfAborted = (signal) => {
 function getAudioContext(sampleRate = ASR_SAMPLE_RATE) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) {
-    throw new Error("当前浏览器不支持 AudioContext，无法识别音频。");
+    throw new Error("Browser មិនគាំទ្រ AudioContext សម្រាប់ស្រង់សំឡេងទេ។");
   }
 
   return new AudioContextClass({ sampleRate });
@@ -161,7 +161,7 @@ function normalizeWhisperLanguageToken(token) {
 }
 
 function getPreferredWhisperLanguage(preferredLanguage) {
-  return UI_LANGUAGE_TO_WHISPER_LANGUAGE[preferredLanguage] ?? "zh";
+  return UI_LANGUAGE_TO_WHISPER_LANGUAGE[preferredLanguage] ?? "en";
 }
 
 function getLanguageDetectionSample(audio) {
@@ -195,7 +195,7 @@ function createModelLoadProgressCallback(onProgress) {
     reportedProgress = nextProgress;
     onProgress?.({
       progress: nextProgress,
-      phase: `下载或读取 ${AUTOMATIC_CAPTION_MODEL_LABEL} ONNX`,
+      phase: `កំពុងទាញយក ឬដំណើរការ ${AUTOMATIC_CAPTION_MODEL_LABEL} ONNX (CPU Local)...`,
     });
   };
 }
@@ -218,7 +218,7 @@ async function detectWhisperLanguage(transcriber, audio, preferredLanguage, onPr
   }
 
   try {
-    onProgress?.({ progress: 70, phase: "识别音频语言" });
+    onProgress?.({ progress: 70, phase: "កំពុងវិភាគរកភាសាសំឡេង (Language Detection)..." });
     const sample = getLanguageDetectionSample(audio);
     const features = await transcriber.processor(sample);
     const output = await transcriber.model.generate({
@@ -315,12 +315,12 @@ function getAsrWorker() {
     }
 
     if (message.type === "error") {
-      request.reject(new Error(message.error || "自动字幕生成失败"));
+      request.reject(new Error(message.error || "ការស្រង់ Subtitles ដោយស្វ័យប្រវត្តិបរាជ័យ"));
     }
   });
 
   asrWorker.addEventListener("error", (event) => {
-    const error = new Error(event.message || "自动字幕 Worker 运行失败");
+    const error = new Error(event.message || "ASR Worker ដំណើរការមិនជោគជ័យ");
     asrWorker?.terminate();
     asrWorker = null;
     rejectWorkerRequests(error);
@@ -332,12 +332,12 @@ function getAsrWorker() {
 function transcribeAudioInWorker(audio, { onProgress, preferredLanguage, signal, requireWorker = false }) {
   throwIfAborted(signal);
   if (shouldSkipAsrWorker && !requireWorker) {
-    return Promise.reject(new Error("本轮已停用自动字幕 Worker。"));
+    return Promise.reject(new Error("បានផ្អាកដំណើរការ ASR Worker ក្នុងជុំនេះ"));
   }
 
   const worker = getAsrWorker();
   if (!worker) {
-    return Promise.reject(new Error("当前浏览器不支持 Worker 自动字幕。"));
+    return Promise.reject(new Error("Browser មិនគាំទ្រ Worker សម្រាប់ ASR ទេ។"));
   }
 
   const requestId = makeId("asr");
@@ -377,7 +377,7 @@ async function transcribeAudioOnMainThread(audio, { onProgress, preferredLanguag
   const languageLabel = WHISPER_LANGUAGE_NAMES[languageResult.language] ?? languageResult.language.toUpperCase();
   onProgress?.({
     progress: 74,
-    phase: `${languageResult.detected ? "检测为" : "按"} ${languageLabel} 转写字幕`,
+    phase: `${languageResult.detected ? "បានរកឃើញភាសា" : "តាមភាសា"} ${languageLabel} — កំពុងស្រង់ Subtitles...`,
   });
   const transcriptionOptions = {
     chunk_length_s: 30,
@@ -442,14 +442,14 @@ function resetAsrWorker() {
 
 async function runTranscription(
   blob,
-  { onProgress, preferredLanguage = "zh", timelineOffset = 0, grouping = "phrases", signal, requireWorker = false } = {},
+  { onProgress, preferredLanguage = "en", timelineOffset = 0, grouping = "phrases", signal, requireWorker = false } = {},
 ) {
   throwIfAborted(signal);
-  onProgress?.({ progress: 5, phase: "解码原声音频" });
+  onProgress?.({ progress: 5, phase: "កំពុងឌិកូដសំឡេង (Decoding Audio)..." });
   const { audio, duration } = await decodeAudioForAsr(blob);
   throwIfAborted(signal);
   if (!audio.length || !duration) {
-    throw new Error("没有检测到可识别的音频。");
+    throw new Error("មិនមានសំឡេងដែលអាចស្រង់ Transcript បានទេ។");
   }
 
   let result;
@@ -460,7 +460,7 @@ async function runTranscription(
     throwIfAborted(signal);
     if (error?.name === "AbortError" || requireWorker) throw error;
     console.warn("ASR worker failed, falling back to main thread.", error);
-    onProgress?.({ progress: 8, phase: "Worker 不可用，切换主线程自动字幕" });
+    onProgress?.({ progress: 8, phase: "កំពុងដំណើរការលើ Main Thread..." });
     result = await transcribeAudioOnMainThread(audio, { onProgress, preferredLanguage });
   }
   throwIfAborted(signal);
@@ -472,13 +472,13 @@ async function runTranscription(
     console.warn("ASR worker returned a suspicious transcript, retrying on the WASM main thread.", result.output);
     shouldSkipAsrWorker = true;
     resetAsrWorker();
-    onProgress?.({ progress: 78, phase: "Worker 结果异常，切换稳定 WASM 重新识别" });
+    onProgress?.({ progress: 78, phase: "កំពុងប្តូរទៅ WASM CPU ស្ថិរភាពឡើងវិញ..." });
     result = await transcribeAudioOnMainThread(audio, { onProgress, preferredLanguage });
   }
   throwIfAborted(signal);
 
   if (isSuspiciousTranscript(result.output, result.language, preferredLanguage)) {
-    throw new Error("自动字幕结果像是识别错语言了，请刷新后重新生成一次。");
+    throw new Error("ការស្រង់សំឡេងមិនទាន់ច្បាស់លាស់ សូមសាកល្បងម្តងទៀត។");
   }
 
   const segments = captionSegmentsFromWords(result.output?.chunks, duration, {
@@ -486,10 +486,10 @@ async function runTranscription(
     normalizeText: (text) => normalizeAsrText(text, result.language),
   });
   if (!segments.length) {
-    throw new Error("没有识别到可用字幕。");
+    throw new Error("មិនមាន Subtitles ត្រូវបានស្រង់ឃើញទេ។");
   }
 
-  onProgress?.({ progress: 96, phase: "写入字幕轨道" });
+  onProgress?.({ progress: 96, phase: "កំពុងបញ្ចូល Subtitles ទៅក្នុង Timeline..." });
   return {
     segments,
     text: segments.map((segment) => segment.text).join("\n"),

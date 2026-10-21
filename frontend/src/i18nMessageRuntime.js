@@ -33,5 +33,18 @@ export function localizeUiMessage(message, language) {
     });
     return result;
   }
+  if (language !== "en") {
+    const enCopy = UI_MESSAGE_COPY.en ?? {};
+    if (enCopy[text]) return enCopy[text];
+    for (const entry of compileTemplates("en")) {
+      const match = text.match(entry.regex);
+      if (!match) continue;
+      let result = entry.translated;
+      entry.placeholders.forEach((placeholder, index) => {
+        result = result.replaceAll(`{${placeholder}}`, match[index + 1] ?? "");
+      });
+      return result;
+    }
+  }
   return text;
 }

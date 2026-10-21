@@ -514,3 +514,93 @@ export async function synthesizeWithVoxCpm({
   onProgress(100);
   return outputBlob;
 }
+
+/**
+ * Fetch list of custom LoRA models from backend
+ */
+export async function getVoxCpmLoraModels() {
+  try {
+    const res = await fetch(`${BACKEND_BASE}/lora/models`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (res.ok) return await res.json();
+  } catch {}
+  return { models: [], active_lora: null, count: 0 };
+}
+
+/**
+ * Activate a LoRA adapter
+ */
+export async function loadVoxCpmLora(modelName) {
+  const res = await fetch(`${BACKEND_BASE}/lora/load`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ modelName }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "មិនអាច Load LoRA បានទេ");
+  }
+  return await res.json();
+}
+
+/**
+ * Fetch Khmer training prompts
+ */
+export async function getVoxCpmTrainingPrompts() {
+  try {
+    const res = await fetch(`${BACKEND_BASE}/train/prompts`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (res.ok) return await res.json();
+  } catch {}
+  return { prompts: [] };
+}
+
+/**
+ * Start LoRA Training directly from UI
+ */
+export async function startVoxCpmTraining({ modelName, samples, steps = 300, learningRate = 0.0001 }) {
+  const res = await fetch(`${BACKEND_BASE}/train/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ modelName, samples, steps, learningRate }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "បរាជ័យក្នុងការចាប់ផ្តើម Train");
+  }
+  return await res.json();
+}
+
+/**
+ * Get current training status
+ */
+export async function getVoxCpmTrainingStatus() {
+  try {
+    const res = await fetch(`${BACKEND_BASE}/train/status`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (res.ok) return await res.json();
+  } catch {}
+  return { status: "idle", progress: 0, logs: [] };
+}
+
+/**
+ * Stop active training
+ */
+export async function stopVoxCpmTraining() {
+  const res = await fetch(`${BACKEND_BASE}/train/stop`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "បរាជ័យក្នុងការបញ្ឈប់");
+  }
+  return await res.json();
+}
+

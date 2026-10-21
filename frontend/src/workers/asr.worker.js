@@ -20,19 +20,19 @@ const UI_LANGUAGE_TO_WHISPER_LANGUAGE = {
 };
 
 const WHISPER_LANGUAGE_NAMES = {
-  zh: "中文",
+  zh: "ចិន (Chinese)",
   en: "English",
-  ja: "日本語",
-  ko: "한국어",
-  es: "Español",
-  fr: "Français",
-  de: "Deutsch",
-  pt: "Português",
-  km: "ភាសាខ្មែរ",
-  vi: "Tiếng Việt",
-  it: "Italiano",
-  id: "Bahasa Indonesia",
-  ru: "Русский",
+  ja: "Japanese",
+  ko: "Korean",
+  es: "Spanish",
+  fr: "French",
+  de: "German",
+  pt: "Portuguese",
+  km: "ខ្មែរ (Khmer)",
+  vi: "Vietnamese",
+  it: "Italian",
+  id: "Indonesian",
+  ru: "Russian",
 };
 
 let transcriberState = null;
@@ -90,7 +90,7 @@ function normalizeWhisperLanguageToken(token) {
 }
 
 function getPreferredWhisperLanguage(preferredLanguage) {
-  return UI_LANGUAGE_TO_WHISPER_LANGUAGE[preferredLanguage] ?? "zh";
+  return UI_LANGUAGE_TO_WHISPER_LANGUAGE[preferredLanguage] ?? "en";
 }
 
 function getLanguageDetectionSample(audio) {
@@ -122,7 +122,7 @@ function createModelLoadProgressCallback(requestId) {
     }
 
     reportedProgress = nextProgress;
-    postProgress(requestId, nextProgress, `下载或读取 ${AUTOMATIC_CAPTION_MODEL_LABEL} ONNX`);
+    postProgress(requestId, nextProgress, `កំពុងទាញយក ឬដំណើរការ ${AUTOMATIC_CAPTION_MODEL_LABEL} ONNX (CPU Local)...`);
   };
 }
 
@@ -154,7 +154,7 @@ async function getTranscriber(requestId) {
           postProgress(
             requestId,
             7,
-            preferredDevice === "webgpu" ? "在 Worker 中初始化 WebGPU ONNX" : "在 Worker 中初始化 WASM ONNX",
+            preferredDevice === "webgpu" ? "កំពុងចាប់ផ្តើម WebGPU ONNX..." : "កំពុងចាប់ផ្តើម WASM CPU ONNX...",
           );
           return await createTranscriber(requestId, preferredDevice);
         } catch (error) {
@@ -162,7 +162,7 @@ async function getTranscriber(requestId) {
             throw error;
           }
           console.warn("Whisper WebGPU initialization failed, falling back to WASM.", error);
-          postProgress(requestId, 7, "WebGPU 初始化失败，切换 WASM Worker");
+          postProgress(requestId, 7, "ប្តូរទៅដំណើរការលើ WASM CPU...");
           return createTranscriber(requestId, "wasm");
         }
       })(),
@@ -196,7 +196,7 @@ async function detectWhisperLanguage(transcriber, audio, preferredLanguage, requ
   }
 
   try {
-    postProgress(requestId, 70, "识别音频语言");
+    postProgress(requestId, 70, "កំពុងវិភាគរកភាសាសំឡេង (Language Detection)...");
     const sample = getLanguageDetectionSample(audio);
     const features = await transcriber.processor(sample);
     const output = await transcriber.model.generate({
@@ -244,12 +244,12 @@ function serializeOutput(output) {
 
 async function transcribe({ requestId, audioBuffer, preferredLanguage, modelId }) {
   if (modelId && modelId !== AUTOMATIC_CAPTION_MODEL_ID) {
-    throw new Error("自动字幕模型版本已更新，请刷新后重新生成。");
+    throw new Error("Model ASR ត្រូវបានធ្វើបច្ចុប្បន្នភាព សូម Refresh រួចសាកល្បងម្តងទៀត។");
   }
 
   const audio = new Float32Array(audioBuffer);
   if (!audio.length) {
-    throw new Error("没有检测到可识别的音频。");
+    throw new Error("មិនមានសំឡេងដែលអាចស្រង់ Transcript បានទេ។");
   }
 
   const transcriber = await getTranscriber(requestId);
@@ -258,7 +258,7 @@ async function transcribe({ requestId, audioBuffer, preferredLanguage, modelId }
   postProgress(
     requestId,
     74,
-    `${languageResult.detected ? "检测为" : "按"} ${languageLabel} 转写字幕`,
+    `${languageResult.detected ? "បានរកឃើញភាសា" : "តាមភាសា"} ${languageLabel} — កំពុងស្រង់ Subtitles...`,
   );
 
   const transcriptionOptions = {
@@ -295,7 +295,7 @@ self.addEventListener("message", (event) => {
     self.postMessage({
       type: "error",
       requestId: message.requestId,
-      error: error instanceof Error ? error.message : "自动字幕生成失败",
+      error: error instanceof Error ? error.message : "ការស្រង់ Subtitles ដោយស្វ័យប្រវត្តិមិនជោគជ័យ",
     });
   });
 });

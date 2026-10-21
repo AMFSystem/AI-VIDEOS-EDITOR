@@ -168,6 +168,20 @@ const PLUGIN_TOOL_COPY = {
   ru: { plugins: "Плагины" },
 };
 
+const DUBBER_TOOL_COPY = {
+  zh: { dubber: "配音 Dubber" },
+  en: { dubber: "Dubber" },
+  ja: { dubber: "吹き替え Dubber" },
+  ko: { dubber: "더빙 Dubber" },
+  es: { dubber: "Doblaje Dubber" },
+  fr: { dubber: "Doublage Dubber" },
+  de: { dubber: "Dubber" },
+  pt: { dubber: "Dublagem Dubber" },
+  km: { dubber: "បកប្រែរឿង" },
+  vi: { dubber: "Lồng tiếng Dubber" },
+  ru: { dubber: "Дубляж Dubber" },
+};
+
 const MEDIA_COMPATIBILITY_COPY = {
   zh: { mediaCompatibilityProcessing: "正在分析并兼容处理该媒体…", mediaCompatibilityReady: "兼容媒体已准备完成", mediaCompatibilityFailed: "兼容处理失败", mediaCompatibilityFailedHint: "无法读取该媒体，请尝试转换为 MP4/H.264/AAC" },
   en: { mediaCompatibilityProcessing: "Analyzing and preparing compatible media…", mediaCompatibilityReady: "Compatible media is ready", mediaCompatibilityFailed: "Compatibility processing failed", mediaCompatibilityFailedHint: "This media could not be read. Try MP4 with H.264/AAC." },
@@ -500,7 +514,7 @@ const VECTOR_LIBRARY_COPY = {
 export const LANGUAGE_STORAGE_KEY = "ai-voiceover-ui-language";
 
 export const APP_LANGUAGES = [
-  { id: "zh", name: "中文", nativeName: "中文", hint: "简体中文" },
+  { id: "km", name: "Khmer", nativeName: "ភាសាខ្មែរ", hint: "Khmer" },
   { id: "en", name: "English", nativeName: "English", hint: "English" },
   { id: "ja", name: "Japanese", nativeName: "日本語", hint: "Japanese" },
   { id: "ko", name: "Korean", nativeName: "한국어", hint: "Korean" },
@@ -508,7 +522,6 @@ export const APP_LANGUAGES = [
   { id: "fr", name: "French", nativeName: "Français", hint: "French" },
   { id: "de", name: "German", nativeName: "Deutsch", hint: "German" },
   { id: "pt", name: "Portuguese", nativeName: "Português", hint: "Portuguese" },
-  { id: "km", name: "Khmer", nativeName: "ភាសាខ្មែរ", hint: "Khmer" },
   { id: "vi", name: "Vietnamese", nativeName: "Tiếng Việt", hint: "Vietnamese" },
   { id: "ru", name: "Russian", nativeName: "Русский", hint: "Russian" },
   { id: "it", name: "Italian", nativeName: "Italiano", hint: "Italiano" },
@@ -3883,14 +3896,18 @@ export const LANGUAGE_FALLBACKS = {
 
 export function getStoredLanguage() {
   if (typeof window === "undefined") {
-    return "";
+    return "km";
   }
 
   try {
     const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    return APP_LANGUAGES.some((language) => language.id === stored) ? stored : "";
+    if (!stored || stored === "zh") {
+      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "km");
+      return "km";
+    }
+    return APP_LANGUAGES.some((language) => language.id === stored) ? stored : "km";
   } catch {
-    return "";
+    return "km";
   }
 }
 
@@ -3923,7 +3940,7 @@ export function createTranslator(languageId) {
   const projectChromeCopy = PROJECT_CHROME_COPY[languageId] ?? PROJECT_CHROME_COPY.en;
   const coreLabelCopy = CORE_LABEL_COPY[languageId] ?? CORE_LABEL_COPY.en;
   const specializedCopy = Object.assign({}, ...[
-    EXPORT_RENDER_COPY, MEDIA_COMPATIBILITY_COPY, COMMUNITY_LINKS_COPY, AUDIO_SPATIAL_COPY, VOICE_COLOR_COPY, VOICE_CLONE_COPY, TIMELINE_SELECTION_COPY, TIMELINE_FINE_EDIT_COPY, TIMELINE_TRIM_COPY, TIMELINE_TOOLBAR_COPY, SHORTCUT_GUIDE_COPY, FACE_SWAP_COPY, VECTOR_LIBRARY_COPY, PROJECT_CHROME_COPY, CORE_LABEL_COPY, MOBILE_DRAWER_COPY, MOBILE_CLIP_ACTION_COPY, PLUGIN_TOOL_COPY,
+    EXPORT_RENDER_COPY, MEDIA_COMPATIBILITY_COPY, COMMUNITY_LINKS_COPY, AUDIO_SPATIAL_COPY, VOICE_COLOR_COPY, VOICE_CLONE_COPY, TIMELINE_SELECTION_COPY, TIMELINE_FINE_EDIT_COPY, TIMELINE_TRIM_COPY, TIMELINE_TOOLBAR_COPY, SHORTCUT_GUIDE_COPY, FACE_SWAP_COPY, VECTOR_LIBRARY_COPY, PROJECT_CHROME_COPY, CORE_LABEL_COPY, MOBILE_DRAWER_COPY, MOBILE_CLIP_ACTION_COPY, PLUGIN_TOOL_COPY, DUBBER_TOOL_COPY,
     VISUAL_EDITOR_COPY, COLOR_GRADE_COPY, TRANSITION_EDITOR_COPY, ASSET_PREVIEW_COPY, ASSET_DROP_COPY,
     AUTO_CAPTION_STATUS_COPY, VISUAL_PANEL_TITLE_COPY, VISUAL_MASK_SHAPE_COPY,
     VISUAL_KEYFRAME_ACTION_COPY, VISUAL_TAB_COPY, VISUAL_SPEED_CURVE_COPY, SOURCE_AUDIO_SYNC_COPY,
@@ -3936,7 +3953,13 @@ export function createTranslator(languageId) {
     AUTO_EDIT_RESULT_COPY, IMAGE_AI_CAPTION_COPY, PICTURE_IN_PICTURE_COPY, EFFECTS_WORKSPACE_COPY, VECTOR_STATE_COPY, VECTOR_DOCUMENT_COPY, VECTOR_ADVANCED_COPY,
     SRT_IMPORT_COPY, CLICK_RIPPLE_COPY,
   ].map((source) => ({ ...(source.en ?? {}), ...(source[languageId] ?? {}) })));
-  return (key, fallbackText) => (RELIGHTING_COPY[languageId] ?? RELIGHTING_COPY.en)[key] ?? (DEPTH_MAP_COPY[languageId] ?? DEPTH_MAP_COPY.en)[key] ?? (REPAIR_ITERATION_COPY[languageId] ?? REPAIR_ITERATION_COPY.en)[key] ?? (CAPTION_GROUPING_COPY[languageId] ?? CAPTION_GROUPING_COPY.en)[key] ?? (TIMELINE_GAIN_COPY[languageId] ?? TIMELINE_GAIN_COPY.en)[key] ?? pauseCopy[key] ?? audioExportCopy[key] ?? markerCopy[key] ?? reviewedCopy[key] ?? completionCopy[key] ?? coreLabelCopy[key] ?? repairCopy[key] ?? specializedCopy[key] ?? exportOptionsCopy[key] ?? EXPORT_OPTIONS_COPY.en[key] ?? exportExtraStatusCopy[key] ?? EXPORT_EXTRA_STATUS_COPY.en[key] ?? projectChromeCopy[key] ?? PROJECT_CHROME_COPY.en[key] ?? captionAudioLinkCopy[key] ?? CAPTION_AUDIO_LINK_COPY.en[key] ?? ttsBackendCopy[key] ?? TTS_BACKEND_COPY.en[key] ?? mobileStickerCopy[key] ?? MOBILE_STICKER_COPY.en[key] ?? mobileClipActionCopy[key] ?? MOBILE_CLIP_ACTION_COPY.en[key] ?? mobileDrawerCopy[key] ?? MOBILE_DRAWER_COPY.en[key] ?? srtImportCopy[key] ?? exportCopy[key] ?? EXPORT_RENDER_COPY.en[key] ?? assetPreviewCopy[key] ?? ASSET_PREVIEW_COPY.en[key] ?? assetDropCopy[key] ?? ASSET_DROP_COPY.en[key] ?? autoCaptionStatusCopy[key] ?? AUTO_CAPTION_STATUS_COPY.en[key] ?? copy[key] ?? fallback[key] ?? UI_COPY.zh[key] ?? fallbackText ?? key;
+  return (key, fallbackText) => {
+    const res = (RELIGHTING_COPY[languageId] ?? RELIGHTING_COPY.en)[key] ?? (DEPTH_MAP_COPY[languageId] ?? DEPTH_MAP_COPY.en)[key] ?? (REPAIR_ITERATION_COPY[languageId] ?? REPAIR_ITERATION_COPY.en)[key] ?? (CAPTION_GROUPING_COPY[languageId] ?? CAPTION_GROUPING_COPY.en)[key] ?? (TIMELINE_GAIN_COPY[languageId] ?? TIMELINE_GAIN_COPY.en)[key] ?? pauseCopy[key] ?? audioExportCopy[key] ?? markerCopy[key] ?? reviewedCopy[key] ?? completionCopy[key] ?? coreLabelCopy[key] ?? repairCopy[key] ?? specializedCopy[key] ?? exportOptionsCopy[key] ?? EXPORT_OPTIONS_COPY.en[key] ?? exportExtraStatusCopy[key] ?? EXPORT_EXTRA_STATUS_COPY.en[key] ?? projectChromeCopy[key] ?? PROJECT_CHROME_COPY.en[key] ?? captionAudioLinkCopy[key] ?? CAPTION_AUDIO_LINK_COPY.en[key] ?? ttsBackendCopy[key] ?? TTS_BACKEND_COPY.en[key] ?? mobileStickerCopy[key] ?? MOBILE_STICKER_COPY.en[key] ?? mobileClipActionCopy[key] ?? MOBILE_CLIP_ACTION_COPY.en[key] ?? mobileDrawerCopy[key] ?? MOBILE_DRAWER_COPY.en[key] ?? srtImportCopy[key] ?? exportCopy[key] ?? EXPORT_RENDER_COPY.en[key] ?? assetPreviewCopy[key] ?? ASSET_PREVIEW_COPY.en[key] ?? assetDropCopy[key] ?? ASSET_DROP_COPY.en[key] ?? autoCaptionStatusCopy[key] ?? AUTO_CAPTION_STATUS_COPY.en[key] ?? copy[key] ?? fallback[key] ?? fallbackText ?? key;
+    if (typeof res === "string" && /[\u4e00-\u9fa5]/.test(res)) {
+      return fallback[key] ?? fallbackText ?? key;
+    }
+    return res;
+  };
 }
 
 export function translateOptionName(languageId, name) {

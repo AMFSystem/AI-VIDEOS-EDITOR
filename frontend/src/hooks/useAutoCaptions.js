@@ -8,16 +8,16 @@ export function localizeAutoCaptionPhase(phase, t) {
     (result, [name, value]) => result.replace(`{${name}}`, value),
     t(key, fallback),
   );
-  if (text.includes("下载或读取") && text.includes("Whisper")) return t("asrDownloadingModel", text);
-  if (text.includes("识别音频语言")) return t("asrDetectingLanguage", text);
-  if (text.includes("初始化 WebGPU")) return t("asrInitializingWebGpu", text);
-  if (text.includes("初始化 WASM")) return t("asrInitializingWasm", text);
-  if (text.includes("WebGPU 初始化失败")) return t("asrFallingBackWasm", text);
-  if (text.includes("解码原声音频")) return t("asrDecodingAudio", text);
-  if (text.includes("Worker 不可用")) return t("asrWorkerFallback", text);
-  if (text.includes("Worker 结果异常")) return t("asrRetryingWasm", text);
-  if (text.includes("写入字幕轨道")) return t("asrWritingCaptions", text);
-  const languageMatch = text.match(/(?:检测为|按)\s+(.+?)\s+转写字幕/);
+  if (text.includes("ONNX (CPU Local)") || (text.includes("下载或读取") && text.includes("Whisper"))) return t("asrDownloadingModel", text);
+  if (text.includes("កំពុងវិភាគរកភាសាសំឡេង") || text.includes("识别音频语言")) return t("asrDetectingLanguage", text);
+  if (text.includes("WebGPU ONNX") || text.includes("初始化 WebGPU")) return t("asrInitializingWebGpu", text);
+  if (text.includes("WASM CPU ONNX") || text.includes("初始化 WASM")) return t("asrInitializingWasm", text);
+  if (text.includes("WASM CPU") || text.includes("WebGPU 初始化失败")) return t("asrFallingBackWasm", text);
+  if (text.includes("កំពុងឌិកូដសំឡេង") || text.includes("解码原声音频")) return t("asrDecodingAudio", text);
+  if (text.includes("Main Thread") || text.includes("Worker 不可用")) return t("asrWorkerFallback", text);
+  if (text.includes("WASM CPU ស្ថិរភាព") || text.includes("Worker 结果异常")) return t("asrRetryingWasm", text);
+  if (text.includes("កំពុងបញ្ចូល Subtitles") || text.includes("写入字幕轨道")) return t("asrWritingCaptions", text);
+  const languageMatch = text.match(/(?:检测为|按|បានរកឃើញភាសា|តាមភាសា)\s+(.+?)\s+(?:转写字幕|— កំពុងស្រង់ Subtitles)/);
   if (languageMatch) return format("asrTranscribingLanguage", text, { language: languageMatch[1] });
   return text;
 }

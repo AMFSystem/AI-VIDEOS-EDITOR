@@ -1,0 +1,953 @@
+/* AI Story & Movie Dubber Panel CSS */
+
+.dubber-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  color: #e2edf1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+  box-sizing: border-box;
+  font-family: "Kantumruy Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ========================================================
+   Upload Dropzone & File Card (Direct Video Input)
+   ======================================================== */
+.dubber-upload-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 22px 14px;
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.65);
+  border: 1.5px dashed rgba(56, 189, 248, 0.35);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.dubber-upload-dropzone:hover {
+  background: rgba(56, 189, 248, 0.08);
+  border-color: #38bdf8;
+  transform: translateY(-1px);
+}
+
+.dubber-upload-dropzone.is-dragging {
+  background: rgba(56, 189, 248, 0.14);
+  border-color: #38bdf8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+}
+
+.dubber-upload-icon-wrapper {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+}
+
+.dubber-upload-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.dubber-upload-hint {
+  font-size: 11px;
+  color: #94a3b8;
+  max-width: 240px;
+  line-height: 1.4;
+}
+
+/* Uploaded File Selected Card */
+.dubber-uploaded-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-sizing: border-box;
+}
+
+.dubber-uploaded-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.dubber-uploaded-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  flex-shrink: 0;
+}
+
+.dubber-uploaded-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dubber-uploaded-name {
+  font-size: 12px;
+  font-weight: 650;
+  color: #f8fafc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dubber-uploaded-meta {
+  font-size: 10.5px;
+  color: #7dd3fc;
+}
+
+.dubber-uploaded-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.dubber-change-file-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.dubber-change-file-btn:hover {
+  background: rgba(56, 189, 248, 0.2);
+  color: #ffffff;
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+/* ========================================================
+   Step Cards
+   ======================================================== */
+.dubber-card {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(16, 23, 36, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
+}
+
+.dubber-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dubber-step-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.dubber-step-num {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
+.dubber-chip-ai {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+}
+
+.dubber-link-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: #38bdf8;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.dubber-link-btn:hover {
+  background: rgba(56, 189, 248, 0.12);
+  color: #7dd3fc;
+}
+
+/* Grid & Fields */
+.dubber-grid-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Third field (Model selector) spans full width */
+.dubber-grid-fields .dubber-field:nth-child(3) {
+  grid-column: 1 / -1;
+}
+
+/* Local Whisper — Gemini Key for Translation */
+.dubber-local-translation-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  box-sizing: border-box;
+}
+
+.dubber-local-translation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fcd34d;
+}
+
+.dubber-local-translation-hint {
+  font-size: 10.5px;
+  color: #fbbf24;
+  line-height: 1.4;
+}
+
+.dubber-local-translation-hint.is-ready {
+  color: #86efac;
+}
+
+.dubber-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dubber-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dubber-field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.dubber-clear-btn {
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 10.5px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.dubber-clear-btn:hover {
+  color: #cbd5e1;
+}
+
+.dubber-select {
+  width: 100%;
+  padding: 7px 9px;
+  background: #0b111e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  color: #f1f5f9;
+  font-size: 11.5px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: border-color 0.16s ease;
+}
+
+.dubber-select:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.dubber-select optgroup {
+  background: #0b111e;
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 4px 0;
+}
+
+.dubber-select option {
+  background: #0f172a;
+  color: #f1f5f9;
+  font-size: 11.5px;
+  padding: 4px 8px;
+}
+
+/* Model Engine Status & API Key Configuration */
+.dubber-engine-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 11px;
+  box-sizing: border-box;
+}
+
+.dubber-engine-status.is-local {
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+}
+
+.dubber-engine-status.is-ready {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #86efac;
+}
+
+.dubber-engine-status.is-missing {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fcd34d;
+}
+
+.dubber-key-toggle-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 5px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.dubber-key-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+/* Inline Key Input Box */
+.dubber-key-input-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  box-sizing: border-box;
+}
+
+.dubber-key-input-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dubber-key-input-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fcd34d;
+}
+
+.dubber-key-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dubber-key-input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  background: #090e1a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #f8fafc;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+}
+
+.dubber-key-input:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+.dubber-key-save-btn {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  border: none;
+  color: #ffffff;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.dubber-key-save-btn:hover {
+  background: linear-gradient(135deg, #b45309 0%, #92400e 100%);
+}
+
+.dubber-select.is-voice-select {
+  border-color: rgba(56, 189, 248, 0.25);
+  background: rgba(11, 17, 30, 0.95);
+}
+
+.dubber-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  background: #090e1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  color: #f8fafc;
+  font-size: 12px;
+  line-height: 1.5;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+  min-height: 70px;
+  box-sizing: border-box;
+  transition: border-color 0.16s ease;
+}
+
+.dubber-textarea:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+/* Primary Button */
+.dubber-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 14px;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 650;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  box-shadow: 0 3px 10px rgba(2, 132, 199, 0.25);
+}
+
+.dubber-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+}
+
+.dubber-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Result Box */
+.dubber-result-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px;
+  background: rgba(14, 165, 233, 0.05);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.dubber-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dubber-result-title {
+  font-size: 11px;
+  font-weight: 650;
+  color: #38bdf8;
+}
+
+.dubber-char-count {
+  font-size: 10px;
+  color: #64748b;
+}
+
+.dubber-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dubber-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.dubber-textarea.is-result {
+  background: rgba(9, 14, 26, 0.9);
+  border-color: rgba(56, 189, 248, 0.25);
+  min-height: 85px;
+}
+
+.dubber-transcript-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.dubber-textarea.is-transcript {
+  background: rgba(10, 15, 26, 0.75);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  min-height: 65px;
+}
+
+/* Voice Profile Missing Alert */
+.dubber-no-voice-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+  font-size: 11px;
+}
+
+.dubber-btn-small {
+  background: #0284c7;
+  border: none;
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.dubber-btn-small:hover {
+  background: #0369a1;
+}
+
+/* Sliders */
+.dubber-slider-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  background: rgba(11, 18, 30, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 7px;
+}
+
+.dubber-slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: #94a3b8;
+}
+
+.dubber-slider-val {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.dubber-slider-card input[type="range"] {
+  width: 100%;
+  accent-color: #38bdf8;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+/* Voice Generator Button */
+.dubber-btn-generate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  color: #ffffff;
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 650;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  box-shadow: 0 3px 12px rgba(13, 148, 136, 0.25);
+}
+
+.dubber-btn-generate:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857 0%, #0f766e 100%);
+  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.38);
+}
+
+.dubber-btn-generate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Progress bar */
+.dubber-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dubber-progress-bar {
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.dubber-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8, #0ea5e9);
+  transition: width 0.25s ease;
+}
+
+.dubber-progress-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: #38bdf8;
+}
+
+/* ========================================================
+   Output Audio Card (Step 3)
+   ======================================================== */
+.dubber-output-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(15, 23, 42, 0.88));
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+}
+
+.dubber-output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dubber-output-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.dubber-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+}
+
+.dubber-voice-tag {
+  font-size: 10.5px;
+  color: #94a3b8;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dubber-output-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.dubber-player-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  background: rgba(2, 132, 199, 0.3);
+  color: #38bdf8;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+}
+
+.dubber-player-btn:hover {
+  background: rgba(2, 132, 199, 0.5);
+  color: #ffffff;
+}
+
+.dubber-player-btn.is-playing {
+  background: rgba(225, 29, 72, 0.25);
+  border-color: rgba(225, 29, 72, 0.4);
+  color: #fb7185;
+}
+
+.dubber-timeline-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(16, 185, 129, 0.35));
+  color: #86efac;
+  font-size: 11.5px;
+  font-weight: 650;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+}
+
+.dubber-timeline-btn:hover {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.35), rgba(16, 185, 129, 0.45));
+  color: #ffffff;
+}
+
+.dubber-download-btn {
+  display: grid;
+  place-items: center;
+  width: 33px;
+  height: 33px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.16s ease;
+}
+
+.dubber-download-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+/* ========================================================
+   Model Selection Header & Clean Status Cards
+   ======================================================== */
+.dubber-field-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.dubber-field-header-row label {
+  margin: 0 !important;
+}
+
+.dubber-open-settings-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  color: #38bdf8;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  font-family: inherit;
+}
+
+.dubber-open-settings-pill:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.dubber-model-status-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.dubber-model-status-card.is-local {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.dubber-model-status-card.is-cloud {
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.dubber-status-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dubber-status-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dubber-status-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #f1f5f9;
+}
+
+.dubber-model-status-card.is-local .dubber-status-title {
+  color: #34d399;
+}
+
+.dubber-status-desc {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #94a3b8;
+}
+
+.dubber-active-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  padding: 1px 6px;
+  border-radius: 10px;
+  letter-spacing: 0.3px;
+}
+
+.dubber-active-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+}
+
+.dubber-status-gear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+
+.dubber-status-gear-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}

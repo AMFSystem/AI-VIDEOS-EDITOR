@@ -1,7 +1,9 @@
+@import url("https://fonts.googleapis.com/css2?family=Kantumruy+Pro:ital,wght@0,100..700;1,100..700&display=swap");
+
 :root {
   color-scheme: dark;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Kantumruy Pro", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     "PingFang SC", "Microsoft YaHei", sans-serif;
   background: #07090d;
   color: #eef5f7;
@@ -23,12 +25,14 @@ body {
     radial-gradient(circle at 46% -18%, rgba(48, 240, 219, 0.1), transparent 28%),
     #07090d;
   -webkit-font-smoothing: antialiased;
+  font-family: "Kantumruy Pro", Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
 button,
 textarea,
-input {
-  font: inherit;
+input,
+select {
+  font-family: "Kantumruy Pro", inherit;
 }
 
 button {
@@ -113,18 +117,24 @@ button:disabled {
 .project-file-button {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  border: 0;
-  padding: 2px 5px;
-  border-radius: 5px;
-  color: #8e9aa5;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 5px 11px;
+  border-radius: 7px;
+  color: #e2e8f0;
   font: inherit;
-  font-size: 12px;
-  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.04);
   cursor: pointer;
+  transition: all 0.16s ease;
 }
 
-.project-file-button:hover { color: #e8fffc; background: rgba(255,255,255,.075); }
+.project-file-button:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.16);
+}
 .project-file-input { display: none; }
 .file-menu-card {
   display: grid;
@@ -1396,54 +1406,43 @@ button:disabled {
 }
 
 .drop-zone {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  gap: 2px 10px;
-  min-height: 78px;
+  justify-content: center;
+  min-height: 62px;
   margin-top: 12px;
-  padding: 10px 12px;
-  border: 1px dashed rgba(173, 184, 196, 0.24);
+  padding: 12px;
+  border: 1px dashed rgba(173, 184, 196, 0.28);
   border-radius: 8px;
   color: #99a5b1;
-  text-align: left;
-  background: rgba(255, 255, 255, 0.018);
+  background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
   transition:
     border-color 160ms ease,
     background 160ms ease,
-    color 160ms ease;
-}
-
-.drop-zone strong {
-  color: #dfe8ee;
-  font-size: 14px;
-  line-height: 1.25;
-}
-
-.drop-zone span {
-  min-width: 0;
-  overflow: hidden;
-  color: #7c8793;
-  font-size: 11px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+    color 160ms ease,
+    transform 160ms ease;
 }
 
 .drop-zone svg {
-  grid-row: 1 / span 2;
-  justify-self: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   color: #8c96a2;
+  transition: color 160ms ease, transform 180ms ease, filter 180ms ease;
 }
 
 .drop-zone:hover,
 .drop-zone.is-dragging {
   border-color: rgba(46, 233, 217, 0.76);
-  color: #eafdfb;
-  background: rgba(46, 233, 217, 0.06);
+  color: #30f0db;
+  background: rgba(46, 233, 217, 0.08);
+}
+
+.drop-zone:hover svg,
+.drop-zone.is-dragging svg {
+  color: #30f0db;
+  filter: drop-shadow(0 4px 12px rgba(48, 240, 219, 0.35));
+  transform: translateY(-2px);
 }
 
 .asset-card {

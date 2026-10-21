@@ -94,7 +94,7 @@ async function probeAudio(buffer) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function normalizeTo48k(inputBuffer) {
   const filter = [
-    "aresample=48000:resampler=soxr:precision=20",
+    "aresample=48000",
     "highpass=f=60:poles=2",
     "lowpass=f=20000:poles=2",
     "loudnorm=I=-14:TP=-1:LRA=7",
@@ -384,14 +384,14 @@ function buildSynthesisFilterChain(profile, speed) {
   const pitchRatio = Math.max(0.88, Math.min(1.12, rawPitchRatio));
 
   // ── Stage 1: High-quality 48kHz upsampling ──────────────────────────────
-  filters.push("aresample=48000:resampler=soxr:precision=20");
+  filters.push("aresample=48000");
 
   // ── Stage 2: Pitch transposition to match speaker's F0 ──────────────────
   if (Math.abs(pitchRatio - 1.0) > 0.02) {
     const shiftedRate = Math.round(TARGET_SAMPLE_RATE * pitchRatio);
     // asetrate changes pitch; resample restores sample rate
     filters.push(`asetrate=${shiftedRate}`);
-    filters.push("aresample=48000:resampler=soxr:precision=20");
+    filters.push("aresample=48000");
   }
 
   // ── Stage 3: Speed/tempo adjustment ─────────────────────────────────────
@@ -464,21 +464,21 @@ function buildSynthesisFilterChain(profile, speed) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// XTTS v2 Local Server Bridge (Port 3002)
+// OpenBMB VoxCPM2 Local Neural Server Bridge (Port 3002)
 // ─────────────────────────────────────────────────────────────────────────────
-const XTTS_SERVER_URL = process.env.XTTS_SERVER_URL || "http://127.0.0.1:3002";
+const VOXCPM_SERVER_URL = process.env.VOXCPM_SERVER_URL || process.env.XTTS_SERVER_URL || "http://127.0.0.1:3002";
 
-async function checkXttsServer() {
+async function checkVoxCpmServer() {
   try {
-    const res = await fetch(`${XTTS_SERVER_URL}/status`, {
+    const res = await fetch(`${VOXCPM_SERVER_URL}/status`, {
       method: "GET",
-      signal: AbortSignal.timeout(1200),
+      signal: AbortSignal.timeout(1500),
     });
     if (res.ok) {
       return await res.json();
     }
   } catch {
-    // Local XTTS server is offline
+    // Local VoxCPM2 server is offline
   }
   return null;
 }
@@ -488,57 +488,160 @@ async function checkXttsServer() {
 // ─────────────────────────────────────────────────────────────────────────────
 export const voxcpmService = {
   /**
-   * Get VoxCPM2 Engine Status & Local XTTS Neural Cloner State
+   * Get OpenBMB VoxCPM2 Engine Status & Local Neural Server State
    */
   async getStatus() {
-    const xttsStatus = await checkXttsServer();
-    const isXttsOnline = Boolean(xttsStatus && (xttsStatus.xtts_loaded || xttsStatus.available));
+    const srvStatus = await checkVoxCpmServer();
+    const isOnline = Boolean(srvStatus && (srvStatus.loaded || srvStatus.xtts_loaded || srvStatus.available));
+    const isOpenBMB = srvStatus?.engine === "voxcpm2_neural" || String(srvStatus?.model || "").toLowerCase().includes("voxcpm");
 
     return {
       available: true,
-      model: isXttsOnline ? "XTTS-v2-Neural" : VOXCPM2_VERSION,
-      sampleRate: isXttsOnline ? 24000 : TARGET_SAMPLE_RATE,
+      model: isOpenBMB ? "OpenBMB/VoxCPM2" : isOnline ? "XTTS-v2-Neural" : VOXCPM2_VERSION,
+      sampleRate: srvStatus?.sampleRate || (isOnline ? 48000 : TARGET_SAMPLE_RATE),
       offlineSupported: true,
-      description: isXttsOnline
-        ? "XTTS v2 · Real Local Neural Voice Cloner (Coqui TTS + FreeVC24)"
-        : "VoxCPM2 · 48kHz Acoustic DSP Cloner (Offline Fallback)",
-      activeEngine: isXttsOnline ? "xtts_v2_neural" : "dsp_hybrid",
-      xttsOnline: isXttsOnline,
-      xttsDetails: xttsStatus || {
+      description: isOpenBMB
+        ? "OpenBMB VoxCPM2 · 48kHz Real Zero-Shot Neural Cloner & Voice Design"
+        : isOnline
+          ? "XTTS v2 · Real Local Neural Voice Cloner"
+          : "VoxCPM2 · 48kHz Acoustic DSP Cloner (Offline Fallback)",
+      activeEngine: isOpenBMB ? "openbmb_voxcpm2" : (isOnline ? "xtts_v2_neural" : "dsp_hybrid"),
+      xttsOnline: isOnline,
+      voxcpmOnline: isOnline && isOpenBMB,
+      loraModels: srvStatus?.lora_models || [],
+      activeLora: srvStatus?.active_lora || null,
+      xttsDetails: srvStatus || {
         available: false,
-        hint: "Start python xtts_server.py on port 3002 for 100% real neural cloning",
+        hint: "Start python voxcpm_server.py on port 3002 for 100% real human neural cloning",
       },
       features: [
         "zero-shot-cloning",
+        "voice-design-prompt",
+        "lora-fine-tuning-ready",
+        "48khz-studio-quality",
         "multi-band-f0-tracking",
         "mfcc-inspired-embedding",
-        "hnr-estimation",
-        "zcr-analysis",
-        "formant-tracking",
         "harmonic-exciter-dsp",
         "true-peak-limiter",
         "soxr-48k-resampler",
-        "vad-voice-activity-detection",
-        ...(isXttsOnline ? ["real-neural-zero-shot", "xtts-multilingual-conditioning"] : []),
+        ...(isOnline ? ["real-neural-zero-shot", "openbmb-voxcpm2-native"] : []),
       ],
     };
   },
 
   /**
+   * Get list of custom fine-tuned LoRA models available on disk
+   */
+  async getLoraModels() {
+    try {
+      const res = await fetch(`${VOXCPM_SERVER_URL}/lora/models`, {
+        signal: AbortSignal.timeout(2000),
+      });
+      if (res.ok) return await res.json();
+    } catch {}
+    return { models: [], active_lora: null, count: 0 };
+  },
+
+  /**
+   * Activate a specific LoRA model
+   */
+  async loadLora(modelName) {
+    const res = await fetch(`${VOXCPM_SERVER_URL}/lora/load`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model_name: modelName }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Failed to activate LoRA: ${err}`);
+    }
+    return await res.json();
+  },
+
+  /**
+   * Get standardized Khmer prompt sentences for studio recording
+   */
+  async getTrainingPrompts() {
+    try {
+      const res = await fetch(`${VOXCPM_SERVER_URL}/train/prompts`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (res.ok) return await res.json();
+    } catch (err) {
+      logger.warn(`[VoxCPM2] Prompts fetch fallback: ${err.message}`);
+    }
+    return { prompts: [] };
+  },
+
+  /**
+   * Start in-app LoRA fine-tuning directly on VoxCPM2
+   */
+  async startTraining({ modelName, samples, steps = 300, learningRate = 0.0001 }) {
+    const res = await fetch(`${VOXCPM_SERVER_URL}/train/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model_name: modelName,
+        samples,
+        steps,
+        learning_rate: learningRate,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Failed to start training: ${err}`);
+    }
+    return await res.json();
+  },
+
+  /**
+   * Get live training progress, loss, ETA, and recent logs
+   */
+  async getTrainingStatus() {
+    try {
+      const res = await fetch(`${VOXCPM_SERVER_URL}/train/status`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (res.ok) return await res.json();
+    } catch {}
+    return { status: "idle", progress: 0, logs: [] };
+  },
+
+  /**
+   * Stop/cancel active training
+   */
+  async stopTraining() {
+    const res = await fetch(`${VOXCPM_SERVER_URL}/train/stop`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Failed to stop training: ${err}`);
+    }
+    return await res.json();
+  },
+
+
+  /**
    * Extract deep VoxCPM2 48kHz voice profile from reference audio
    */
-  async extractProfile({ audioBuffer, mimeType = "audio/wav", name = "VoxCPM2 Voice", language = "km" }) {
+  async extractProfile({ audioBuffer, mimeType = "audio/wav", name = "VoxCPM2 Voice", language = "km", voiceDesign = "" }) {
     logger.info(`[VoxCPM2] Extracting profile for "${name}" (${audioBuffer.length} bytes)`);
 
-    // Check if local neural XTTS server is available
-    const xttsStatus = await checkXttsServer();
-    let xttsProfileId = null;
+    // Check if local neural VoxCPM2 server is available
+    const srvStatus = await checkVoxCpmServer();
+    let neuralProfileId = null;
+    let refWavPath = null;
 
-    if (xttsStatus && (xttsStatus.xtts_loaded || xttsStatus.available)) {
+    if (srvStatus && (srvStatus.loaded || srvStatus.available)) {
       try {
-        logger.info(`[VoxCPM2] Forwarding profile extraction to local XTTS v2 server...`);
+        logger.info(`[VoxCPM2] Forwarding voice reference audio to OpenBMB VoxCPM2 server...`);
         const base64Audio = audioBuffer.toString("base64");
-        const xttsRes = await fetch(`${XTTS_SERVER_URL}/clone`, {
+        const srvRes = await fetch(`${VOXCPM_SERVER_URL}/clone`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -550,13 +653,14 @@ export const voxcpmService = {
           signal: AbortSignal.timeout(60000),
         });
 
-        if (xttsRes.ok) {
-          const xttsData = await xttsRes.json();
-          xttsProfileId = xttsData.profile?.profileId;
-          logger.info(`[VoxCPM2] Local XTTS v2 profile registered successfully: ${xttsProfileId}`);
+        if (srvRes.ok) {
+          const srvData = await srvRes.json();
+          neuralProfileId = srvData.profile?.profileId;
+          refWavPath = srvData.profile?.referenceWavPath;
+          logger.info(`[VoxCPM2] OpenBMB VoxCPM2 profile registered successfully: ${neuralProfileId}`);
         }
-      } catch (xttsErr) {
-        logger.warn(`[VoxCPM2] XTTS registration warning: ${xttsErr.message}`);
+      } catch (srvErr) {
+        logger.warn(`[VoxCPM2] Registration warning: ${srvErr.message}`);
       }
     }
 
@@ -577,15 +681,17 @@ export const voxcpmService = {
     const acousticProfile = await analyzeAcousticProfile(normalizedWav);
     logger.info(`[VoxCPM2] F0=${acousticProfile.meanF0}Hz (${acousticProfile.pitchRegister}), HNR=${acousticProfile.hnrDb}dB, Score=${acousticProfile.trainingQuality.score}%`);
 
-    const profileId = xttsProfileId || `voxcpm_${crypto.randomUUID()}`;
+    const profileId = neuralProfileId || `voxcpm_${crypto.randomUUID()}`;
 
     return {
       profileId,
-      xttsProfileId: xttsProfileId || null,
+      xttsProfileId: neuralProfileId || null,
+      referenceWavPath: refWavPath || null,
+      voiceDesign: voiceDesign || "",
       name,
-      engine: xttsProfileId ? "xtts_v2" : "voxcpm2",
-      model: xttsProfileId ? "XTTS-v2-LocalNeural" : VOXCPM2_VERSION,
-      sampleRate: xttsProfileId ? 24000 : TARGET_SAMPLE_RATE,
+      engine: neuralProfileId ? "openbmb_voxcpm2" : "voxcpm2_dsp",
+      model: neuralProfileId ? "OpenBMB/VoxCPM2" : VOXCPM2_VERSION,
+      sampleRate: neuralProfileId ? 48000 : TARGET_SAMPLE_RATE,
       language,
       gender: acousticProfile.pitchRegister,
       duration: meta.duration,
@@ -596,9 +702,9 @@ export const voxcpmService = {
   },
 
   /**
-   * Synthesize speech using VoxCPM2 or Local XTTS v2 Neural Engine
+   * Synthesize speech using OpenBMB VoxCPM2 Real Neural Engine
    */
-  async synthesizeSpeech({ text, profile, speed = 1.0, language = "km" }) {
+  async synthesizeSpeech({ text, profile, speed = 1.0, language = "km", voiceDesign = "", loraModel = "" }) {
     if (!text || !String(text).trim()) {
       throw new Error("អត្ថបទត្រូវនិយាយគឺចាំបាច់");
     }
@@ -606,45 +712,49 @@ export const voxcpmService = {
     const cleanText = String(text).trim();
     const lang = language || profile?.language || "km";
     const spd = Math.max(0.5, Math.min(2.0, parseFloat(speed) || 1.0));
+    const effectiveVoiceDesign = voiceDesign || profile?.voiceDesign || profile?.voice_design || "";
+    const effectiveLora = loraModel || profile?.loraModel || profile?.lora_model || "";
 
-    // ── Route 1: Check Local Neural XTTS server first ─────────────────────────
-    const xttsStatus = await checkXttsServer();
-    if (xttsStatus && xttsStatus.loading) {
-      throw new Error("ម៉ូដែល AI XTTS v2 កំពុងទាញយកទម្ងន់ម៉ូដែលពី Hugging Face (~1.8GB) ឬកំពុង Load ចូល Memory។ សូមរង់ចាំឱ្យទាញយកចប់សិន (ប្រហែល ២-៣ នាទី) ទើបសំឡេងចេញមកដូចមនុស្សពិត ១០០%។");
+    // ── Route 1: Check OpenBMB VoxCPM2 Neural Server first ────────────────────
+    const srvStatus = await checkVoxCpmServer();
+    if (srvStatus && srvStatus.loading) {
+      throw new Error("ម៉ូដែល OpenBMB VoxCPM2 កំពុងផ្ទុកចូល Memory សូមរង់ចាំបន្តិច (ប្រហែល ២០-៣០ វិនាទី) ដើម្បីបង្កើតសំឡេងដូចមនុស្សពិត ១០០%។");
     }
-    if (xttsStatus && (xttsStatus.xtts_loaded || xttsStatus.available)) {
+    if (srvStatus && (srvStatus.loaded || srvStatus.available)) {
       try {
-        logger.info(`[VoxCPM2] Forwarding speech synthesis to local XTTS v2 server (100% Neural Cloner)...`);
-        const xttsRes = await fetch(`${XTTS_SERVER_URL}/tts`, {
+        logger.info(`[VoxCPM2] Forwarding speech synthesis to OpenBMB VoxCPM2 (Real Neural Cloner)...`);
+        const srvRes = await fetch(`${VOXCPM_SERVER_URL}/tts`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             text: cleanText,
             profile_id: profile?.xttsProfileId || profile?.profileId,
-            profile,
+            voice_design: effectiveVoiceDesign,
+            reference_wav_path: profile?.referenceWavPath,
             speed: spd,
             language: lang,
+            lora_model: effectiveLora || undefined,
           }),
-          signal: AbortSignal.timeout(120000),
+          signal: AbortSignal.timeout(180000),
         });
 
-        if (xttsRes.ok) {
-          const arrayBuf = await xttsRes.arrayBuffer();
+        if (srvRes.ok) {
+          const arrayBuf = await srvRes.arrayBuffer();
           const buffer = Buffer.from(arrayBuf);
-          logger.info(`[VoxCPM2] XTTS Neural audio synthesized successfully: ${buffer.length} bytes`);
+          logger.info(`[VoxCPM2] OpenBMB VoxCPM2 Neural audio synthesized successfully: ${buffer.length} bytes @ 48kHz`);
           return {
             buffer,
             mimeType: "audio/wav",
-            sampleRate: 24000,
-            model: "XTTS-v2-LocalNeural",
+            sampleRate: srvStatus.sampleRate || 48000,
+            model: "OpenBMB/VoxCPM2",
             neural: true,
           };
         } else {
-          const errText = await xttsRes.text().catch(() => "");
-          logger.warn(`[VoxCPM2] XTTS server returned ${xttsRes.status}: ${errText}`);
+          const errText = await srvRes.text().catch(() => "");
+          logger.warn(`[VoxCPM2] OpenBMB server returned ${srvRes.status}: ${errText}`);
         }
-      } catch (xttsErr) {
-        logger.warn(`[VoxCPM2] Local XTTS server call failed, using DSP fallback: ${xttsErr.message}`);
+      } catch (srvErr) {
+        logger.warn(`[VoxCPM2] Local VoxCPM2 server call failed, using fallback: ${srvErr.message}`);
       }
     }
 

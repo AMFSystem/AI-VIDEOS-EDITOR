@@ -17,7 +17,7 @@
     radial-gradient(circle at 85% 80%, rgba(121, 40, 202, 0.10) 0%, transparent 45%),
     radial-gradient(circle at 15% 75%, rgba(0, 242, 254, 0.08) 0%, transparent 45%);
   color: #f1f5f9;
-  font-family: -apple-system, BlinkMacSystemFont, "Kantumruy Pro", "Preahvihear", "Inter", "Segoe UI", Roboto, sans-serif;
+  font-family: "Kantumruy Pro", -apple-system, BlinkMacSystemFont, "Preahvihear", "Inter", "Segoe UI", Roboto, sans-serif;
   overflow-y: auto;
   overflow-x: hidden;
   animation: voiceStudioFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -624,7 +624,7 @@
 /* Controls Grid */
 .tts-controls-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
   padding: 14px 18px;
   border-radius: 10px;

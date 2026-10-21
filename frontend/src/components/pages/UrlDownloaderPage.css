@@ -19,7 +19,7 @@
     radial-gradient(circle at 90% 85%, rgba(48, 240, 219, 0.08) 0%, transparent 40%),
     radial-gradient(circle at 10% 70%, rgba(99, 102, 241, 0.06) 0%, transparent 40%);
   color: #f1f5f9;
-  font-family: -apple-system, BlinkMacSystemFont, "Kantumruy Pro", "Preahvihear", "Inter", "Segoe UI", Roboto, sans-serif;
+  font-family: "Kantumruy Pro", -apple-system, BlinkMacSystemFont, "Preahvihear", "Inter", "Segoe UI", Roboto, sans-serif;
   overflow-y: auto;
   overflow-x: hidden;
   animation: urlPageFadeIn 0.22s ease-out;

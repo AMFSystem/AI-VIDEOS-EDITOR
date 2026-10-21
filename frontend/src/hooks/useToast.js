@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { localizeUiMessage } from "../i18nMessageRuntime.js";
 
-export function useToast(timeout = 2600, language = "zh") {
+export function useToast(timeout = 2600, language = "km") {
   const [toast, setToast] = useState("");
   const timerRef = useRef(0);
   const notify = useCallback((message) => {

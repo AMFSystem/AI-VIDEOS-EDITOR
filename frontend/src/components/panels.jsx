@@ -92,17 +92,15 @@ export function LanguageIntro({ t, closing, onChoose }) {
             <img src="/icons/timeline-studio-icon.svg" alt="" />
             <span>
               <strong>Timeline Studio</strong>
-              <small>{t("languageKicker")}</small>
+              <small>AI Voice Studio</small>
             </span>
           </div>
         </div>
         <h1>
           <span className="language-title-en">Choose interface language</span>
-          <span className="language-title-local">{t("languageTitle")}</span>
         </h1>
         <span className="language-intro-copy">
           <strong>Pick a language. This choice will be saved for next time.</strong>
-          <span>{t("languageSubtitle")}</span>
         </span>
         <div className="language-grid">
           {APP_LANGUAGES.map((language) => (
@@ -112,7 +110,7 @@ export function LanguageIntro({ t, closing, onChoose }) {
             </button>
           ))}
         </div>
-        <small className="language-intro-footnote">{t("languageSaved")}</small>
+        <small className="language-intro-footnote">You can change it later in Settings</small>
       </div>
     </div>
   );
@@ -248,6 +246,8 @@ export function MediaPanel({
           <button
             className={`drop-zone ${isDragging ? "is-dragging" : ""}`}
             type="button"
+            title={t("uploadDropTitle", "Click or drop image, video, or audio here")}
+            aria-label={t("uploadDropTitle", "Upload file")}
             onClick={(event) => {
               fileInputRef.current?.click();
               releasePointerActivatedFocus(event);
@@ -264,34 +264,7 @@ export function MediaPanel({
               handleFiles(event.dataTransfer.files);
             }}
           >
-            <CloudArrowUp size={42} />
-            <strong>{t("uploadDropTitle")}</strong>
-            <span>{t("uploadSupport")}</span>
-          </button>
-          <button
-            className="url-download-sidebar-btn"
-            type="button"
-            onClick={onOpenUrlDownloader}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              padding: "9px 12px",
-              margin: "8px 0 12px",
-              borderRadius: "8px",
-              border: "1px dashed rgba(48, 240, 219, 0.4)",
-              background: "rgba(48, 240, 219, 0.06)",
-              color: "#30f0db",
-              cursor: "pointer",
-              fontSize: "12px",
-              fontWeight: "600",
-              width: "100%",
-              transition: "all 0.15s ease",
-            }}
-          >
-            <DownloadSimple size={16} weight="bold" />
-            <span>{t("downloadFromUrlAction", "ទាញយកពីគេហទំព័រ")}</span>
+            <CloudArrowUp size={36} />
           </button>
           {renderAssetList(userAssets, { deletable: true })}
         </>

@@ -3,6 +3,7 @@ import { CaretDown } from "@phosphor-icons/react";
 import { COMPACT_WORKSPACE_QUERY, TOOL_RAIL } from "../config/editor.js";
 import { MediaPanel, ToolPanel } from "./panels.jsx";
 import { PluginCatalogPanel } from "./GenerationPlugins.jsx";
+import { DubberPanel } from "./panels/DubberPanel.jsx";
 
 export function EditorSidebar({ model: d }) {
   const toolRailRef = useRef(null);
@@ -129,6 +130,25 @@ export function EditorSidebar({ model: d }) {
             onOpenInspector={() => {
               if (window.matchMedia?.(COMPACT_WORKSPACE_QUERY).matches) d.setMobilePanel?.("inspector");
             }}
+          />
+        ) : d.activeTool === "dubber" ? (
+          <DubberPanel
+            t={d.t}
+            notify={d.notify}
+            sourceAudioBlob={d.sourceAudioBlob}
+            sourceAudioDuration={d.sourceAudioDuration}
+            sourceAudioName={d.sourceAudioName}
+            applyAssetToTrack={d.applyAssetToTrack}
+            onOpenVoiceStudio={d.onOpenVoiceStudio}
+            setCaptionSegments={d.setCaptionSegments}
+            setCaptionsEnabled={d.setCaptionsEnabled}
+            updateScript={d.updateScript}
+            script={d.script}
+            captionSegments={d.captionSegments}
+            captionStyle={d.captionStyle}
+            handleFiles={d.handleFiles}
+            seekTo={d.seekTo}
+            setSelectedTrack={d.setSelectedTrack}
           />
         ) : (
           <ToolPanel

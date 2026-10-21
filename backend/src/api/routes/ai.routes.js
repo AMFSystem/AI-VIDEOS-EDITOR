@@ -17,6 +17,7 @@ aiRouter.post("/elevenlabs/tts", aiController.elevenLabsTts);
 aiRouter.post("/elevenlabs/verify", aiController.elevenLabsVerifyKey);
 
 // Google Gemini 2.0 Flash Audio & Scriptwriting
+aiRouter.get("/gemini/status", aiController.geminiStatus);
 aiRouter.post("/gemini/verify", aiController.geminiVerifyKey);
 aiRouter.post("/gemini/tts", aiController.geminiTts);
 aiRouter.post("/gemini/generate-script", aiController.geminiGenerateScript);
@@ -25,3 +26,11 @@ aiRouter.post("/gemini/generate-script", aiController.geminiGenerateScript);
 aiRouter.get("/voxcpm/status", aiController.voxcpmStatus);
 aiRouter.post("/voxcpm/clone", aiController.voxcpmClone);
 aiRouter.post("/voxcpm/tts", aiController.voxcpmTts);
+aiRouter.get("/voxcpm/lora/models", aiController.voxcpmLoraModels);
+aiRouter.post("/voxcpm/lora/load", aiController.voxcpmLoraLoad);
+aiRouter.get("/voxcpm/train/prompts", aiController.voxcpmTrainPrompts);
+aiRouter.post("/voxcpm/train/start", aiController.voxcpmTrainStart);
+aiRouter.get("/voxcpm/train/status", aiController.voxcpmTrainStatus);
+aiRouter.post("/voxcpm/train/stop", aiController.voxcpmTrainStop);
+
+

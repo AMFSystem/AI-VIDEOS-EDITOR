@@ -10,6 +10,7 @@ import {
   synthesizeGeminiSpeech,
   generateGeminiScript,
 } from "../../services/ai/geminiService.js";
+import { config } from "../../config/index.js";
 import { voxcpmService } from "../../services/ai/voxcpmService.js";
 
 export const aiController = {
@@ -145,8 +146,16 @@ export const aiController = {
     }
   },
 
+  async geminiStatus(_req, res) {
+    const key = config.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+    return res.json({
+      configured: !!key,
+      hasServerKey: !!key,
+    });
+  },
+
   async geminiVerifyKey(req, res) {
-    const { apiKey } = req.body;
+    const apiKey = req.body?.apiKey || config.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) {
       return res.status(400).json({ error: "Google Gemini API Key គឺចាំបាច់" });
     }
@@ -155,14 +164,15 @@ export const aiController = {
       if (!result.valid) {
         return res.status(400).json({ error: result.error });
       }
-      res.json(result);
+      res.json({ ...result, hasServerKey: !!config.geminiApiKey });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   },
 
   async geminiTts(req, res) {
-    const { text, voiceName, apiKey } = req.body;
+    const apiKey = req.body?.apiKey || config.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const { text, voiceName, audioBase64, referenceMimeType, vocalStyle } = req.body;
     if (!apiKey) {
       return res.status(400).json({ error: "Google Gemini API Key គឺចាំបាច់" });
     }
@@ -175,6 +185,9 @@ export const aiController = {
         apiKey,
         text,
         voiceName,
+        audioBase64,
+        mimeType: referenceMimeType || "audio/wav",
+        vocalStyle,
       });
       res.setHeader("Content-Type", mimeType);
       res.setHeader("Access-Control-Allow-Origin", "*");
@@ -185,7 +198,8 @@ export const aiController = {
   },
 
   async geminiGenerateScript(req, res) {
-    const { apiKey, prompt, topic, tone } = req.body;
+    const apiKey = req.body?.apiKey || config.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const { prompt, topic, tone } = req.body;
     if (!apiKey) {
       return res.status(400).json({ error: "Google Gemini API Key គឺចាំបាច់" });
     }
@@ -228,8 +242,76 @@ export const aiController = {
     }
   },
 
+  async voxcpmLoraModels(_req, res) {
+    try {
+      const data = await voxcpmService.getLoraModels();
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async voxcpmLoraLoad(req, res) {
+    const { modelName } = req.body;
+    if (!modelName) {
+      return res.status(400).json({ error: "ឈ្មោះ LoRA modelName គឺចាំបាច់" });
+    }
+    try {
+      const data = await voxcpmService.loadLora(modelName);
+      res.json({ success: true, ...data });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async voxcpmTrainPrompts(_req, res) {
+    try {
+      const data = await voxcpmService.getTrainingPrompts();
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async voxcpmTrainStart(req, res) {
+    const { modelName, samples, steps = 300, learningRate = 0.0001 } = req.body;
+    if (!modelName || !samples || samples.length === 0) {
+      return res.status(400).json({ error: "modelName និង samples គឺចាំបាច់" });
+    }
+    try {
+      const data = await voxcpmService.startTraining({
+        modelName,
+        samples,
+        steps,
+        learningRate,
+      });
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async voxcpmTrainStatus(_req, res) {
+    try {
+      const data = await voxcpmService.getTrainingStatus();
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async voxcpmTrainStop(_req, res) {
+    try {
+      const data = await voxcpmService.stopTraining();
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+
   async voxcpmTts(req, res) {
-    const { text, profile, speed = 1.0, language = "km" } = req.body;
+    const { text, profile, speed = 1.0, language = "km", loraModel = "" } = req.body;
     if (!text || !String(text).trim()) {
       return res.status(400).json({ error: "អត្ថបទត្រូវនិយាយគឺចាំបាច់" });
     }
@@ -240,6 +322,7 @@ export const aiController = {
         profile,
         speed: parseFloat(speed) || 1.0,
         language,
+        loraModel: loraModel || profile?.loraModel,
       });
       res.setHeader("Content-Type", mimeType);
       res.setHeader("Access-Control-Allow-Origin", "*");

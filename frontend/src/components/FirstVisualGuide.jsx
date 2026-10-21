@@ -24,9 +24,9 @@ function getTargetRect(selector) {
   return { top: rect.top, left: rect.left, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
 }
 
-export function FirstVisualGuide({ language = "zh", onClose, onComplete }) {
+export function FirstVisualGuide({ language = "km", onClose, onComplete }) {
   const [targets, setTargets] = useState({ canvas: null, timeline: null });
-  const copy = COPY[language] ?? COPY.en;
+  const copy = COPY[language] ?? COPY.km ?? COPY.en;
 
   useLayoutEffect(() => {
     const update = () => setTargets({

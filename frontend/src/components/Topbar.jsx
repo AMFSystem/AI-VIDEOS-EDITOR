@@ -13,7 +13,6 @@ import {
   MicrophoneStage,
   Pause,
   Play,
-  ShieldCheck,
   SlidersHorizontal,
 } from "@phosphor-icons/react";
 
@@ -119,82 +118,73 @@ export function Topbar({
         <IconButton label={t("collapseSidebar")} active={compactRail} onClick={() => setCompactRail((v) => !v)}>
           <SlidersHorizontal size={19} />
         </IconButton>
-        <div>
-          <div className="project-title-row">
-            <div className="project-title">{t("projectTitle")}</div>
-            <div className="menu-anchor">
-              <button className="project-file-button" type="button" onClick={() => setShowFileMenu((open) => !open)}>
-                {t("fileMenu")} <CaretDown size={13} />
-              </button>
-              {showFileMenu ? (
-                <Popover className="project-file-popover" closeLabel={t("close")} onClose={() => setShowFileMenu(false)}>
-                  <div className="file-menu-card">
-                    <div className="file-menu-heading">
-                      <span>{t("projectMenuHeading")}</span>
-                      <small>Timeline Studio</small>
-                    </div>
-                    <button className="file-menu-action file-menu-new" type="button" onClick={handleNewProject}>
-                      <span className="file-menu-icon"><FilePlus size={17} /></span>
-                      <span className="file-menu-copy"><strong>{t("newProject")}</strong><small>{t("newProjectHint")}</small></span>
-                    </button>
-                    <div className="file-menu-divider" />
-                    <button className="file-menu-action" type="button" onClick={() => handleImportProject()}>
-                      <span className="file-menu-icon"><FileArrowUp size={17} /></span>
-                      <span className="file-menu-copy"><strong>{t("importProject")}</strong><small>{t("importProjectHint")}</small></span>
-                      <span className="file-menu-format">.timeline</span>
-                    </button>
-                    <button className="file-menu-action is-primary" type="button" onClick={handleExportProject}>
-                      <span className="file-menu-icon"><FileArrowDown size={17} /></span>
-                      <span className="file-menu-copy"><strong>{t("exportProject")}</strong><small>{t("exportProjectHint")}</small></span>
-                      <span className="file-menu-format">.timeline</span>
-                    </button>
-                    <button
-                      className="file-menu-action"
-                      type="button"
-                      onClick={() => {
-                        setShowFileMenu(false);
-                        onOpenUrlDownloader?.();
-                      }}
-                    >
-                      <span className="file-menu-icon"><DownloadSimple size={17} /></span>
-                      <span className="file-menu-copy">
-                        <strong>{t("downloadFromUrl", "ទាញយកពីគេហទំព័រ")}</strong>
-                        <small>YouTube, TikTok, Facebook, KissKH...</small>
-                      </span>
-                      <span className="file-menu-format">URL</span>
-                    </button>
-                    <button
-                      className="file-menu-action"
-                      type="button"
-                      onClick={() => {
-                        setShowFileMenu(false);
-                        onOpenVoiceStudio?.();
-                      }}
-                    >
-                      <span className="file-menu-icon"><MicrophoneStage size={17} /></span>
-                      <span className="file-menu-copy">
-                        <strong>{t("voiceCloneStudio", "ក្លូនសំឡេង AI")}</strong>
-                        <small>{t("voiceCloneStudioHint", "ស្ទូឌីយោក្លូនសំឡេង និងបម្លែងអត្ថបទទៅជាសំឡេង")}</small>
-                      </span>
-                      <span className="file-menu-format">VOICE</span>
-                    </button>
-                    <div className="file-menu-divider" />
-                    <nav className="file-menu-resources" aria-label={t("resourceLinks")}>
-                      <a href="/features/">{t("resourceFeatures")}</a>
-                      <a href="/how-it-works/">{t("resourceGuide")}</a>
-                      <a href="/faq/">{t("resourceFaq")}</a>
-                      <a href="/privacy/">{t("resourcePrivacy")}</a>
-                    </nav>
-                  </div>
-                </Popover>
-              ) : null}
-              <input ref={projectFileInputRef} className="project-file-input" type="file" accept="application/zip,.timeline" onChange={(event) => event.target.files?.[0] && handleImportProject(event.target.files[0])} />
-            </div>
-          </div>
-          <div className="autosave">
-            <ShieldCheck size={13} weight="fill" />
-            {t("autosave")} · {lastSaved}
-          </div>
+        <div className="menu-anchor">
+          <button className="project-file-button" type="button" onClick={() => setShowFileMenu((open) => !open)}>
+            {t("fileMenu")} <CaretDown size={13} />
+          </button>
+          {showFileMenu ? (
+            <Popover className="project-file-popover" closeLabel={t("close")} onClose={() => setShowFileMenu(false)}>
+              <div className="file-menu-card">
+                <div className="file-menu-heading">
+                  <span>{t("projectMenuHeading")}</span>
+                  <small>Timeline Studio</small>
+                </div>
+                <button className="file-menu-action file-menu-new" type="button" onClick={handleNewProject}>
+                  <span className="file-menu-icon"><FilePlus size={17} /></span>
+                  <span className="file-menu-copy"><strong>{t("newProject")}</strong><small>{t("newProjectHint")}</small></span>
+                </button>
+                <div className="file-menu-divider" />
+                <button className="file-menu-action" type="button" onClick={() => handleImportProject()}>
+                  <span className="file-menu-icon"><FileArrowUp size={17} /></span>
+                  <span className="file-menu-copy"><strong>{t("importProject")}</strong><small>{t("importProjectHint")}</small></span>
+                  <span className="file-menu-format">.timeline</span>
+                </button>
+                <button className="file-menu-action is-primary" type="button" onClick={handleExportProject}>
+                  <span className="file-menu-icon"><FileArrowDown size={17} /></span>
+                  <span className="file-menu-copy"><strong>{t("exportProject")}</strong><small>{t("exportProjectHint")}</small></span>
+                  <span className="file-menu-format">.timeline</span>
+                </button>
+                <button
+                  className="file-menu-action"
+                  type="button"
+                  onClick={() => {
+                    setShowFileMenu(false);
+                    onOpenUrlDownloader?.();
+                  }}
+                >
+                  <span className="file-menu-icon"><DownloadSimple size={17} /></span>
+                  <span className="file-menu-copy">
+                    <strong>{t("downloadFromUrl", "ទាញយកពីគេហទំព័រ")}</strong>
+                    <small>YouTube, TikTok, Facebook, KissKH...</small>
+                  </span>
+                  <span className="file-menu-format">URL</span>
+                </button>
+                <button
+                  className="file-menu-action"
+                  type="button"
+                  onClick={() => {
+                    setShowFileMenu(false);
+                    onOpenVoiceStudio?.();
+                  }}
+                >
+                  <span className="file-menu-icon"><MicrophoneStage size={17} /></span>
+                  <span className="file-menu-copy">
+                    <strong>{t("voiceCloneStudio", "ក្លូនសំឡេង AI")}</strong>
+                    <small>{t("voiceCloneStudioHint", "ស្ទូឌីយោក្លូនសំឡេង និងបម្លែងអត្ថបទទៅជាសំឡេង")}</small>
+                  </span>
+                  <span className="file-menu-format">VOICE</span>
+                </button>
+                <div className="file-menu-divider" />
+                <nav className="file-menu-resources" aria-label={t("resourceLinks")}>
+                  <a href="/features/">{t("resourceFeatures")}</a>
+                  <a href="/how-it-works/">{t("resourceGuide")}</a>
+                  <a href="/faq/">{t("resourceFaq")}</a>
+                  <a href="/privacy/">{t("resourcePrivacy")}</a>
+                </nav>
+              </div>
+            </Popover>
+          ) : null}
+          <input ref={projectFileInputRef} className="project-file-input" type="file" accept="application/zip,.timeline" onChange={(event) => event.target.files?.[0] && handleImportProject(event.target.files[0])} />
         </div>
       </div>
 

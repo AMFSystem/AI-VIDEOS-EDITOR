@@ -79,8 +79,9 @@ export const elevenlabsService = {
     if (!apiKey || !String(apiKey).trim()) {
       throw new Error("ElevenLabs API Key គឺចាំបាច់");
     }
-    if (!voiceId || !String(voiceId).trim()) {
-      throw new Error("Voice ID គឺចាំបាច់សម្រាប់ ElevenLabs");
+    let targetVoiceId = String(voiceId || "").trim();
+    if (!targetVoiceId || targetVoiceId.startsWith("gemini_") || targetVoiceId.length < 10) {
+      targetVoiceId = "21m00Tcm4TlvDq8ikWAM"; // Default Rachel voice
     }
     if (!text || !String(text).trim()) {
       throw new Error("អត្ថបទត្រូវនិយាយគឺចាំបាច់");
@@ -98,9 +99,9 @@ export const elevenlabsService = {
       },
     };
 
-    logger.info(`[ElevenLabs] Synthesizing speech with voice ${voiceId}, text length: ${payload.text.length}`);
+    logger.info(`[ElevenLabs] Synthesizing speech with voice ${targetVoiceId}, text length: ${payload.text.length}`);
 
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`, {
+    let res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(targetVoiceId)}`, {
       method: "POST",
       headers: {
         "xi-api-key": trimmedKey,
@@ -109,6 +110,19 @@ export const elevenlabsService = {
       },
       body: JSON.stringify(payload),
     });
+
+    if (!res.ok && res.status === 404 && targetVoiceId !== "21m00Tcm4TlvDq8ikWAM") {
+      logger.warn(`[ElevenLabs] Voice ${targetVoiceId} not found (404), retrying with default Rachel voice...`);
+      res = await fetch("https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM", {
+        method: "POST",
+        headers: {
+          "xi-api-key": trimmedKey,
+          "Content-Type": "application/json",
+          "Accept": "audio/mpeg",
+        },
+        body: JSON.stringify(payload),
+      });
+    }
 
     if (!res.ok) {
       const errText = await res.text();

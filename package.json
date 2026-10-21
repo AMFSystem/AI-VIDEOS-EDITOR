@@ -12,6 +12,8 @@
   "scripts": {
     "dev": "node scripts/start-dev.mjs",
     "dev:all": "node scripts/start-dev.mjs",
+    "stop": "node scripts/stop-dev.mjs",
+    "restart": "node scripts/stop-dev.mjs && node scripts/start-dev.mjs",
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "npm run dev --prefix backend",
     "dev:xtts": "python backend/python/xtts_server.py",
