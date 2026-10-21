@@ -4,7 +4,11 @@ import ortWasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url
 import { openVoiceModelFileUrls } from "../config/voiceModels.js";
 import { fetchFirstAvailableModel } from "../lib/modelSources.js";
 
-ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.max(1, Math.min(4, navigator.hardwareConcurrency || 1)) : 1;
+// Use SharedArrayBuffer multi-threading only when cross-origin isolated (COOP/COEP headers set)
+// Single-threaded WASM still runs OpenVoice in ~2-4s on modern hardware — acceptable UX.
+ort.env.wasm.numThreads = self.crossOriginIsolated
+  ? Math.max(1, Math.min(4, navigator.hardwareConcurrency || 2))
+  : 1;
 ort.env.wasm.simd = true;
 ort.env.wasm.wasmPaths = { mjs: ortWasmMjsUrl, wasm: ortWasmUrl };
 ort.env.webgpu.powerPreference = "high-performance";
@@ -34,7 +38,7 @@ async function cachedModel(path, requestId) {
 async function getSessions(requestId) {
   if (!sessionsPromise) {
     sessionsPromise = (async () => {
-      progress(requestId, 8, "下载 OpenVoice 模型");
+      progress(requestId, 8, "កំពុងទាញ OpenVoice v2 Model (DownloadingModel)...");
       // Remove the short-lived pre-release cache. The service worker owns the
       // canonical, provider-independent model cache and avoids duplicate model
       // copies competing for the browser quota.
@@ -43,7 +47,7 @@ async function getSessions(requestId) {
         cachedModel("reference-encoder.onnx", requestId),
         cachedModel("converter.onnx", requestId),
       ]);
-      progress(requestId, 42, "初始化音色编码器");
+      progress(requestId, 42, "កំពុង Initialize OpenVoice Tone-Color Encoder...");
       const reference = await ort.InferenceSession.create(referenceBytes, {
         executionProviders: ["wasm"], graphOptimizationLevel: "all",
       });
@@ -51,7 +55,7 @@ async function getSessions(requestId) {
       // FP16 flow/decoder can return numerically valid but audibly corrupted
       // samples on WebGPU, while measured conversion time is close enough that
       // the WASM quality win is the better product tradeoff.
-      progress(requestId, 56, "初始化变声模型 · WASM 稳定模式");
+      progress(requestId, 56, "កំពុង Initialize OpenVoice Voice Converter (WASM · High Quality)...");
       const converter = await ort.InferenceSession.create(converterBytes, {
         executionProviders: ["wasm"], graphOptimizationLevel: "all",
       });
@@ -247,7 +251,7 @@ function finishConvertedAudio(output, source) {
 async function encode(samples, requestId) {
   const { reference } = await getSessions(requestId);
   const spec = spectrogram(embeddingSpeechSamples(samples));
-  progress(requestId, 78, "提取音色特征");
+  progress(requestId, 78, "កំពុងស្រង់យក Tone-Color Speaker Embedding...");
   const result = await reference.run({
     spectrogram_frames: new ort.Tensor("float32", spec.data, [1, spec.frameCount, BINS]),
   });
@@ -259,7 +263,7 @@ async function convert(samples, targetEmbedding, seed, requestId) {
   const spec = spectrogram(samples);
   const sourceEmbedding = await encode(samples, requestId);
   const transposed = transposeFrames(spec.data, spec.frameCount);
-  progress(requestId, 84, "转换为克隆音色");
+  progress(requestId, 84, "កំពុងបម្លែងសំឡេងទៅជា Clone Voice (OpenVoice v2)...");
   const result = await converter.run({
     spectrogram: new ort.Tensor("float32", transposed, [1, BINS, spec.frameCount]),
     frame_mask: new ort.Tensor("float32", new Float32Array(spec.frameCount).fill(1), [1, 1, spec.frameCount]),
@@ -268,7 +272,7 @@ async function convert(samples, targetEmbedding, seed, requestId) {
     noise: new ort.Tensor("float32", seededNoise(192 * spec.frameCount, seed), [1, 192, spec.frameCount]),
   });
   const tensor = result.audio || Object.values(result)[0];
-  progress(requestId, 96, "清理尾部静音");
+  progress(requestId, 96, "ហ្វ្រេម Complete · Cleaning tail silence...");
   return finishConvertedAudio(tensor.data, samples);
 }
 

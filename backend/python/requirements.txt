@@ -1,0 +1,11 @@
+# XTTS v2 + FreeVC24 Zero-Shot Neural Voice Cloning Requirements
+# Python 3.11 recommended for Windows compatibility
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+numpy<2.0.0
+scipy>=1.10.0
+torch>=2.1.0
+torchaudio>=2.1.0
+torchcodec
+coqui-tts>=0.24.0

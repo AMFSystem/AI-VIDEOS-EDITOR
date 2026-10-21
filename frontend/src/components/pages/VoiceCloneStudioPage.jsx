@@ -2036,7 +2036,10 @@ export function VoiceCloneStudioPage({
                           <Waveform size={22} weight="fill" />
                         </div>
                         <div className="clone-model-info">
-                          <span className="clone-model-name">VoxCPM2 (OpenBMB 48kHz)</span>
+                          <span className="clone-model-name">VoxCPM2 (Local / Offline)</span>
+                          <span style={{ fontSize: "11px", color: "#94a3b8", display: "block", marginTop: "2px" }}>
+                            ⚡ ដំណើរការលើម៉ាស៊ីន (48kHz DSP + XTTS Bridge)
+                          </span>
                         </div>
                         {cloneModel === "voxcpm2" && (
                           <div className="clone-model-selected-check">
@@ -2056,7 +2059,10 @@ export function VoiceCloneStudioPage({
                           <Lightning size={22} weight="fill" />
                         </div>
                         <div className="clone-model-info">
-                          <span className="clone-model-name">OpenVoice v2 (Fast WASM)</span>
+                          <span className="clone-model-name">OpenVoice v2 (WASM)</span>
+                          <span style={{ fontSize: "11px", color: "#94a3b8", display: "block", marginTop: "2px" }}>
+                            🎨 បម្លែងទឹកដមសំឡេង (Tone Color Transfer)
+                          </span>
                         </div>
                         {cloneModel === "openvoice" && (
                           <div className="clone-model-selected-check">
@@ -2084,6 +2090,9 @@ export function VoiceCloneStudioPage({
                         </div>
                         <div className="clone-model-info">
                           <span className="clone-model-name">ElevenLabs Neural (Cloud Pro)</span>
+                          <span style={{ fontSize: "11px", color: "#38bdf8", fontWeight: "600", display: "block", marginTop: "2px" }}>
+                            🌟 សំឡេងមនុស្សពិត ១០០% (Human Voice Khmer)
+                          </span>
                         </div>
                         {cloneModel === "elevenlabs" && (
                           <div className="clone-model-selected-check">
@@ -2091,6 +2100,34 @@ export function VoiceCloneStudioPage({
                           </div>
                         )}
                       </div>
+                    </div>
+
+                    {/* Model Quality Explanation Box */}
+                    <div style={{
+                      marginTop: 12,
+                      padding: "10px 14px",
+                      borderRadius: 8,
+                      fontSize: "12px",
+                      lineHeight: "1.5",
+                      background: cloneModel === "elevenlabs" ? "rgba(56, 189, 248, 0.08)" : "rgba(245, 158, 11, 0.08)",
+                      border: cloneModel === "elevenlabs" ? "1px solid rgba(56, 189, 248, 0.25)" : "1px solid rgba(245, 158, 11, 0.25)",
+                      color: cloneModel === "elevenlabs" ? "#38bdf8" : "#fbbf24",
+                    }}>
+                      {cloneModel === "elevenlabs" && (
+                        <div>
+                          <strong>🌟 ElevenLabs Neural (ណែនាំខ្លាំងបំផុតសម្រាប់ភាសាខ្មែរ):</strong> នេះជាបច្ចេកវិទ្យាតែមួយគត់ដែល Clone ចេញមកដូចសំឡេងមនុស្សពិត ១០០% ទាំងដង្ហើម និងទឹកដមសំនៀងធម្មជាតិ។ (តម្រូវឱ្យមាន API Key ដោយឥតគិតថ្លៃពី elevenlabs.io)
+                        </div>
+                      )}
+                      {cloneModel === "voxcpm2" && (
+                        <div>
+                          <strong>⚠️ សម្គាល់ VoxCPM2 (DSP Offline):</strong> ដំណើរការដោយប្រើ Google TTS + Filter ប្រេកង់ ដូច្នេះសំឡេងនៅតែមានសំនៀងជា Robot មិនអាចដូចមនុស្សពិត ១០០% ឡើយ លុះត្រាតែអ្នកដំណើរការ Python XTTS Neural Server ក្នុងកុំព្យូទ័រ។
+                        </div>
+                      )}
+                      {cloneModel === "openvoice" && (
+                        <div>
+                          <strong>⚠️ សម្គាល់ OpenVoice v2:</strong> បម្លែងទឹកដមបានល្អតែលើភាសាអង់គ្លេស និងចិនប៉ុណ្ណោះ។ សម្រាប់ភាសាខ្មែរ សំឡេងចេញមកនៅតែមានសំនៀងរឹងជា Robot ដដែល។
+                        </div>
+                      )}
                     </div>
                   </div>
 

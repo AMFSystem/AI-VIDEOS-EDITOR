@@ -14,6 +14,7 @@
     "dev:all": "node scripts/start-dev.mjs",
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "npm run dev --prefix backend",
+    "dev:xtts": "python backend/python/xtts_server.py",
     "desktop": "npm run start --prefix desktop",
     "build": "npm run build --prefix frontend",
     "preview": "npm run preview --prefix frontend",
