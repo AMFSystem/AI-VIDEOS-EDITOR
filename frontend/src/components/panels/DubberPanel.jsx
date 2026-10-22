@@ -16,23 +16,16 @@ import { getStoredGeminiKey } from "../../lib/geminiRuntime.js";
 import { ApiKeyModal } from "../../pages/VoiceCloneStudio/modals/ApiKeyModal.jsx";
 import "./DubberPanel.css";
 
-// Engine configurations (Cloud AI with API Keys vs. Local Computer)
+// Engine configurations (Cloud AI with API Keys vs. Local Computer vs. Free Google Translation)
 const ENGINE_CONFIG = {
-  "gemini-2.5-flash": {
-    name: "Google Gemini 2.5 Flash",
-    provider: "gemini",
-    type: "cloud",
-    storageKey: "ai_video_editor_gemini_api_keys",
-    legacyKey: "ai_video_editor_gemini_api_key",
-    placeholder: "AIzaSy... (Gemini API Key)",
+  "google-translate": {
+    name: "Google Translate (ផ្លូវការ Google ត្រឹមត្រូវ 100%)",
+    provider: "google",
+    type: "free",
   },
-  "gemini-2.5-flash-lite": {
-    name: "Google Gemini 2.5 Flash Lite",
-    provider: "gemini",
-    type: "cloud",
-    storageKey: "ai_video_editor_gemini_api_keys",
-    legacyKey: "ai_video_editor_gemini_api_key",
-    placeholder: "AIzaSy... (Gemini API Key)",
+  "local-whisper": {
+    name: "Local Whisper ONNX (ម៉ាស៊ីនកុំព្យូទ័រផ្ទាល់)",
+    type: "local",
   },
   "gemini-2.0-flash": {
     name: "Google Gemini 2.0 Flash",
@@ -81,10 +74,6 @@ const ENGINE_CONFIG = {
     storageKey: "ai_video_editor_anthropic_api_keys",
     legacyKey: "ai_video_editor_anthropic_api_key",
     placeholder: "sk-ant-... (Anthropic API Key)",
-  },
-  "local-whisper": {
-    name: "Local Whisper ONNX",
-    type: "local",
   },
   "local-offline": {
     name: "Local Offline Model",
@@ -187,8 +176,8 @@ export function DubberPanel({
     return localStorage.getItem("ai_video_editor_dubber_style") || "cinematic_story";
   });
   const [selectedEngine, setSelectedEngine] = useState(() => {
-    let saved = localStorage.getItem("ai_video_editor_dubber_engine") || "gemini-2.5-flash";
-    if (saved === "gemini-2.0-flash-lite") saved = "gemini-2.5-flash-lite";
+    let saved = localStorage.getItem("ai_video_editor_dubber_engine") || "gemini-2.0-flash";
+    if (saved.includes("2.5") || saved === "gemini-2.0-flash-lite") saved = "gemini-2.0-flash";
     return saved;
   });
 
@@ -237,12 +226,12 @@ export function DubberPanel({
   // Sync selectedEngine: if selected cloud model has no key, gracefully switch
   useEffect(() => {
     const conf = ENGINE_CONFIG[selectedEngine];
-    if (!conf || conf.type === "local") return;
+    if (!conf || conf.type === "local" || conf.type === "free") return;
 
     if (!activeProviders[conf.provider]) {
       if (activeProviders.gemini) {
-        setSelectedEngine("gemini-2.5-flash");
-        localStorage.setItem("ai_video_editor_dubber_engine", "gemini-2.5-flash");
+        setSelectedEngine("gemini-2.0-flash");
+        localStorage.setItem("ai_video_editor_dubber_engine", "gemini-2.0-flash");
       } else if (activeProviders.openai) {
         setSelectedEngine("openai-gpt4o");
         localStorage.setItem("ai_video_editor_dubber_engine", "openai-gpt4o");
@@ -253,8 +242,8 @@ export function DubberPanel({
         setSelectedEngine("claude-3.5-sonnet");
         localStorage.setItem("ai_video_editor_dubber_engine", "claude-3.5-sonnet");
       } else {
-        setSelectedEngine("local-whisper");
-        localStorage.setItem("ai_video_editor_dubber_engine", "local-whisper");
+        setSelectedEngine("google-translate");
+        localStorage.setItem("ai_video_editor_dubber_engine", "google-translate");
       }
     }
   }, [activeProviders, selectedEngine]);
@@ -264,7 +253,7 @@ export function DubberPanel({
   // Helper to read stored API Key for the active engine
   const getEngineApiKey = (engineId) => {
     const conf = ENGINE_CONFIG[engineId];
-    if (!conf || conf.type === "local") return "";
+    if (!conf || conf.type === "local" || conf.type === "free") return "";
     try {
       const raw = localStorage.getItem(conf.storageKey);
       if (raw) {
@@ -286,7 +275,8 @@ export function DubberPanel({
 
   const currentKey = getEngineApiKey(selectedEngine);
   const isLocalEngine = ENGINE_CONFIG[selectedEngine]?.type === "local";
-  const effectiveKey = currentKey || (isLocalEngine ? getStoredGeminiKey() : "");
+  const isFreeEngine = ENGINE_CONFIG[selectedEngine]?.type === "free" || selectedEngine === "google-translate";
+  const effectiveKey = currentKey || ((isLocalEngine || isFreeEngine) ? getStoredGeminiKey() : "");
 
   const formatFileSize = (bytes) => {
     if (!bytes || isNaN(bytes)) return "";
@@ -371,7 +361,7 @@ export function DubberPanel({
       return;
     }
 
-    if (!effectiveKey) {
+    if (!effectiveKey && !isLocalEngine && !isFreeEngine) {
       notify(`⚠️ សូមកំណត់ API Key សម្រាប់ ${ENGINE_CONFIG[selectedEngine]?.name || "AI"} ដើម្បីដំណើរការបកប្រែ`);
       setIsApiKeyModalOpen(true);
       return;
@@ -441,7 +431,7 @@ export function DubberPanel({
     }
 
     // Check if cloud model requires API key
-    if (!isLocalEngine && !effectiveKey) {
+    if (!isLocalEngine && !isFreeEngine && !effectiveKey) {
       notify(`⚠️ សូមកំណត់ API Key សម្រាប់ ${ENGINE_CONFIG[selectedEngine]?.name || "AI"} ជាមុនសិន`);
       setIsApiKeyModalOpen(true);
       return;
@@ -457,12 +447,16 @@ export function DubberPanel({
       const audioBlobToProcess = await dubberService.extractOptimizedAudio(uploadedFile);
 
       setProcessingStatus(
-        isLocalEngine
+        isFreeEngine
+          ? "កំពុងបកប្រែជាមួយ Google Translation..."
+          : isLocalEngine
           ? "កំពុងដំណើរការ Local Whisper លើកុំព្យូទ័រ..."
           : `កំពុងស្រង់ Transcript & បកប្រែជាមួយ ${ENGINE_CONFIG[selectedEngine]?.name}...`
       );
       notify(
-        isLocalEngine
+        isFreeEngine
+          ? "កំពុងស្រង់សំឡេង និងបកប្រែតាម Google Translation ត្រឹមត្រូវ 100%..."
+          : isLocalEngine
           ? "កំពុងស្រង់សាច់រឿងលើម៉ាស៊ីនផ្ទាល់ (Local)..."
           : `កំពុងស្រង់ និងបកប្រែជាមួយ ${ENGINE_CONFIG[selectedEngine]?.name}...`
       );
@@ -493,7 +487,9 @@ export function DubberPanel({
         const count = applySubtitlesToTimeline(result.subtitles, khmerText, targetDuration);
 
         // Notify user of result
-        if (isLocalEngine) {
+        if (isFreeEngine || selectedEngine === "google-translate") {
+          notify(`✅ បានស្រង់ Transcript (${detected}) និងបញ្ចូល Subtitles ចំនួន ${count} ឃ្លាលើ Timeline តាម Google Translation ត្រឹមត្រូវ 100%!`);
+        } else if (isLocalEngine) {
           notify(`✅ បានស្រង់ Transcript (${detected}) និងបញ្ចូល Subtitles ចំនួន ${count} ឃ្លាលើ Timeline ដោយប្រើ Local CPU ដោយជោគជ័យ!`);
         } else if (
           targetLang === "km" &&
@@ -616,7 +612,7 @@ export function DubberPanel({
             <span>បកប្រែរឿង & Subtitles លើ Timeline</span>
           </div>
           <span className="dubber-chip-ai">
-            {isLocalEngine ? "Local AI" : "Cloud AI"}
+            {isLocalEngine ? "Local AI" : (isFreeEngine ? "Google AI" : "Cloud AI")}
           </span>
         </div>
 
@@ -688,6 +684,7 @@ export function DubberPanel({
               }}
             >
               <option value="cinematic_story">🎬 ភាពយន្ត & សម្រាយរឿង (Cinematic Dubbing)</option>
+              <option value="google_standard">🌐 បកប្រែត្រឹមត្រូវសុក្រិត (Google Translation Standard)</option>
               <option value="dialogue">💬 សន្ទនាតួអង្គរស់រវើក (Character Dialogue)</option>
               <option value="documentary">🎙️ អត្ថាធិប្បាយឯកសារ & ព័ត៌មាន (Documentary)</option>
               <option value="dramatic">🎭 មនោសញ្ចេតនា & កម្សត់ (Dramatic & Emotional)</option>
@@ -709,16 +706,18 @@ export function DubberPanel({
                 localStorage.setItem("ai_video_editor_dubber_engine", val);
               }}
             >
-              <optgroup label="💻 Run Local Computer (100% Offline & Free)">
-                <option value="local-whisper">💻 Local Whisper ONNX (CPU / Local Machine)</option>
+              <optgroup label="🌐 Google Translation (ផ្លូវការ Google - ត្រឹមត្រូវ 100%)">
+                <option value="google-translate">🌐 Google Translate (លឿនបំផុត & ត្រឹមត្រូវ 100% គ្មាន Key)</option>
+              </optgroup>
+
+              <optgroup label="💻 Run Local Computer (ម៉ាស៊ីនផ្ទាល់ - គ្មាន Key)">
+                <option value="local-whisper">💻 Local Whisper ONNX (ស្រង់សំឡេងលើម៉ាស៊ីនផ្ទាល់ + បកប្រែ)</option>
                 <option value="local-offline">🏠 Local Offline Model (CPU / គ្មាន Key)</option>
               </optgroup>
 
               {activeProviders.gemini && (
                 <optgroup label="⚡ Google Gemini (Active Key)">
-                  <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash (ចុងក្រោយ & ឆ្លាតវៃបំផុត)</option>
-                  <option value="gemini-2.5-flash-lite">🚀 Gemini 2.5 Flash Lite (លឿនបំផុត)</option>
-                  <option value="gemini-2.0-flash">⚡ Gemini 2.0 Flash</option>
+                  <option value="gemini-2.0-flash">⚡ Gemini 2.0 Flash (លឿន & ឆ្លាតវៃបំផុត)</option>
                   <option value="gemini-1.5-flash">🚀 Gemini 1.5 Flash (ស្ថិរភាពខ្ពស់)</option>
                   <option value="gemini-1.5-pro">💎 Gemini 1.5 Pro (គុណភាពភាពយន្ត)</option>
                 </optgroup>

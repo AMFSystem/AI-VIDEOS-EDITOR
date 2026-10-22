@@ -2,9 +2,34 @@ import {
   translateStoryScript,
   transcribeAndTranslateVideoAudio,
   synthesizeDubbingSpeech,
+  translateWithGoogle,
 } from "../../services/ai/dubberService.js";
 
 export const dubberController = {
+  /**
+   * Translate text using Google Translate
+   * POST /api/dubber/google-translate
+   */
+  async googleTranslate(req, res) {
+    try {
+      const { text, sourceLang, targetLang } = req.body || {};
+      const result = await translateWithGoogle({
+        text,
+        sourceLang: sourceLang || "auto",
+        targetLang: targetLang || "km",
+      });
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (err) {
+      console.error("Dubber Google Translate error:", err);
+      res.status(500).json({
+        success: false,
+        error: err.message,
+      });
+    }
+  },
   /**
    * Transcribe video audio directly and translate to Khmer
    * POST /api/dubber/transcribe-translate

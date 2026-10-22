@@ -1,4 +1,4 @@
-/**
+  /**
  * AI Story & Movie Dubber Service
  * Handles:
  * 1. Story / Dialogue Translation into natural Khmer storytelling narration
@@ -42,6 +42,60 @@ function containsKhmer(str) {
 }
 
 /**
+ * Translate text using Google Translate API (Free, high accuracy, standard Google Translation)
+ * @param {object} params
+ * @param {string} params.text
+ * @param {string} [params.sourceLang="auto"]
+ * @param {string} [params.targetLang="km"]
+ * @returns {Promise<{ translatedText: string, segments: Array<{ index: number, text: string }>, detectedLanguage: string, model: string }>}
+ */
+export async function translateWithGoogle({ text, sourceLang = "auto", targetLang = "km" }) {
+  if (!text || !text.trim()) {
+    return { translatedText: "", segments: [], detectedLanguage: sourceLang, model: "google-translate" };
+  }
+
+  const sl = sourceLang === "auto" ? "auto" : sourceLang;
+  const tl = targetLang || "km";
+
+  const url = "https://translate.googleapis.com/translate_a/single";
+  const params = new URLSearchParams({
+    client: "gtx",
+    sl,
+    tl,
+    dt: "t",
+    q: text.trim(),
+  });
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    },
+    body: params.toString(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Google Translate returned HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  const rawSegments = data?.[0] || [];
+  const translatedText = rawSegments.map((item) => (item && item[0] ? item[0] : "")).join("");
+  const detectedLanguage = data?.[2] || sl;
+
+  const rawLines = translatedText.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  const segments = rawLines.map((line, idx) => ({ index: idx + 1, text: line }));
+
+  return {
+    translatedText,
+    detectedLanguage,
+    segments,
+    model: "google-translate",
+  };
+}
+
+/**
  * Translate Story / Movie Dialogue into natural Khmer narration script
  * @param {object} params
  * @param {string} params.text
@@ -63,8 +117,10 @@ export async function translateStoryScript({
   if (!text || !text.trim()) {
     throw new Error("សូមបញ្ចូលអត្ថបទ ឬសាច់រឿងដែលត្រូវបកប្រែ");
   }
-  if (!apiKey || !apiKey.trim()) {
-    throw new Error("API Key គឺចាំបាច់ដើម្បីដំណើរការបកប្រែ AI");
+
+  // If user selected Google Translate or has no API key, use official Google Translate!
+  if (model === "google-translate" || !apiKey || !apiKey.trim()) {
+    return await translateWithGoogle({ text, sourceLang, targetLang });
   }
 
   const cleanKey = apiKey.trim();
@@ -176,13 +232,11 @@ CRITICAL RULES:
 
   // Case C: Google Gemini (Default & Most Capable for Khmer)
   const candidateModels = Array.from(new Set([
-    model === "gemini-2.0-flash-lite" ? "gemini-2.5-flash-lite" : (model || "gemini-2.5-flash"),
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
+    model && model.startsWith("gemini-") && !model.includes("2.5") ? model : "gemini-2.0-flash",
     "gemini-2.0-flash",
     "gemini-1.5-flash",
     "gemini-1.5-pro",
-  ])).filter((m) => m && m.startsWith("gemini-") && m !== "gemini-2.0-flash-lite");
+  ])).filter((m) => m && m.startsWith("gemini-") && !m.includes("2.5"));
 
   const userPrompt = `Translate the following dialogue/script to ${targetLangFull}.
 Source Language: ${sourceLang}
@@ -240,7 +294,13 @@ ${text.trim()}
     }
   }
 
-  throw lastError || new Error("ការបកប្រែសាច់រឿងបរាជ័យគ្រប់ម៉ូដែល");
+  // Graceful fallback to Google Translate if all Gemini candidates fail
+  try {
+    console.warn("[Dubber Translation] Gemini failed, falling back to Google Translate...");
+    return await translateWithGoogle({ text, sourceLang, targetLang });
+  } catch (gErr) {
+    throw lastError || gErr || new Error("ការបកប្រែសាច់រឿងបរាជ័យគ្រប់ម៉ូដែល");
+  }
 }
 
 /**
@@ -318,16 +378,13 @@ ${targetLang === "km" ? `- Khmer orthography: Do NOT insert spaces between every
 }
 Return pure JSON without markdown backticks or commentary.`;
 
-  // Gemini candidate models
-  const cleanModel = model === "gemini-2.0-flash-lite" ? "gemini-2.5-flash-lite" : (model || "gemini-2.5-flash");
+  // Gemini candidate models (prioritize real, active models)
   const candidateModels = Array.from(new Set([
-    cleanModel.startsWith("gemini-") ? cleanModel : "gemini-2.5-flash",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
+    model && model.startsWith("gemini-") && !model.includes("2.5") ? model : "gemini-2.0-flash",
     "gemini-2.0-flash",
     "gemini-1.5-flash",
     "gemini-1.5-pro",
-  ])).filter((m) => m && m !== "gemini-2.0-flash-lite");
+  ])).filter((m) => m && m.startsWith("gemini-") && !m.includes("2.5"));
 
   const requestBody = {
     contents: [

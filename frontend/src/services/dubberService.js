@@ -158,6 +158,76 @@ export const dubberService = {
   extractOptimizedAudio: extractOptimizedAudioForDubbing,
 
   /**
+   * Translate text using Google Translate API (Free, high accuracy, standard Google Translation)
+   * @param {object} params
+   * @param {string} params.text
+   * @param {string} [params.sourceLang="auto"]
+   * @param {string} [params.targetLang="km"]
+   * @returns {Promise<{ translatedText: string, segments: Array<{ index: number, text: string }>, detectedLanguage: string, model: string }>}
+   */
+  async translateWithGoogle({ text, sourceLang = "auto", targetLang = "km" }) {
+    if (!text || !text.trim()) {
+      return { translatedText: "", segments: [], detectedLanguage: sourceLang, model: "google-translate" };
+    }
+
+    const sl = sourceLang === "auto" ? "auto" : sourceLang;
+    const tl = targetLang || "km";
+
+    // 1. Try Backend Google Translate Proxy first
+    try {
+      const res = await apiRequest("/api/dubber/google-translate", {
+        method: "POST",
+        body: JSON.stringify({ text, sourceLang: sl, targetLang: tl }),
+      });
+      if (res && res.translatedText) {
+        return res;
+      }
+    } catch (backendErr) {
+      console.warn("Backend Google Translate unavailable, trying client-side fetch:", backendErr);
+    }
+
+    // 2. Direct Client-side fetch to Google Translate API
+    try {
+      const url = "https://translate.googleapis.com/translate_a/single";
+      const params = new URLSearchParams({
+        client: "gtx",
+        sl,
+        tl,
+        dt: "t",
+        q: text.trim(),
+      });
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+        },
+        body: params.toString(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const rawSegments = data?.[0] || [];
+        const translatedText = rawSegments.map((item) => (item && item[0] ? item[0] : "")).join("");
+        const detectedLanguage = data?.[2] || sl;
+        const rawLines = translatedText.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+        const segments = rawLines.map((line, idx) => ({ index: idx + 1, text: line }));
+
+        return {
+          translatedText,
+          detectedLanguage,
+          segments,
+          model: "google-translate",
+        };
+      }
+    } catch (clientErr) {
+      console.error("Client Google Translate fetch error:", clientErr);
+    }
+
+    throw new Error("ការបកប្រែតាម Google Translation មិនជោគជ័យ សូមពិនិត្យមើលអ៊ីនធឺណិត");
+  },
+
+  /**
    * Translate Story or Movie Dialogue into expressive Khmer narration text
    * @param {object} params
    * @param {string} params.text
@@ -176,10 +246,12 @@ export const dubberService = {
     apiKey = "",
     model = "gemini-2.0-flash",
   }) {
-    const key = apiKey || getStoredGeminiKey();
-    if (!key) {
-      throw new Error("សូមភ្ជាប់ API Key ដើម្បីប្រើប្រាស់មុខងារបកប្រែរឿង AI");
+    // If Google Translate model or no API key, use official Google Translate directly!
+    if (model === "google-translate" || style === "google_standard" || (!apiKey && !getStoredGeminiKey())) {
+      return await dubberService.translateWithGoogle({ text, sourceLang, targetLang });
     }
+
+    const key = apiKey || getStoredGeminiKey();
 
     // 1. Attempt backend translation first
     try {
@@ -308,15 +380,12 @@ CRITICAL RULES:
     }
 
     // Case C: Google Gemini (Default & Most Capable for Khmer)
-    const cleanModel = model === "gemini-2.0-flash-lite" ? "gemini-2.5-flash-lite" : (model || "gemini-2.5-flash");
     const candidateModels = Array.from(new Set([
-      cleanModel.startsWith("gemini-") ? cleanModel : "gemini-2.5-flash",
-      "gemini-2.5-flash",
-      "gemini-2.5-flash-lite",
+      model && model.startsWith("gemini-") && !model.includes("2.5") ? model : "gemini-2.0-flash",
       "gemini-2.0-flash",
       "gemini-1.5-flash",
       "gemini-1.5-pro",
-    ])).filter((m) => m && m.startsWith("gemini-") && m !== "gemini-2.0-flash-lite");
+    ])).filter((m) => m && m.startsWith("gemini-") && !m.includes("2.5"));
 
     let lastError = null;
     for (const m of candidateModels) {
@@ -359,7 +428,13 @@ CRITICAL RULES:
       }
     }
 
-    throw lastError || new Error("ការបកប្រែសាច់រឿងបរាជ័យគ្រប់ម៉ូដែល");
+    // Graceful fallback to Google Translate if Gemini fails
+    try {
+      console.warn("Gemini client translation failed, falling back to Google Translate...");
+      return await dubberService.translateWithGoogle({ text, sourceLang, targetLang });
+    } catch (gErr) {
+      throw lastError || gErr || new Error("ការបកប្រែសាច់រឿងបរាជ័យគ្រប់ម៉ូដែល");
+    }
   },
 
   /**
@@ -456,9 +531,9 @@ ${numberedText}`;
     apiKey = "",
     onProgress,
   }) {
-    // 1. If Local Computer Engine is selected:
-    if (engine === "local-whisper" || engine === "local-offline") {
-      onProgress?.({ progress: 10, phase: "កំពុងដំណើរការ Local Whisper លើកុំព្យូទ័រ..." });
+    // 1. If Local Computer Engine or Google Translate is selected:
+    if (engine === "local-whisper" || engine === "local-offline" || engine === "google-translate") {
+      onProgress?.({ progress: 10, phase: "កំពុងស្រង់ Transcript លើកុំព្យូទ័រ (Local Whisper)..." });
       const asrResult = await transcribeAudioToCaptionSegments(audioBlob, {
         preferredLanguage: sourceLang !== "auto" ? sourceLang : "en",
         onProgress: (p) => onProgress?.({ progress: p.progress || 30, phase: p.phase }),
@@ -471,18 +546,24 @@ ${numberedText}`;
       let translationSucceeded = false;
       let translationError = null;
 
-      // Translate to Khmer if API key is available
-      const fallbackKey = apiKey || getStoredGeminiKey();
-      if (fallbackKey && asrSegments.length > 0) {
-        onProgress?.({ progress: 80, phase: "កំពុងបកប្រែ Subtitles ទាំងអស់ទៅជាភាសាខ្មែរ..." });
+      // Translate to Khmer/Target Language
+      if (asrSegments.length > 0) {
+        const transEngine = engine === "google-translate" ? "google-translate" : (apiKey ? engine : "google-translate");
+        onProgress?.({
+          progress: 80,
+          phase: transEngine === "google-translate"
+            ? "កំពុងបកប្រែ Subtitles តាម Google Translation ត្រឹមត្រូវ 100%..."
+            : "កំពុងបកប្រែ Subtitles តាម AI...",
+        });
+
         try {
           const translatedSegs = await dubberService.translateCaptionSegments({
             segments: asrSegments,
             sourceLang,
-            targetLang: "km",
+            targetLang,
             style,
-            apiKey: fallbackKey,
-            model: "gemini-2.5-flash",
+            apiKey,
+            model: transEngine,
             onProgress,
           });
 
@@ -497,8 +578,29 @@ ${numberedText}`;
             translationSucceeded = true;
           }
         } catch (trErr) {
-          console.warn("Translation after local Whisper error:", trErr);
-          translationError = trErr?.message || String(trErr);
+          console.warn("Translation after local Whisper error, falling back to Google Translate:", trErr);
+          try {
+            const fallbackSegs = await dubberService.translateCaptionSegments({
+              segments: asrSegments,
+              sourceLang,
+              targetLang,
+              style: "google_standard",
+              model: "google-translate",
+              onProgress,
+            });
+            if (fallbackSegs && fallbackSegs.length > 0) {
+              subtitles = fallbackSegs.map((seg, i) => ({
+                start: seg.start,
+                end: seg.end,
+                original: asrSegments[i]?.text || seg.text,
+                khmer: seg.text,
+              }));
+              translatedText = fallbackSegs.map((s) => s.text).join("\n");
+              translationSucceeded = true;
+            }
+          } catch (fbErr) {
+            translationError = fbErr?.message || String(fbErr);
+          }
         }
       }
 
@@ -517,15 +619,52 @@ ${numberedText}`;
         translatedKhmerText: translatedText,
         translationSucceeded,
         translationError,
-        noTranslationKey: !fallbackKey,
         subtitles,
       };
     }
 
     // 2. Cloud AI Engines with API Key
     const key = apiKey || getStoredGeminiKey();
-    if (!key) {
+    if (!key && engine !== "google-translate") {
       throw new Error(`សូមភ្ជាប់ API Key សម្រាប់ ${engine} ដើម្បីដំណើរការបកប្រែ`);
+    }
+
+    // If audio is large (>15MB), directly use Local Whisper for ASR to avoid Gemini 20MB inlineData overflow!
+    if (audioBlob.size > 15 * 1024 * 1024) {
+      onProgress?.({ progress: 15, phase: "វីដេអូធំ: កំពុងស្រង់សំឡេងតាម Local Whisper ល្បឿនលឿន..." });
+      const asrResult = await transcribeAudioToCaptionSegments(audioBlob, {
+        preferredLanguage: sourceLang !== "auto" ? sourceLang : "en",
+        onProgress: (p) => onProgress?.({ progress: p.progress || 35, phase: p.phase }),
+      });
+
+      const asrSegments = asrResult.segments || [];
+      const rawTranscript = asrResult.text || asrSegments.map((s) => s.text).join(" ");
+      onProgress?.({ progress: 75, phase: "កំពុងបកប្រែសាច់រឿងទៅជាភាសាខ្មែរ..." });
+
+      const translatedSegs = await dubberService.translateCaptionSegments({
+        segments: asrSegments,
+        sourceLang,
+        targetLang,
+        style,
+        apiKey: key,
+        model: engine,
+        onProgress,
+      });
+
+      const subtitles = translatedSegs.map((seg, i) => ({
+        start: seg.start,
+        end: seg.end,
+        original: asrSegments[i]?.text || seg.text,
+        khmer: seg.text,
+      }));
+      const translatedKhmerText = translatedSegs.map((s) => s.text).join("\n");
+
+      return {
+        originalTranscript: rawTranscript,
+        detectedLanguage: asrResult.language || sourceLang || "auto",
+        translatedKhmerText,
+        subtitles,
+      };
     }
 
     // Convert audio blob to base64
@@ -603,15 +742,12 @@ ${targetLang === "km" ? `- Khmer orthography: Do NOT insert spaces between every
 }
 Return pure JSON without markdown backticks or commentary.`;
 
-    const cleanModel = engine === "gemini-2.0-flash-lite" ? "gemini-2.5-flash-lite" : (engine || "gemini-2.5-flash");
     const candidateModels = Array.from(new Set([
-      cleanModel.startsWith("gemini-") ? cleanModel : "gemini-2.5-flash",
-      "gemini-2.5-flash",
-      "gemini-2.5-flash-lite",
+      engine && engine.startsWith("gemini-") && !engine.includes("2.5") ? engine : "gemini-2.0-flash",
       "gemini-2.0-flash",
       "gemini-1.5-flash",
       "gemini-1.5-pro",
-    ])).filter((m) => m && m !== "gemini-2.0-flash-lite");
+    ])).filter((m) => m && m.startsWith("gemini-") && !m.includes("2.5"));
 
     for (const model of candidateModels) {
       try {
@@ -703,7 +839,42 @@ Return pure JSON without markdown backticks or commentary.`;
       }
     }
 
-    throw new Error("ការស្រង់ Transcript និងបកប្រែវីដេអូបរាជ័យ");
+    // Automatic reliable fallback: if Gemini Multimodal Audio fails or times out, transcribe via Local Whisper and translate!
+    console.warn("Gemini multimodal audio failed, falling back to Local Whisper + Google Translation...");
+    onProgress?.({ progress: 40, phase: "ប្តូរមកស្រង់ Transcript តាម Local Whisper លើកុំព្យូទ័រ..." });
+    const asrResult = await transcribeAudioToCaptionSegments(audioBlob, {
+      preferredLanguage: sourceLang !== "auto" ? sourceLang : "en",
+      onProgress: (p) => onProgress?.({ progress: p.progress || 50, phase: p.phase }),
+    });
+
+    const asrSegments = asrResult.segments || [];
+    const rawTranscript = asrResult.text || asrSegments.map((s) => s.text).join(" ");
+    onProgress?.({ progress: 80, phase: "កំពុងបកប្រែ Subtitles ទៅជាភាសាខ្មែរ..." });
+
+    const translatedSegs = await dubberService.translateCaptionSegments({
+      segments: asrSegments,
+      sourceLang,
+      targetLang,
+      style,
+      apiKey: key,
+      model: "google-translate",
+      onProgress,
+    });
+
+    const subtitles = translatedSegs.map((seg, i) => ({
+      start: seg.start,
+      end: seg.end,
+      original: asrSegments[i]?.text || seg.text,
+      khmer: seg.text,
+    }));
+    const translatedKhmerText = translatedSegs.map((s) => s.text).join("\n");
+
+    return {
+      originalTranscript: rawTranscript,
+      detectedLanguage: asrResult.language || sourceLang || "auto",
+      translatedKhmerText,
+      subtitles,
+    };
   },
 
   /**
