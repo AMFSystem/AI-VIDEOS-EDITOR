@@ -20,6 +20,7 @@ aiRouter.post("/elevenlabs/verify", aiController.elevenLabsVerifyKey);
 aiRouter.get("/gemini/status", aiController.geminiStatus);
 aiRouter.post("/gemini/verify", aiController.geminiVerifyKey);
 aiRouter.post("/gemini/tts", aiController.geminiTts);
+aiRouter.post("/gemini/analyze-voice", aiController.geminiAnalyzeVoice);
 aiRouter.post("/gemini/generate-script", aiController.geminiGenerateScript);
 
 // VoxCPM2 OpenBMB 48kHz Neural Diffusion Cloner & TTS
@@ -32,5 +33,15 @@ aiRouter.get("/voxcpm/train/prompts", aiController.voxcpmTrainPrompts);
 aiRouter.post("/voxcpm/train/start", aiController.voxcpmTrainStart);
 aiRouter.get("/voxcpm/train/status", aiController.voxcpmTrainStatus);
 aiRouter.post("/voxcpm/train/stop", aiController.voxcpmTrainStop);
+
+// F5-TTS Flow Matching Diffusion Voice Cloner & TTS
+aiRouter.get("/f5tts/status", aiController.f5ttsStatus);
+aiRouter.post("/f5tts/clone", aiController.f5ttsClone);
+aiRouter.post("/f5tts/tts", aiController.f5ttsTts);
+
+// PyVideoTrans Video Translation, Alignment & Dubber Pipeline
+aiRouter.get("/pyvideotrans/status", aiController.pyvideotransStatus);
+aiRouter.post("/pyvideotrans/align-dub", aiController.pyvideotransAlignDub);
+aiRouter.post("/pyvideotrans/setup-repo", aiController.pyvideotransSetupRepo);
 
 

@@ -205,9 +205,15 @@ export async function verifyGeminiKey(apiKey) {
  * @param {string} text
  * @param {string} [vocalStyle]
  * @param {boolean} [hasAudio]
+ * @param {string} [vocalPersona] Deep acoustic profile extracted from reference listening
  * @returns {string}
  */
-export function buildHumanVocalPrompt(text, vocalStyle = "natural_warm", hasAudio = false) {
+export function buildHumanVocalPrompt(
+  text,
+  vocalStyle = "natural_warm",
+  hasAudio = false,
+  vocalPersona = ""
+) {
   let styleDetails = "";
   switch (vocalStyle) {
     case "storytelling":
@@ -228,6 +234,13 @@ export function buildHumanVocalPrompt(text, vocalStyle = "natural_warm", hasAudi
       break;
   }
 
+  const personaSection = vocalPersona
+    ? `\n[DEEP LISTENING ACOUSTIC VOCAL PERSONA]:
+The speaker's voice has been auditioned and analyzed with deep listening:
+${vocalPersona.trim()}
+Strictly match this speaker's timbre, pitch melody, breathing cadence, and vocal texture.\n`
+    : "";
+
   const audioGuidance = hasAudio
     ? `Reference Audio Provided:
 Listen to the speaker's audio clip attached:
@@ -241,11 +254,143 @@ Listen to the speaker's audio clip attached:
 
   return `You are a master Cambodian voice actor and native speaker reading Khmer with exceptional human realism.
 Style: ${styleDetails}
-${audioGuidance}
+${personaSection}${audioGuidance}
 
 Speak the following text with this exact human vocal tone, inflection, and cadence in authentic Khmer (ភាសាខ្មែរ) without any introduction, greetings, or meta-comments:
 
 ${text.trim()}`;
+}
+
+/**
+ * Deep Acoustic Auditioning:
+ * Gemini listens deeply to the speaker's audio recording (15s to 60s+)
+ * and extracts a rich, detailed Vocal Persona directive (timbre, pitch melody, breath rhythm, resonance).
+ * @param {object} params
+ * @param {string} params.apiKey
+ * @param {Blob|File} params.audioBlob
+ * @param {string} [params.language="km"]
+ * @param {function} [params.onProgress]
+ * @returns {Promise<string>} Detailed Vocal Persona description
+ */
+export async function analyzeVocalPersonaWithGemini({
+  apiKey,
+  audioBlob,
+  language = "km",
+  onProgress = () => {},
+}) {
+  if (!audioBlob) throw new Error("ឯកសារសំឡេងគំរូគឺចាំបាច់");
+  const cleanKey = (apiKey || getStoredGeminiKey() || "").trim();
+
+  onProgress(10);
+
+  // Convert audio blob to base64 (allow up to 16MB for 60s+ of uncompressed studio audio)
+  const maxBytes = 16 * 1024 * 1024;
+  const slice = audioBlob.size > maxBytes ? audioBlob.slice(0, maxBytes, audioBlob.type || "audio/wav") : audioBlob;
+  const mimeType = slice.type || "audio/wav";
+
+  const audioBase64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const res = reader.result;
+      const b64 = typeof res === "string" ? res.split(",")[1] : "";
+      resolve(b64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(slice);
+  });
+
+  onProgress(30);
+
+  // Channel 1: Try backend proxy
+  try {
+    const res = await fetch("/api/ai/gemini/analyze-voice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        apiKey: cleanKey,
+        audioBase64,
+        mimeType,
+        language,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.persona) {
+        onProgress(100);
+        return data.persona;
+      }
+    }
+  } catch {
+    // Fall back to direct browser fetch
+  }
+
+  if (!cleanKey) {
+    throw new Error("Google Gemini API Key គឺចាំបាច់ដើម្បីដំណើរការវិភាគសំឡេងស៊ីជម្រៅ");
+  }
+
+  onProgress(50);
+
+  const auditionPrompt = `You are an expert audio acoustic engineer and vocal casting director.
+Listen carefully to the entire audio recording attached. This speaker's voice will be cloned for human-sounding Khmer text-to-speech.
+
+Analyze the speaker deeply across all acoustic dimensions:
+1. Gender and estimated vocal age (e.g. young woman, mature man).
+2. Fundamental pitch (F0 range, average pitch, melodic pitch inflection curves when emphasizing words).
+3. Timbre & resonance (chest resonance warmth, throat frequencies, vocal tract formant characteristics, brightness vs softness, airiness/breathiness).
+4. Cadence & Rhythm (speaking speed, pauses, micro-breath intake frequency between phrases, natural Cambodian speech flow).
+5. Emotional undertone & personality (warm, friendly, confident, soothing, engaging).
+
+Provide a concise, highly specific 3 to 5 sentence Voice Profile Directive. Format it as direct instructions to an audio generator to reproduce this exact voice identically. Do not include markdown headers or meta-text.`;
+
+  const candidateModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
+  let lastError = null;
+
+  for (const model of candidateModels) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  inlineData: {
+                    mimeType,
+                    data: audioBase64,
+                  },
+                },
+                { text: auditionPrompt },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 1024,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        lastError = new Error(errJson?.error?.message || `HTTP ${response.status}`);
+        continue;
+      }
+
+      onProgress(85);
+      const result = await response.json();
+      const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text && text.trim()) {
+        onProgress(100);
+        return text.trim();
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("មិនអាចវិភាគសំឡេងតាម Gemini បានទេ");
 }
 
 /**
@@ -271,6 +416,7 @@ export async function synthesizeWithGemini({
   referenceAudioBase64 = null,
   referenceMimeType = "audio/wav",
   vocalStyle = "natural_warm",
+  vocalPersona = "",
   onProgress = () => {},
 }) {
   if (!text || !text.trim()) throw new Error("សូមបញ្ចូលអត្ថបទសម្រាប់និយាយ");
@@ -281,11 +427,12 @@ export async function synthesizeWithGemini({
   let audioBase64 = referenceAudioBase64 || null;
   let audioMime = referenceMimeType || "audio/wav";
 
-  // Convert reference audio to base64 if provided
+  // Convert reference audio to base64 if provided (support up to 16MB for 60s+ audio)
   if (!audioBase64 && referenceAudioBlob) {
     try {
-      const slice = referenceAudioBlob.size > 2 * 1024 * 1024
-        ? referenceAudioBlob.slice(0, 2 * 1024 * 1024, referenceAudioBlob.type || "audio/wav")
+      const maxBytes = 16 * 1024 * 1024;
+      const slice = referenceAudioBlob.size > maxBytes
+        ? referenceAudioBlob.slice(0, maxBytes, referenceAudioBlob.type || "audio/wav")
         : referenceAudioBlob;
       audioMime = slice.type || "audio/wav";
       audioBase64 = await new Promise((resolve, reject) => {
@@ -315,6 +462,7 @@ export async function synthesizeWithGemini({
         audioBase64,
         referenceMimeType: audioMime,
         vocalStyle,
+        vocalPersona,
       }),
     });
 
@@ -335,10 +483,9 @@ export async function synthesizeWithGemini({
   // Channel 2: Direct browser fetch with model fallback
   onProgress(40);
   const candidateModels = [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-preview-tts",
-    "gemini-2.0-flash-exp",
     "gemini-2.0-flash",
+    "gemini-2.0-flash-exp",
+    "gemini-1.5-flash",
   ];
 
   let lastDirectError = null;
@@ -350,7 +497,7 @@ export async function synthesizeWithGemini({
     for (const withAudio of attempts) {
       try {
         const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`;
-        const promptText = buildHumanVocalPrompt(text, vocalStyle, withAudio);
+        const promptText = buildHumanVocalPrompt(text, vocalStyle, withAudio, vocalPersona);
 
         const parts = [];
         if (withAudio && audioBase64) {

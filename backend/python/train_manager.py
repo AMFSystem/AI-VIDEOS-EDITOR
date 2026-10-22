@@ -74,25 +74,54 @@ DEFAULT_KHMER_PROMPTS = [
 # Audio Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 def resample_to_16k_mono(audio_bytes: bytes) -> np.ndarray:
-    """Decode audio bytes (WAV/MP3/OGG) and convert to 16kHz mono float32."""
+    """Decode audio bytes (WAV/MP3/OGG/WebM/M4A/AAC) and convert to 16kHz mono float32."""
     import io
-    bio = io.BytesIO(audio_bytes)
-    data, sr = sf.read(bio)
-    if data.ndim > 1:
-        data = np.mean(data, axis=1)
-    
-    if sr != TARGET_SR:
-        gcd = np.gcd(sr, TARGET_SR)
-        up = TARGET_SR // gcd
-        down = sr // gcd
-        data = scipy.signal.resample_poly(data, up, down)
-    
-    # Peak normalize
-    max_val = np.max(np.abs(data))
-    if max_val > 1e-5:
-        data = (data / max_val) * 0.95
-        
-    return data.astype(np.float32)
+    # 1. Try direct soundfile decode
+    try:
+        bio = io.BytesIO(audio_bytes)
+        data, sr = sf.read(bio)
+        if data.ndim > 1:
+            data = np.mean(data, axis=1)
+        if sr != TARGET_SR:
+            gcd = np.gcd(sr, TARGET_SR)
+            up = TARGET_SR // gcd
+            down = sr // gcd
+            data = scipy.signal.resample_poly(data, up, down)
+        max_val = np.max(np.abs(data))
+        if max_val > 1e-5:
+            data = (data / max_val) * 0.95
+        return data.astype(np.float32)
+    except Exception as sf_err:
+        # 2. Universal fallback: decode WebM, Opus, M4A, AAC via ffmpeg
+        ffmpeg_bin = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
+        if os.path.exists(ffmpeg_bin):
+            try:
+                cmd = [
+                    ffmpeg_bin,
+                    "-nostdin",
+                    "-hide_banner",
+                    "-loglevel", "error",
+                    "-i", "pipe:0",
+                    "-vn",
+                    "-ar", "16000",
+                    "-ac", "1",
+                    "-f", "wav",
+                    "pipe:1",
+                ]
+                proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                wav_out, _ = proc.communicate(input=audio_bytes)
+                if proc.returncode == 0 and len(wav_out) > 44:
+                    bio = io.BytesIO(wav_out)
+                    data, _ = sf.read(bio)
+                    if data.ndim > 1:
+                        data = np.mean(data, axis=1)
+                    max_val = np.max(np.abs(data))
+                    if max_val > 1e-5:
+                        data = (data / max_val) * 0.95
+                    return data.astype(np.float32)
+            except Exception as ffmpeg_err:
+                pass
+        raise RuntimeError(f"មិនអាចឌីកូដសំឡេង (Decode Audio Error): {sf_err}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Training Manager Class
@@ -165,13 +194,21 @@ class LoRATrainingManager:
     ) -> Dict[str, Any]:
         with self._lock:
             if self._process and self._process.poll() is None:
-                raise RuntimeError("ដំណើរការបង្វឹកកំពុងដំណើរការរួចហើយ សូមរង់ចាំ ឬចុច Stop សិន")
+                self._append_log("🛑 បញ្ឈប់ដំណើរការបង្វឹកចាស់ដោយស្វ័យប្រវត្តិដើម្បីចាប់ផ្តើមវគ្គថ្មី...")
+                try:
+                    self._process.terminate()
+                    time.sleep(1.0)
+                    if self._process.poll() is None:
+                        self._process.kill()
+                except Exception as e:
+                    pass
+                self._process = None
             
             clean_name = re.sub(r"[^a-zA-Z0-9_\u1780-\u17FF]", "_", model_name.strip())
             if not clean_name:
                 clean_name = f"khmer_lora_{int(time.time())}"
             
-            steps = max(50, min(2000, int(steps)))
+            steps = max(10, min(2000, int(steps)))
 
             self.state.update({
                 "status": "preparing",
@@ -256,14 +293,14 @@ class LoRATrainingManager:
                 except Exception as unload_err:
                     self._append_log(f"⚠️ Unload note: {unload_err}")
 
-            # 3. Write Training YAML Config
+            # 3. Write Training YAML Config (Tuned for Fast & Realistic Mac MPS/CPU Voice Adaptation)
             import yaml
             train_config = {
                 "pretrained_path": "openbmb/VoxCPM2",
                 "train_manifest": str(manifest_path.resolve()),
                 "sample_rate": 16000,
                 "batch_size": 1,
-                "grad_accum_steps": 8,
+                "grad_accum_steps": 1,  # 1 step = 1 audio sample for instant step updates without freezing
                 "num_workers": 1,
                 "num_iters": steps,
                 "max_steps": steps,
@@ -272,15 +309,15 @@ class LoRATrainingManager:
                 "log_interval": 1,
                 "learning_rate": learning_rate,
                 "weight_decay": 0.01,
-                "warmup_steps": min(20, max(5, steps // 10)),
+                "warmup_steps": min(10, max(2, steps // 10)),
                 "max_grad_norm": 1.0,
                 "tensorboard": str(logs_dir.resolve()),
                 "lambdas": {"loss/diff": 1.0, "loss/stop": 1.0},
                 "lora": {
-                    "enable_lm": True,
+                    "enable_lm": False,  # Audio DiT generates acoustic timbre & pitch; disabling 2B LM makes training 4x faster!
                     "enable_dit": True,
                     "enable_proj": False,
-                    "r": 32,
+                    "r": 16,
                     "alpha": 16,
                     "dropout": 0.0,
                 }

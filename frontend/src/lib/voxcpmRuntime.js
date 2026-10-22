@@ -458,8 +458,9 @@ export async function synthesizeWithVoxCpm({
   onProgress(15);
 
   // ── Try backend synthesis (full DSP chain) ──────────────────────────────
+  let res;
   try {
-    const res = await fetch(`${BACKEND_BASE}/tts`, {
+    res = await fetch(`${BACKEND_BASE}/tts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -470,49 +471,19 @@ export async function synthesizeWithVoxCpm({
       }),
       signal: AbortSignal.timeout(90000), // 90s timeout for long texts
     });
-
-    if (res.ok) {
-      onProgress(90);
-      const blob = await res.blob();
-      onProgress(100);
-      return blob;
-    }
-
-    const errData = await res.json().catch(() => ({}));
-    console.warn("[VoxCPM2] Backend TTS failed:", errData.error || res.status);
   } catch (err) {
-    console.warn("[VoxCPM2] Backend TTS error, using browser fallback:", err.message);
+    throw new Error(`មិនអាចភ្ជាប់ទៅកាន់ VoxCPM2 Server បានទេ (${err.message})។ សូមប្រាកដថាបានបើក: python backend/python/voxcpm_server.py`);
   }
 
-  // ── Browser fallback: Google TTS + browser DSP ───────────────────────────
-  onProgress(30);
-  const lang = language || profile?.language || "km";
-  const ttsUrl = `http://127.0.0.1:3001/api/ai/tts-google?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}&speed=1.0`;
-
-  let baseAudioBlob;
-  try {
-    const res = await fetch(ttsUrl, { signal: AbortSignal.timeout(30000) });
-    if (!res.ok) throw new Error(`TTS HTTP ${res.status}`);
-    baseAudioBlob = await res.blob();
-  } catch (err) {
-    throw new Error(`មិនអាចទាក់ទងម៉ាស៊ីនសំឡេងបានទេ: ${err.message}`);
+  if (res.ok) {
+    onProgress(90);
+    const blob = await res.blob();
+    onProgress(100);
+    return blob;
   }
 
-  onProgress(55);
-
-  // Decode base audio to 48kHz
-  const samples48k = await decodeAudioTo48k(baseAudioBlob);
-
-  onProgress(70);
-
-  // Apply browser DSP (pitch morphing + saturation)
-  const processed = await applyBrowserDsp(samples48k, profile?.acousticProfile);
-
-  onProgress(95);
-
-  const outputBlob = encodeWav48k(processed, VOXCPM2_SAMPLE_RATE);
-  onProgress(100);
-  return outputBlob;
+  const errData = await res.json().catch(() => ({}));
+  throw new Error(errData.error || `VoxCPM2 Server error (${res.status})។ សូមពិនិត្យមើល Python Server :3002`);
 }
 
 /**
@@ -545,6 +516,49 @@ export async function loadVoxCpmLora(modelName) {
   return await res.json();
 }
 
+export const DEFAULT_VOXCPM_PROMPTS = [
+  {
+    id: "prompt_1",
+    category: "សួស្តី & ស្វាគមន៍ (Greeting)",
+    text: "សួស្តីបងប្អូនទាំងអស់គ្នា សូមស្វាគមន៍មកកាន់កម្មវិធីរបស់យើងខ្ញុំនៅថ្ងៃនេះ។",
+  },
+  {
+    id: "prompt_2",
+    category: "វប្បធម៌ & ទេសចរណ៍ (Culture)",
+    text: "ប្រទេសកម្ពុជាសម្បូរទៅដោយសម្បត្តិវប្បធម៌ប្រវត្តិសាស្ត្រ និងរមណីយដ្ឋានធម្មជាតិស្រស់ស្អាតជាច្រើន។",
+  },
+  {
+    id: "prompt_3",
+    category: "បច្ចេកវិទ្យា & អនាគត (Tech)",
+    text: "បច្ចេកវិទ្យាបញ្ញាសិប្បនិម្មិតកំពុងជួយសម្រួលដល់ការងារប្រចាំថ្ងៃរបស់មនុស្សយ៉ាងឆាប់រហ័ស។",
+  },
+  {
+    id: "prompt_4",
+    category: "សំណួរ & សន្ទនា (Question)",
+    text: "តើអ្នកទាំងអស់គ្នាមានចំណាប់អារម្មណ៍យ៉ាងណាដែរចំពោះព័ត៌មានទាន់ហេតុការណ៍នៅព្រឹកនេះ?",
+  },
+  {
+    id: "prompt_5",
+    category: "ការថ្លែងអំណរគុណ (Gratitude)",
+    text: "សូមអរគុណយ៉ាងជ្រាលជ្រៅសម្រាប់ការចំណាយពេលវេលាដ៏មានតម្លៃតាមដានទស្សនារបស់លោកអ្នក។",
+  },
+  {
+    id: "prompt_6",
+    category: "ការលើកទឹកចិត្ត (Inspiration)",
+    text: "ភាពជោគជ័យមិនមែនកើតឡើងដោយចៃដន្យនោះទេ ប៉ុន្តែជាលទ្ធផលនៃការខិតខំប្រឹងប្រែងជារៀងរាល់ថ្ងៃ។",
+  },
+  {
+    id: "prompt_7",
+    category: "ការអានព័ត៌មាន (News)",
+    text: "ថ្ងៃនេះអាកាសធាតុមានភាពអំណោយផលល្អ ដោយមានពន្លឺថ្ងៃស្រទន់និងខ្យល់ត្រជាក់បក់រំភើយ។",
+  },
+  {
+    id: "prompt_8",
+    category: "ការលាគ្នា (Closing)",
+    text: "សូមជូនពរឱ្យលោកអ្នកនិងក្រុមគ្រួសារជួបតែសេចក្តីសុខ សុភមង្គល និងសុខភាពល្អគ្រប់ពេលវេលា។",
+  },
+];
+
 /**
  * Fetch Khmer training prompts
  */
@@ -553,9 +567,12 @@ export async function getVoxCpmTrainingPrompts() {
     const res = await fetch(`${BACKEND_BASE}/train/prompts`, {
       signal: AbortSignal.timeout(4000),
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.prompts && data.prompts.length > 0) return data;
+    }
   } catch {}
-  return { prompts: [] };
+  return { prompts: DEFAULT_VOXCPM_PROMPTS };
 }
 
 /**
@@ -566,7 +583,7 @@ export async function startVoxCpmTraining({ modelName, samples, steps = 300, lea
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ modelName, samples, steps, learningRate }),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(180000), // 3 minutes timeout for audio uploads
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -581,11 +598,20 @@ export async function startVoxCpmTraining({ modelName, samples, steps = 300, lea
 export async function getVoxCpmTrainingStatus() {
   try {
     const res = await fetch(`${BACKEND_BASE}/train/status`, {
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(4000),
     });
     if (res.ok) return await res.json();
   } catch {}
-  return { status: "idle", progress: 0, logs: [] };
+  return {
+    status: "idle",
+    step: 0,
+    total_steps: 50,
+    progress: 0,
+    loss: null,
+    eta_seconds: null,
+    elapsed_seconds: 0,
+    logs: [],
+  };
 }
 
 /**

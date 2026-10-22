@@ -7,6 +7,7 @@ import { apiRequest } from "./apiClient.js";
 import { getStoredGeminiKey } from "../lib/geminiRuntime.js";
 import { synthesizeWithGemini } from "../lib/geminiRuntime.js";
 import { synthesizeWithVoxCpm } from "../lib/voxcpmRuntime.js";
+import { synthesizeWithF5Tts } from "../lib/f5ttsRuntime.js";
 import { synthesizeWithElevenLabs, getStoredElevenLabsKey } from "../lib/elevenlabsRuntime.js";
 import { synthesizeBaseVoice } from "../lib/baseVoiceSynthesis.js";
 import { convertVoiceBlob } from "../lib/openVoiceRuntime.js";
@@ -531,9 +532,9 @@ ${numberedText}`;
     apiKey = "",
     onProgress,
   }) {
-    // 1. If Local Computer Engine or Google Translate is selected:
-    if (engine === "local-whisper" || engine === "local-offline" || engine === "google-translate") {
-      onProgress?.({ progress: 10, phase: "កំពុងស្រង់ Transcript លើកុំព្យូទ័រ (Local Whisper)..." });
+    // 1. If Local Computer Engine, PyVideoTrans or Google Translate is selected:
+    if (engine === "local-whisper" || engine === "local-offline" || engine === "google-translate" || engine === "pyvideotrans") {
+      onProgress?.({ progress: 10, phase: engine === "pyvideotrans" ? "កំពុងដំណើរការ PyVideoTrans ASR..." : "កំពុងស្រង់ Transcript លើកុំព្យូទ័រ (Local Whisper)..." });
       const asrResult = await transcribeAudioToCaptionSegments(audioBlob, {
         preferredLanguage: sourceLang !== "auto" ? sourceLang : "en",
         onProgress: (p) => onProgress?.({ progress: p.progress || 30, phase: p.phase }),
@@ -926,6 +927,7 @@ Return pure JSON without markdown backticks or commentary.`;
           voiceName,
           referenceAudioBlob: profile.referenceBlob,
           vocalStyle: profile.vocalTone || "storytelling",
+          vocalPersona: profile.vocalPersona || "",
           onProgress: (p) => onProgress(20 + Math.round(p * 0.55)),
         });
       } catch (gemErr) {
@@ -940,17 +942,8 @@ Return pure JSON without markdown backticks or commentary.`;
         geminiBase = res.blob;
       }
 
-      if (profile.embedding) {
-        onPhase(`កំពុងបម្លែងទឹកដមទៅជា "${profile.name}"...`);
-        onProgress(80);
-        try {
-          finalBlob = await convertVoiceBlob(geminiBase, profile.embedding, { seed: 2026 });
-        } catch {
-          finalBlob = geminiBase;
-        }
-      } else {
-        finalBlob = geminiBase;
-      }
+      // Deliver crystal-clear studio Gemini audio without WASM vocoder degradation
+      finalBlob = geminiBase;
     }
     // Engine 2: VoxCPM2 Offline 48kHz
     else if (profile.engine === "voxcpm2" || profile.model?.includes("VoxCPM")) {
@@ -966,6 +959,25 @@ Return pure JSON without markdown backticks or commentary.`;
         });
       } catch (voxErr) {
         console.warn("VoxCPM dubbing fallback:", voxErr);
+        const baseVoice = VOICES.find((v) => v.id === "km_female_sophea") || VOICES[0];
+        const res = await synthesizeBaseVoice({ voice: baseVoice, text: cleanText, speed });
+        finalBlob = res.blob;
+      }
+    }
+    // Engine 2.5: F5-TTS Flow Matching Diffusion (24kHz Studio)
+    else if (profile.engine === "f5tts" || profile.model?.includes("F5-TTS")) {
+      onPhase(`កំពុងសំយោគសំឡេង 24kHz ដោយ F5-TTS Flow Matching (${profile.name})...`);
+      onProgress(20);
+      try {
+        finalBlob = await synthesizeWithF5Tts({
+          text: cleanText,
+          profile,
+          speed,
+          language: profile.language || "km",
+          onProgress: (p) => onProgress(20 + Math.round(p * 0.7)),
+        });
+      } catch (f5Err) {
+        console.warn("F5-TTS dubbing fallback:", f5Err);
         const baseVoice = VOICES.find((v) => v.id === "km_female_sophea") || VOICES[0];
         const res = await synthesizeBaseVoice({ voice: baseVoice, text: cleanText, speed });
         finalBlob = res.blob;
@@ -1011,5 +1023,61 @@ Return pure JSON without markdown backticks or commentary.`;
     onProgress(100);
     onPhase("រួចរាល់!");
     return finalBlob;
+  },
+
+  /**
+   * Align and synchronize all dubbed subtitle segments using PyVideoTrans
+   * @param {object} params
+   * @param {Array<object>} params.segments - [{ id, start, end, text, audioBlob }]
+   * @param {boolean} [params.preserveBgm=true]
+   * @param {number} [params.bgmVolume=0.25]
+   * @param {number} [params.voiceVolume=1.0]
+   * @returns {Promise<Blob>} Aligned master WAV blob
+   */
+  async alignWithPyVideoTrans({
+    segments,
+    preserveBgm = true,
+    bgmVolume = 0.25,
+    voiceVolume = 1.0,
+  }) {
+    if (!segments || segments.length === 0) {
+      throw new Error("Segments list is required for PyVideoTrans alignment");
+    }
+
+    // Convert audioBlob of each segment to Base64
+    const preparedSegments = await Promise.all(
+      segments.map(async (seg) => {
+        let b64 = seg.audioBase64 || "";
+        if (!b64 && seg.audioBlob) {
+          b64 = await blobToBase64(seg.audioBlob);
+        }
+        return {
+          id: seg.id,
+          start: seg.start,
+          end: seg.end,
+          text: seg.text || seg.khmer || "",
+          audioBase64: b64,
+        };
+      })
+    );
+
+    const res = await fetch("http://127.0.0.1:3001/api/ai/pyvideotrans/align-dub", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        segments: preparedSegments,
+        preserveBgm,
+        bgmVolume,
+        voiceVolume,
+      }),
+      signal: AbortSignal.timeout(180000),
+    });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      throw new Error(`PyVideoTrans Alignment failed: ${err || res.status}`);
+    }
+
+    return await res.blob();
   },
 };

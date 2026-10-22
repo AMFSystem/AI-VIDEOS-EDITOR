@@ -481,10 +481,32 @@ async function runTranscription(
     throw new Error("ការស្រង់សំឡេងមិនទាន់ច្បាស់លាស់ សូមសាកល្បងម្តងទៀត។");
   }
 
-  const segments = captionSegmentsFromWords(result.output?.chunks, duration, {
-    timelineOffset, grouping,
-    normalizeText: (text) => normalizeAsrText(text, result.language),
-  });
+  let segments = [];
+  try {
+    segments = captionSegmentsFromWords(result.output?.chunks, duration, {
+      timelineOffset,
+      grouping,
+      normalizeText: (text) => normalizeAsrText(text, result.language),
+    });
+  } catch (timingErr) {
+    console.warn("Word-level timing unavailable, using sentence/phrase chunking fallback:", timingErr);
+    const rawText = getTranscriptText(result.output) || "";
+    if (rawText.trim()) {
+      const phrases = rawText
+        .split(/(?<=[.!?。！？\n])\s+/)
+        .map((p) => normalizeAsrText(p, result.language).trim())
+        .filter(Boolean);
+      const count = Math.max(1, phrases.length);
+      const pieceDuration = duration / count;
+      segments = phrases.map((text, idx) => ({
+        id: makeId("caption"),
+        text,
+        start: Number((timelineOffset + idx * pieceDuration).toFixed(2)),
+        end: Number((timelineOffset + (idx + 1) * pieceDuration).toFixed(2)),
+      }));
+    }
+  }
+
   if (!segments.length) {
     throw new Error("មិនមាន Subtitles ត្រូវបានស្រង់ឃើញទេ។");
   }

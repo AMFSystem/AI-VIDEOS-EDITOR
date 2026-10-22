@@ -392,8 +392,10 @@ export function CloneTab({
                 value={cloneGender || "female"}
                 onChange={(e) => setCloneGender?.(e.target.value)}
               >
-                <option value="female">👩 នារី (Female - សំឡេងស្រទន់/ស្រាល)</option>
-                <option value="male">👨 បុរស (Male - សំឡេងទ្រូង/ធ្ងន់)</option>
+                <option value="female">👩 នារីស្រទន់ (Female - សំឡេង Aoede ស្រទន់ រណ្តំ)</option>
+                <option value="female_kore">🌸 នារីផ្អែមល្ហែម (Female - សំឡេង Kore ផ្អែម ស្រាល ដូចមនុស្សពិត)</option>
+                <option value="male">👨 បុរស (Male - សំឡេង Fenrir ទ្រូង ធ្ងន់)</option>
+                <option value="male_puck">⚡ បុរសរស់រវើក (Male - សំឡេង Puck ស្វាហាប់)</option>
               </select>
             </div>
 
@@ -467,13 +469,60 @@ export function CloneTab({
                   }
                 }}
               >
-                <option value="voxcpm2">OpenBMB VoxCPM2</option>
-                <option value="gemini">Google Gemini 2.5 Flash Studio (ធួន & តុងសំឡេងមនុស្សពិត 95%)</option>
+                <option value="voxcpm2">OpenBMB VoxCPM2 (48kHz Neural)</option>
+                <option value="f5tts">🌟 F5-TTS Flow Matching Diffusion (SOTA 24kHz Studio)</option>
+                <option value="gemini">Google Gemini 2.0 Studio (🎧 Deep Listening 100% ដូចមនុស្សពិត)</option>
                 <option value="elevenlabs">ElevenLabs Neural (Cloud Pro)</option>
                 <option value="openvoice">OpenVoice v2 (WASM)</option>
               </select>
             </div>
 
+            {cloneModel === "gemini" && (
+              <div
+                style={{
+                  background: "rgba(56, 189, 248, 0.1)",
+                  border: "1px solid rgba(56, 189, 248, 0.3)",
+                  borderRadius: "8px",
+                  padding: "10px 14px",
+                  fontSize: "12px",
+                  color: "#7dd3fc",
+                  lineHeight: "1.6",
+                  marginTop: "8px",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "8px",
+                }}
+              >
+                <span>🎧</span>
+                <div>
+                  <strong>របៀបស្តាប់ស៊ីជម្រៅ (Gemini Deep Acoustic Listening 100%)៖</strong> AI នឹងស្តាប់សំឡេងគំរូរបស់អ្នកយ៉ាងលម្អិត (Pass 1) ដើម្បីស្រង់យកកម្រិតសំនៀង (Pitch contour), ធួនសំឡេងទ្រូង (Timbre warmth) និងចង្វាក់ដង្ហើម (Breathing cadence)។ សូមណែនាំថត ឬផ្ទុកឡើងសំឡេងចន្លោះពី <strong>15s ដល់ 60s</strong> ដើម្បីទទួលបានសំឡេងដូចមនុស្សពិត ១០០%!
+                </div>
+              </div>
+            )}
+
+
+            {cloneModel === "f5tts" && (
+              <div
+                style={{
+                  background: "rgba(139, 92, 246, 0.12)",
+                  border: "1px solid rgba(139, 92, 246, 0.35)",
+                  borderRadius: "8px",
+                  padding: "10px 14px",
+                  fontSize: "12px",
+                  color: "#d8b4fe",
+                  lineHeight: "1.6",
+                  marginTop: "8px",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "8px",
+                }}
+              >
+                <span>💡</span>
+                <div>
+                  <strong>គន្លឹះសំឡេងមនុស្សពិត ១០០%៖</strong> ដើម្បីឱ្យ F5-TTS ដំណើរការ Diffusion ដូចមនុស្សពិត សូមប្រាកដថាបានដំឡើង <code>pip install f5-tts</code> ក្នុង Python និងប្រើសំឡេងគំរូច្បាស់ (៥-១០s)។ ប្រសិនបើលោកអ្នកចង់បានសំឡេងមនុស្សស្រីខ្មែរស្រទន់ ពិរោះរណ្តំ និងមានដង្ហើម ៩៥%+ ភ្លាមៗ សូមជ្រើសរើស <strong>Google Gemini 2.5 Flash Studio</strong> (ឥតគិតថ្លៃ)!
+                </div>
+              </div>
+            )}
 
             {cloneModel === "gemini" && !isGeminiValid && !geminiKey && (
               <div className="clone-model-key-warning">
@@ -534,6 +583,8 @@ export function CloneTab({
                       ? "ក្លូនសំឡេងជាមួយ Google Gemini Studio AI"
                       : cloneModel === "voxcpm2"
                       ? "ក្លូនសំឡេងជាមួយ VoxCPM2 (48kHz Ultra-HD)"
+                      : cloneModel === "f5tts"
+                      ? "ក្លូនសំឡេងជាមួយ F5-TTS (Flow Matching Diffusion)"
                       : cloneModel === "elevenlabs"
                       ? "ក្លូនសំឡេងជាមួយ ElevenLabs (100% ដូចពិត)"
                       : "ស្រង់យកម៉ូដែលសំឡេង (OpenVoice v2)"}

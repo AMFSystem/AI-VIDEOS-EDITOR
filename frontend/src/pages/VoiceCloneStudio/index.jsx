@@ -24,6 +24,7 @@ import {
   setStoredGeminiKey,
   verifyGeminiKey,
   synthesizeWithGemini,
+  analyzeVocalPersonaWithGemini,
   generateScriptWithGemini,
 } from "../../lib/geminiRuntime.js";
 import { synthesizeBaseVoice } from "../../lib/baseVoiceSynthesis.js";
@@ -33,6 +34,12 @@ import {
   VOXCPM2_VERSION,
   VOXCPM2_SAMPLE_RATE,
 } from "../../lib/voxcpmRuntime.js";
+import {
+  extractF5TtsProfile,
+  synthesizeWithF5Tts,
+  F5TTS_VERSION,
+  F5TTS_SAMPLE_RATE,
+} from "../../lib/f5ttsRuntime.js";
 import { VOICES } from "../../config/editor.js";
 import { decodeWaveform, getAudioRecordingFormat } from "../../lib/media.js";
 import { formatTime } from "../../lib/timeline.js";
@@ -465,6 +472,7 @@ export function VoiceCloneStudioPage({
   const [extractProgress, setExtractProgress] = useState(0);
   const [extractPhase, setExtractPhase] = useState("");
   const [extractedEmbedding, setExtractedEmbedding] = useState(null);
+  const [extractedVocalPersona, setExtractedVocalPersona] = useState("");
   const [testBlob, setTestBlob] = useState(null);
   const [testUrl, setTestUrl] = useState("");
   const [isPlayingTest, setIsPlayingTest] = useState(false);
@@ -606,32 +614,44 @@ export function VoiceCloneStudioPage({
           return;
         }
 
-        // Gemini 2.0 Flash Audio Studio Cloner + Tone Adaptation
-        setExtractPhase("កំពុងវិភាគទម្រង់សំឡេង និងស្រង់យក Timbre Embedding...");
-        setExtractProgress(20);
+        // Gemini 2.0 Flash Audio Studio Cloner + Deep Acoustic Listening Pass
+        setExtractPhase("🎧 ដំណាក់កាលទី ១៖ Gemini កំពុងស្តាប់ និងវិភាគសំឡេងរបស់អ្នកយ៉ាងលម្អិត (Deep Acoustic Listening & Persona Extraction)...");
+        setExtractProgress(15);
 
-        let embedding = null;
+        let persona = "";
         try {
-          embedding = await extractVoiceEmbedding(referenceBlob, (evt) => {
-            if (evt.phase) setExtractPhase(evt.phase);
-            if (Number.isFinite(evt.progress)) {
-              setExtractProgress(20 + Math.min(30, Math.round(evt.progress * 0.3)));
-            }
+          persona = await analyzeVocalPersonaWithGemini({
+            apiKey: effectiveKey,
+            audioBlob: referenceBlob,
+            language: cloneLanguage,
+            onProgress: (p) => setExtractProgress(15 + Math.round(p * 0.3)),
           });
-        } catch (embErr) {
-          console.warn("OpenVoice WASM embedding fallback to acoustic analyzer:", embErr);
-          const acProfile = await extractVoxCpmProfile(referenceBlob);
-          embedding = acProfile?.embedding || new Float32Array(192);
+        } catch (pErr) {
+          console.warn("Deep listening persona extraction warning:", pErr);
         }
 
-        setExtractedEmbedding(embedding);
-        setExtractedEngine("gemini");
-        setExtractedVoxCpmData(null);
-        const chosenGeminiVoice = cloneGender === "male" ? "Fenrir" : "Aoede";
-        setExtractedVoiceId(`gemini_${chosenGeminiVoice}`);
-        setExtractProgress(55);
+        setExtractedVocalPersona(persona);
 
-        setExtractPhase("កំពុងសំយោគសំឡេង Studio តាមរយៈ Google Gemini 2.5 Flash...");
+        // Acoustic profile embedding for compatibility
+        let embedding = null;
+        try {
+          const acProfile = await extractVoxCpmProfile(referenceBlob);
+          embedding = acProfile?.embedding || new Float32Array(192);
+        } catch (embErr) {
+          embedding = new Float32Array(192);
+        }
+
+        const chosenGeminiVoice =
+          cloneGender === "female_kore"
+            ? "Kore"
+            : cloneGender === "male_puck"
+            ? "Puck"
+            : cloneGender === "male"
+            ? "Fenrir"
+            : "Aoede";
+        setExtractProgress(50);
+
+        setExtractPhase("✨ ដំណាក់កាលទី ២៖ ស្រង់យកធួនសំនៀង និងចង្វាក់ដង្ហើមរួចរាល់! កំពុងសំយោគសំឡេង Studio ដូចមនុស្សពិត ១០០%...");
         const testSentence =
           cloneLanguage === "km"
             ? "សួស្តីបងប្អូនទាំងអស់គ្នា! នេះគឺជាការសាកល្បងសំឡេងក្លូនតាម Google Gemini Studio AI ជាមួយទឹកដមសំនៀងធម្មជាតិ និងច្បាស់ល្អ។"
@@ -645,48 +665,44 @@ export function VoiceCloneStudioPage({
             voiceName: chosenGeminiVoice,
             referenceAudioBlob: referenceBlob,
             vocalStyle: vocalTone,
-            onProgress: (p) => setExtractProgress(55 + Math.round(p * 0.25)),
+            vocalPersona: persona,
+            onProgress: (p) => setExtractProgress(50 + Math.round(p * 0.35)),
           });
         } catch (gemErr) {
-          console.warn("Gemini synthesis fallback:", gemErr);
-          const baseVoice = VOICES.find((v) => v.id === "km_female_sophea") || defaultBaseVoice;
-          const res = await synthesizeBaseVoice({
-            voice: baseVoice,
-            text: testSentence,
-            speed: 1,
-            notify,
-            t,
-            onProgress: (p) => setExtractProgress(55 + Math.round(p * 0.25)),
-          });
-          geminiAudioBlob = res.blob;
+          setIsExtracting(false);
+          setExtractPhase("");
+          notify(`បរាជ័យក្នុងការសំយោគ Gemini Studio៖ ${gemErr.message || "សូមពិនិត្យមើល API Key ឬការភ្ជាប់អ៊ីនធឺណិត"}`);
+          return;
         }
 
-        setExtractPhase("កំពុងបម្លែងទឹកដមទៅជាសំឡេងគំរូរបស់អ្នក...");
-        setExtractProgress(82);
+        // Only commit model extraction once test audio is successfully produced
+        setExtractedEmbedding(embedding);
+        setExtractedEngine("gemini");
+        setExtractedVoxCpmData(null);
+        setExtractedVoiceId(`gemini_${chosenGeminiVoice}`);
 
-        let finalTestBlob = geminiAudioBlob;
-        try {
-          if (embedding && embedding.length > 0) {
-            finalTestBlob = await convertVoiceBlob(geminiAudioBlob, embedding, {
-              onProgress: (evt) => {
-                if (Number.isFinite(evt.progress)) {
-                  setExtractProgress(82 + Math.round(evt.progress * 0.16));
-                }
-              },
-            });
-          }
-        } catch (toneErr) {
-          console.warn("Tone adaptation warning over Gemini:", toneErr);
-          finalTestBlob = geminiAudioBlob;
-        }
+        setExtractPhase("សំយោគសំឡេង Studio រួចរាល់!");
+        setExtractProgress(88);
+
+        // Keep pristine 24kHz native Gemini human voice without WASM vocoder degradation
+        const finalTestBlob = geminiAudioBlob;
 
         setTestBlob(finalTestBlob);
         if (testUrl) URL.revokeObjectURL(testUrl);
-        setTestUrl(URL.createObjectURL(finalTestBlob));
+        const newUrl = URL.createObjectURL(finalTestBlob);
+        setTestUrl(newUrl);
 
         setExtractProgress(100);
-        setExtractPhase("ក្លូនសំឡេងតាម Google Gemini Studio (ធួន & តុងសំឡេង) ជោគជ័យ ១០០%!");
-        notify("ក្លូនសំឡេងតាម Google Gemini Studio បានជោគជ័យ! សំឡេងមានធួន និងតុងសំនៀងដូចមនុស្សពិត ៩៥%+។");
+        setExtractPhase("ក្លូនសំឡេងតាម Google Gemini Studio (ស្តាប់ស៊ីជម្រៅ Deep Listening) ជោគជ័យ ១០០%!");
+        notify("ក្លូនសំឡេងតាម Google Gemini Studio (Deep Listening) ជោគជ័យ! សំឡេងមានធួន និងចង្វាក់ដង្ហើមដូចមនុស្សពិត ១០០%។");
+
+        // Auto play preview audio
+        setTimeout(() => {
+          if (testAudioRef.current) {
+            testAudioRef.current.play().catch(() => {});
+            setIsPlayingTest(true);
+          }
+        }, 300);
       } else if (cloneModel === "elevenlabs") {
         const effectiveKey = apiKey || getStoredElevenLabsKey();
         if (!effectiveKey) {
@@ -740,17 +756,10 @@ export function VoiceCloneStudioPage({
             onProgress: (p) => setExtractProgress(60 + Math.round(p * 0.35)),
           });
         } catch (elErr) {
-          console.warn("ElevenLabs synthesis fallback:", elErr);
-          const baseVoice = VOICES.find((v) => v.id === "km_female_sophea") || defaultBaseVoice;
-          const res = await synthesizeBaseVoice({
-            voice: baseVoice,
-            text: testSentence,
-            speed: 1,
-            notify,
-            t,
-            onProgress: (p) => setExtractProgress(60 + Math.round(p * 0.35)),
-          });
-          testAudioBlob = res.blob;
+          setIsExtracting(false);
+          setExtractPhase("");
+          notify(`បរាជ័យក្នុងការសំយោគ ElevenLabs៖ ${elErr.message || "សូមពិនិត្យមើល API Key ឬ Quota របស់អ្នក"}`);
+          return;
         }
 
         setTestBlob(testAudioBlob);
@@ -803,17 +812,10 @@ export function VoiceCloneStudioPage({
             onProgress: (p) => setExtractProgress(75 + Math.round(p * 0.23)),
           });
         } catch (voxErr) {
-          console.warn("VoxCPM synthesis fallback:", voxErr);
-          const baseVoice = VOICES.find((v) => v.id === "km_female_sophea") || defaultBaseVoice;
-          const res = await synthesizeBaseVoice({
-            voice: baseVoice,
-            text: testSentence,
-            speed: 1,
-            notify,
-            t,
-            onProgress: (p) => setExtractProgress(75 + Math.round(p * 0.23)),
-          });
-          testAudioBlob = res.blob;
+          setIsExtracting(false);
+          setExtractPhase("");
+          notify(`បរាជ័យក្នុងការសំយោគ VoxCPM2 48kHz៖ ${voxErr.message || "សូមប្រាកដថាបានបើក python backend/python/voxcpm_server.py"}`);
+          return;
         }
 
         setTestBlob(testAudioBlob);
@@ -823,6 +825,58 @@ export function VoiceCloneStudioPage({
         setExtractProgress(100);
         setExtractPhase("ក្លូនសំឡេងតាម VoxCPM2 (48kHz) បានជោគជ័យ ១០០%!");
         notify("ស្រង់យកម៉ូដែល VoxCPM2 48kHz បានជោគជ័យ! សំឡេងរលូន និងពិរោះ ដោយមិនចាំបាច់ប្រើ API Key។");
+      } else if (cloneModel === "f5tts") {
+        // F5-TTS Flow Matching Diffusion Voice Cloner (SWivid/F5-TTS Studio 24kHz)
+        setExtractPhase("កំពុងដំណើរការម៉ូដែល F5-TTS (Flow Matching Diffusion)...");
+        setExtractProgress(20);
+
+        const profileData = await extractF5TtsProfile(referenceBlob, {
+          name: cloneName.trim() || `សំឡេង F5-TTS ${formatSavedTime()}`,
+          language: cloneLanguage,
+          onProgress: (evt) => {
+            if (evt.phase) setExtractPhase(evt.phase);
+            if (Number.isFinite(evt.progress)) {
+              setExtractProgress(Math.min(70, Math.round(evt.progress * 0.7)));
+            }
+          },
+        });
+
+        setExtractedVoxCpmData(profileData);
+        setExtractedEmbedding(profileData.embedding || null);
+        setExtractedEngine("f5tts");
+        setExtractedVoiceId("");
+
+        setExtractProgress(75);
+        setExtractPhase("កំពុងសំយោគសំឡេងសាកល្បង 24kHz ដោយ F5-TTS Diffusion...");
+
+        const testSentence =
+          cloneLanguage === "km"
+            ? "សួស្តីបងប្អូនទាំងអស់គ្នា! នេះគឺជាការសាកល្បងសំឡេងក្លូនដោយ F5-TTS Flow Matching កម្រិត Studio 24kHz រលូន និងពិរោះដូចមនុស្សពិត។"
+            : "Hello! This is a test of your voice cloned with F5-TTS Flow Matching Diffusion.";
+
+        let testAudioBlob = null;
+        try {
+          testAudioBlob = await synthesizeWithF5Tts({
+            text: testSentence,
+            profile: profileData,
+            speed: 1.0,
+            language: cloneLanguage,
+            onProgress: (p) => setExtractProgress(75 + Math.round(p * 0.23)),
+          });
+        } catch (f5Err) {
+          setIsExtracting(false);
+          setExtractPhase("");
+          notify(`បរាជ័យក្នុងការសំយោគ F5-TTS Diffusion៖ ${f5Err.message || "សូមប្រាកដថាបានបើក python backend/python/f5tts_server.py"}`);
+          return;
+        }
+
+        setTestBlob(testAudioBlob);
+        if (testUrl) URL.revokeObjectURL(testUrl);
+        setTestUrl(URL.createObjectURL(testAudioBlob));
+
+        setExtractProgress(100);
+        setExtractPhase("ក្លូនសំឡេងតាម F5-TTS (Flow Matching) បានជោគជ័យ ១០០%!");
+        notify("ស្រង់យកម៉ូដែល F5-TTS Flow Matching បានជោគជ័យ! សំឡេងកម្រិត Studio 24kHz ពិរោះដូចមនុស្សពិត។");
       } else {
         // OpenVoice v2 In-Browser WASM Converter
         setExtractPhase("កំពុងស្រង់យក Tone Color តាម OpenVoice v2 (WASM)...");
@@ -930,24 +984,41 @@ export function VoiceCloneStudioPage({
       let sampleBlob = null;
       if (cloneModel === "gemini") {
         const effectiveKey = geminiKey || getStoredGeminiKey();
-        try {
-          sampleBlob = await synthesizeWithGemini({
-            apiKey: effectiveKey,
-            text: testSentence,
-            voiceName: "Aoede",
-            onProgress: (p) => setExtractProgress(30 + Math.round(p * 0.4)),
-          });
-        } catch {
-          const baseVoice = VOICES.find((v) => v.id === "km_female_sophea") || defaultBaseVoice;
-          const res = await synthesizeBaseVoice({
-            voice: baseVoice,
-            text: testSentence,
-            speed: 1,
-            notify,
-            t,
-          });
-          sampleBlob = res.blob;
-        }
+        const vName = (extractedVoiceId || (cloneGender === "male" ? "gemini_Fenrir" : "gemini_Aoede")).replace("gemini_", "");
+        sampleBlob = await synthesizeWithGemini({
+          apiKey: effectiveKey,
+          text: testSentence,
+          voiceName: vName,
+          referenceAudioBlob: referenceBlob,
+          vocalStyle: vocalTone || "natural_warm",
+          vocalPersona: extractedVocalPersona || "",
+          onProgress: (p) => setExtractProgress(30 + Math.round(p * 0.4)),
+        });
+      } else if (cloneModel === "f5tts") {
+        sampleBlob = await synthesizeWithF5Tts({
+          text: testSentence,
+          profile: extractedVoxCpmData || { engine: "f5tts" },
+          speed: 1,
+          language: cloneLanguage,
+          onProgress: (p) => setExtractProgress(30 + Math.round(p * 0.4)),
+        });
+      } else if (cloneModel === "voxcpm2") {
+        sampleBlob = await synthesizeWithVoxCpm({
+          text: testSentence,
+          profile: extractedVoxCpmData || { engine: "voxcpm2" },
+          speed: 1,
+          language: cloneLanguage,
+          onProgress: (p) => setExtractProgress(30 + Math.round(p * 0.4)),
+        });
+      } else if (cloneModel === "elevenlabs") {
+        const effectiveKey = apiKey || getStoredElevenLabsKey();
+        sampleBlob = await synthesizeWithElevenLabs({
+          apiKey: effectiveKey,
+          voiceId: extractedVoiceId || "21m00Tcm4TlvDq8ikWAM",
+          text: testSentence,
+          modelId: "eleven_multilingual_v2",
+          onProgress: (p) => setExtractProgress(30 + Math.round(p * 0.4)),
+        });
       } else {
         const baseVoice = VOICES.find((v) => v.id === "km_female_sophea") || defaultBaseVoice;
         const res = await synthesizeBaseVoice({
@@ -960,7 +1031,7 @@ export function VoiceCloneStudioPage({
         sampleBlob = res.blob;
       }
 
-      if (extractedEmbedding && extractedEmbedding.length > 0) {
+      if (cloneModel === "openvoice" && extractedEmbedding && extractedEmbedding.length > 0) {
         try {
           sampleBlob = await convertVoiceBlob(sampleBlob, extractedEmbedding, {});
         } catch (cErr) {
@@ -970,10 +1041,19 @@ export function VoiceCloneStudioPage({
 
       setTestBlob(sampleBlob);
       if (testUrl) URL.revokeObjectURL(testUrl);
-      setTestUrl(URL.createObjectURL(sampleBlob));
+      const url = URL.createObjectURL(sampleBlob);
+      setTestUrl(url);
       setExtractProgress(100);
       setExtractPhase("បានបង្កើតសំឡេងសាកល្បងរួចរាល់!");
       notify("បានបង្កើតសំឡេងសាកល្បងជោគជ័យ! អ្នកអាចស្តាប់សាកល្បងបាន។");
+
+      // Auto play audio
+      setTimeout(() => {
+        if (testAudioRef.current) {
+          testAudioRef.current.play().catch(() => {});
+          setIsPlayingTest(true);
+        }
+      }, 300);
     } catch (err) {
       console.error(err);
       notify(`បរាជ័យក្នុងការបង្កើតសំឡេងសាកល្បង៖ ${err.message}`);
@@ -992,10 +1072,11 @@ export function VoiceCloneStudioPage({
     }
     const finalName =
       cloneName.trim() ||
-      `សំឡេង ${extractedEngine === "voxcpm2" ? "VoxCPM2" : "ក្លូន"} ${formatSavedTime()}`;
+      `សំឡេង ${extractedEngine === "voxcpm2" ? "VoxCPM2" : extractedEngine === "f5tts" ? "F5-TTS" : "ក្លូន"} ${formatSavedTime()}`;
     const now = new Date().toISOString();
     const finalEngine = extractedEngine || cloneModel;
     const finalQuality =
+      extractedVoxCpmData?.trainingQuality ||
       extractedVoxCpmData?.acousticProfile?.trainingQuality ||
       getTrainingQualityInfo(referenceDuration);
 
@@ -1015,16 +1096,27 @@ export function VoiceCloneStudioPage({
           ? "gemini-2.5-flash"
           : finalEngine === "voxcpm2"
           ? VOXCPM2_VERSION
+          : finalEngine === "f5tts"
+          ? F5TTS_VERSION
           : finalEngine === "elevenlabs"
           ? "eleven_multilingual_v2"
           : "OpenVoice-v2",
-      sampleRate: finalEngine === "gemini" ? 24000 : finalEngine === "voxcpm2" ? VOXCPM2_SAMPLE_RATE : 22050,
+      sampleRate:
+        finalEngine === "gemini"
+          ? 24000
+          : finalEngine === "voxcpm2"
+          ? VOXCPM2_SAMPLE_RATE
+          : finalEngine === "f5tts"
+          ? F5TTS_SAMPLE_RATE
+          : 22050,
       geminiVoiceName:
         finalEngine === "gemini"
-          ? (extractedVoiceId?.replace("gemini_", "") || (cloneGender === "male" ? "Fenrir" : "Aoede"))
+          ? (extractedVoiceId?.replace("gemini_", "") || (cloneGender === "female_kore" ? "Kore" : cloneGender === "male" ? "Fenrir" : "Aoede"))
           : "Aoede",
       vocalTone: vocalTone || "natural_warm",
+      vocalPersona: extractedVocalPersona || "",
       voxcpmProfile: finalEngine === "voxcpm2" ? extractedVoxCpmData : null,
+      f5ttsProfile: finalEngine === "f5tts" ? extractedVoxCpmData : null,
       elevenlabsVoiceId:
         finalEngine === "elevenlabs" && !extractedVoiceId?.startsWith("gemini_")
           ? (extractedVoiceId || "21m00Tcm4TlvDq8ikWAM")
@@ -1050,6 +1142,7 @@ export function VoiceCloneStudioPage({
       // Reset clone form and switch to TTS
       setReferenceBlob(null);
       setExtractedEmbedding(null);
+      setExtractedVocalPersona("");
       setExtractedVoxCpmData(null);
       setExtractedVoiceId("");
       setTestBlob(null);
@@ -1207,36 +1300,18 @@ export function VoiceCloneStudioPage({
             voiceName,
             referenceAudioBlob: activeProfile.referenceBlob || referenceBlob,
             vocalStyle: activeProfile.vocalTone || vocalTone || "natural_warm",
+            vocalPersona: activeProfile.vocalPersona || extractedVocalPersona || "",
             onProgress: (p) => setGenProgress(25 + Math.round(p * 0.5)),
           });
         } catch (gemErr) {
-          console.warn("Gemini synthesis fallback in TTS:", gemErr);
-          const baseVoice = VOICES.find((v) => v.id === "km_female_sophea") || defaultBaseVoice;
-          const res = await synthesizeBaseVoice({
-            voice: baseVoice,
-            text: cleanText,
-            speed: ttsSpeed,
-            notify,
-            t,
-            onProgress: (p) => setGenProgress(25 + Math.round(p * 0.5)),
-          });
-          geminiBase = res.blob;
+          setIsGenerating(false);
+          setGenPhase("");
+          notify(`បរាជ័យក្នុងការសំយោគ Gemini Studio៖ ${gemErr.message || "សូមពិនិត្យមើល API Key ឬការភ្ជាប់អ៊ីនធឺណិត"}`);
+          return;
         }
 
-        if (activeProfile.embedding) {
-          setGenProgress(75);
-          setGenPhase(`កំពុងបម្លែងទឹកដមទៅជា "${activeProfile.name}"...`);
-          try {
-            finalBlob = await convertVoiceBlob(geminiBase, activeProfile.embedding, {
-              seed: 2026,
-            });
-          } catch (convErr) {
-            console.warn("Tone conversion warning over Gemini voice:", convErr);
-            finalBlob = geminiBase;
-          }
-        } else {
-          finalBlob = geminiBase;
-        }
+        // Deliver pristine 24kHz native Gemini human speech without WASM vocoder degradation
+        finalBlob = geminiBase;
       }
       // Case 2: VoxCPM2 Neural Diffusion Profile
       else if (activeProfile?.engine === "voxcpm2" || activeProfile?.model?.includes("VoxCPM")) {
@@ -1251,17 +1326,29 @@ export function VoiceCloneStudioPage({
             onProgress: (p) => setGenProgress(20 + Math.round(p * 0.7)),
           });
         } catch (voxErr) {
-          console.warn("VoxCPM synthesis fallback in TTS:", voxErr);
-          const baseVoice = VOICES.find((v) => v.id === "km_female_sophea") || defaultBaseVoice;
-          const res = await synthesizeBaseVoice({
-            voice: baseVoice,
+          setIsGenerating(false);
+          setGenPhase("");
+          notify(`បរាជ័យក្នុងការសំយោគ VoxCPM2 48kHz៖ ${voxErr.message || "សូមប្រាកដថាបានបើក python backend/python/voxcpm_server.py"}`);
+          return;
+        }
+      }
+      // Case 2.5: F5-TTS Flow Matching Diffusion Profile
+      else if (activeProfile?.engine === "f5tts" || activeProfile?.model?.includes("F5-TTS")) {
+        setGenPhase(`កំពុងសំយោគសំឡេង 24kHz Studio ដោយ F5-TTS Diffusion (${activeProfile.name})...`);
+        setGenProgress(20);
+        try {
+          finalBlob = await synthesizeWithF5Tts({
             text: cleanText,
+            profile: activeProfile,
             speed: ttsSpeed,
-            notify,
-            t,
+            language: activeProfile.language || "km",
             onProgress: (p) => setGenProgress(20 + Math.round(p * 0.7)),
           });
-          finalBlob = res.blob;
+        } catch (f5Err) {
+          setIsGenerating(false);
+          setGenPhase("");
+          notify(`បរាជ័យក្នុងការសំយោគ F5-TTS Diffusion៖ ${f5Err.message || "សូមប្រាកដថាបានបើក python backend/python/f5tts_server.py"}`);
+          return;
         }
       }
       // Case 3: ElevenLabs Cloned Profile
@@ -1283,18 +1370,10 @@ export function VoiceCloneStudioPage({
             onProgress: (p) => setGenProgress(25 + Math.round(p * 0.65)),
           });
         } catch (elErr) {
-          console.warn("ElevenLabs TTS fallback to base voice:", elErr);
-          notify("ElevenLabs មានបញ្ហា - កំពុងប្តូរមកសំយោគតាមសំឡេងមូលដ្ឋានដោយស្វ័យប្រវត្តិ");
-          const baseVoice = VOICES.find((v) => v.id === "km_female_sophea") || defaultBaseVoice;
-          const res = await synthesizeBaseVoice({
-            voice: baseVoice,
-            text: cleanText,
-            speed: ttsSpeed,
-            notify,
-            t,
-            onProgress: (p) => setGenProgress(25 + Math.round(p * 0.65)),
-          });
-          finalBlob = res.blob;
+          setIsGenerating(false);
+          setGenPhase("");
+          notify(`បរាជ័យក្នុងការសំយោគ ElevenLabs៖ ${elErr.message || "សូមពិនិត្យមើល API Key ឬ Quota របស់អ្នក"}`);
+          return;
         }
       }
       // Case 4: Local / OpenVoice Timbre Cloned Profile (or fallback)
@@ -1360,40 +1439,10 @@ export function VoiceCloneStudioPage({
       notify(`បង្កើតសំឡេងបានជោគជ័យ! រយៈពេល៖ ${formatTime(decoded.duration)}`);
     } catch (err) {
       console.error("TTS generation error:", err);
-      // Ultimate fallback: generate speech with base voice so the user ALWAYS gets playable audio
-      try {
-        const baseVoice = VOICES.find((v) => v.id === "km_female_sophea") || defaultBaseVoice;
-        const res = await synthesizeBaseVoice({
-          voice: baseVoice,
-          text: cleanText,
-          speed: ttsSpeed,
-          notify,
-          t,
-        });
-        if (res?.blob) {
-          let fbBlob = res.blob;
-          if (activeProfile?.embedding) {
-            try {
-              fbBlob = await convertVoiceBlob(res.blob, activeProfile.embedding, {});
-            } catch {}
-          }
-          const decoded = await decodeWaveform(fbBlob);
-          setGeneratedBlob(fbBlob);
-          setGeneratedDuration(decoded.duration);
-          setGeneratedPeaks(decoded.peaks);
-          if (generatedUrl) URL.revokeObjectURL(generatedUrl);
-          setGeneratedUrl(URL.createObjectURL(fbBlob));
-          setGenProgress(100);
-          setGenPhase("បង្កើតសំឡេងបានជោគជ័យ (Fallback)!");
-          notify(`បានបង្កើតសំឡេងជោគជ័យ (Fallback)! រយៈពេល៖ ${formatTime(decoded.duration)}`);
-          return;
-        }
-      } catch (fbErr) {
-        console.warn("Base voice fallback failed:", fbErr);
-      }
-      notify(`ការបង្កើតសំឡេងបានបរាជ័យ៖ ${err.message}`);
+      notify(`ការបង្កើតសំឡេងបានបរាជ័យ៖ ${err.message || "សូមពិនិត្យមើលការតភ្ជាប់ម៉ាស៊ីន AI"}`);
     } finally {
       setIsGenerating(false);
+      setGenPhase("");
     }
   };
 

@@ -306,10 +306,14 @@ def train(
             return next(train_iter)
 
     with tracker.live():
+        if accelerator.rank == 0:
+            tracker.print(f"🚀 Training started: {num_iters} total steps (samples: {num_train_samples}, grad_accum: {grad_accum_steps})")
         for step in range(start_step, num_iters):
             # update resume step so signal handler can save current progress
             resume["step"] = step
             tracker.step = step
+            if step == 0 and accelerator.rank == 0:
+                tracker.print(f"⏳ Computing Step 0 / {num_iters}...")
             optimizer.zero_grad(set_to_none=True)
 
             # Gradient accumulation: accumulate gradients over micro-batches before optimizer step

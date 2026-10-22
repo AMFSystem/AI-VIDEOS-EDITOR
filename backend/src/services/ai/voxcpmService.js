@@ -567,11 +567,57 @@ export const voxcpmService = {
       const res = await fetch(`${VOXCPM_SERVER_URL}/train/prompts`, {
         signal: AbortSignal.timeout(3000),
       });
-      if (res.ok) return await res.json();
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.prompts && data.prompts.length > 0) return data;
+      }
     } catch (err) {
       logger.warn(`[VoxCPM2] Prompts fetch fallback: ${err.message}`);
     }
-    return { prompts: [] };
+    return {
+      prompts: [
+        {
+          id: "prompt_1",
+          category: "សួស្តី & ស្វាគមន៍ (Greeting)",
+          text: "សួស្តីបងប្អូនទាំងអស់គ្នា សូមស្វាគមន៍មកកាន់កម្មវិធីរបស់យើងខ្ញុំនៅថ្ងៃនេះ។",
+        },
+        {
+          id: "prompt_2",
+          category: "វប្បធម៌ & ទេសចរណ៍ (Culture)",
+          text: "ប្រទេសកម្ពុជាសម្បូរទៅដោយសម្បត្តិវប្បធម៌ប្រវត្តិសាស្ត្រ និងរមណីយដ្ឋានធម្មជាតិស្រស់ស្អាតជាច្រើន។",
+        },
+        {
+          id: "prompt_3",
+          category: "បច្ចេកវិទ្យា & អនាគត (Tech)",
+          text: "បច្ចេកវិទ្យាបញ្ញាសិប្បនិម្មិតកំពុងជួយសម្រួលដល់ការងារប្រចាំថ្ងៃរបស់មនុស្សយ៉ាងឆាប់រហ័ស។",
+        },
+        {
+          id: "prompt_4",
+          category: "សំណួរ & សន្ទនា (Question)",
+          text: "តើអ្នកទាំងអស់គ្នាមានចំណាប់អារម្មណ៍យ៉ាងណាដែរចំពោះព័ត៌មានទាន់ហេតុការណ៍នៅព្រឹកនេះ?",
+        },
+        {
+          id: "prompt_5",
+          category: "ការថ្លែងអំណរគុណ (Gratitude)",
+          text: "សូមអរគុណយ៉ាងជ្រាលជ្រៅសម្រាប់ការចំណាយពេលវេលាដ៏មានតម្លៃតាមដានទស្សនារបស់លោកអ្នក។",
+        },
+        {
+          id: "prompt_6",
+          category: "ការលើកទឹកចិត្ត (Inspiration)",
+          text: "ភាពជោគជ័យមិនមែនកើតឡើងដោយចៃដន្យនោះទេ ប៉ុន្តែជាលទ្ធផលនៃការខិតខំប្រឹងប្រែងជារៀងរាល់ថ្ងៃ។",
+        },
+        {
+          id: "prompt_7",
+          category: "ការអានព័ត៌មាន (News)",
+          text: "ថ្ងៃនេះអាកាសធាតុមានភាពអំណោយផលល្អ ដោយមានពន្លឺថ្ងៃស្រទន់និងខ្យល់ត្រជាក់បក់រំភើយ។",
+        },
+        {
+          id: "prompt_8",
+          category: "ការលាគ្នា (Closing)",
+          text: "សូមជូនពរឱ្យលោកអ្នកនិងក្រុមគ្រួសារជួបតែសេចក្តីសុខ សុភមង្គល និងសុខភាពល្អគ្រប់ពេលវេលា។",
+        },
+      ],
+    };
   },
 
   /**
@@ -587,7 +633,7 @@ export const voxcpmService = {
         steps,
         learning_rate: learningRate,
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(180000),
     });
     if (!res.ok) {
       const err = await res.text();
@@ -602,11 +648,20 @@ export const voxcpmService = {
   async getTrainingStatus() {
     try {
       const res = await fetch(`${VOXCPM_SERVER_URL}/train/status`, {
-        signal: AbortSignal.timeout(3000),
+        signal: AbortSignal.timeout(4000),
       });
       if (res.ok) return await res.json();
     } catch {}
-    return { status: "idle", progress: 0, logs: [] };
+    return {
+      status: "idle",
+      step: 0,
+      total_steps: 50,
+      progress: 0,
+      loss: null,
+      eta_seconds: null,
+      elapsed_seconds: 0,
+      logs: [],
+    };
   },
 
   /**
@@ -634,34 +689,40 @@ export const voxcpmService = {
 
     // Check if local neural VoxCPM2 server is available
     const srvStatus = await checkVoxCpmServer();
+    if (!srvStatus || (!srvStatus.loaded && !srvStatus.available)) {
+      throw new Error("ម៉ាស៊ីន OpenBMB VoxCPM2 Server (Port 3002) មិនទាន់ដំណើរការទេ។ សូមដំណើរការ Command: python backend/python/voxcpm_server.py ដើម្បីឱ្យ AI អាចរៀន និងស្រង់យកសំឡេងមនុស្សពិតបាន។");
+    }
+
     let neuralProfileId = null;
     let refWavPath = null;
 
-    if (srvStatus && (srvStatus.loaded || srvStatus.available)) {
-      try {
-        logger.info(`[VoxCPM2] Forwarding voice reference audio to OpenBMB VoxCPM2 server...`);
-        const base64Audio = audioBuffer.toString("base64");
-        const srvRes = await fetch(`${VOXCPM_SERVER_URL}/clone`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name,
-            audioBase64: base64Audio,
-            mimeType,
-            language,
-          }),
-          signal: AbortSignal.timeout(60000),
-        });
+    try {
+      logger.info(`[VoxCPM2] Forwarding voice reference audio to OpenBMB VoxCPM2 server...`);
+      const base64Audio = audioBuffer.toString("base64");
+      const srvRes = await fetch(`${VOXCPM_SERVER_URL}/clone`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          audioBase64: base64Audio,
+          mimeType,
+          language,
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
 
-        if (srvRes.ok) {
-          const srvData = await srvRes.json();
-          neuralProfileId = srvData.profile?.profileId;
-          refWavPath = srvData.profile?.referenceWavPath;
-          logger.info(`[VoxCPM2] OpenBMB VoxCPM2 profile registered successfully: ${neuralProfileId}`);
-        }
-      } catch (srvErr) {
-        logger.warn(`[VoxCPM2] Registration warning: ${srvErr.message}`);
+      if (srvRes.ok) {
+        const srvData = await srvRes.json();
+        neuralProfileId = srvData.profile?.profileId;
+        refWavPath = srvData.profile?.referenceWavPath;
+        logger.info(`[VoxCPM2] OpenBMB VoxCPM2 profile registered successfully: ${neuralProfileId}`);
+      } else {
+        const errText = await srvRes.text().catch(() => "");
+        throw new Error(`VoxCPM2 server returned ${srvRes.status}: ${errText}`);
       }
+    } catch (srvErr) {
+      logger.error(`[VoxCPM2] Registration error: ${srvErr.message}`);
+      throw new Error(`បរាជ័យក្នុងការចុះឈ្មោះសំឡេង VoxCPM2៖ ${srvErr.message}`);
     }
 
     // 1. Probe source audio metadata
@@ -715,90 +776,51 @@ export const voxcpmService = {
     const effectiveVoiceDesign = voiceDesign || profile?.voiceDesign || profile?.voice_design || "";
     const effectiveLora = loraModel || profile?.loraModel || profile?.lora_model || "";
 
-    // ── Route 1: Check OpenBMB VoxCPM2 Neural Server first ────────────────────
+    // ── Route 1: Check OpenBMB VoxCPM2 Neural Server ────────────────────
     const srvStatus = await checkVoxCpmServer();
     if (srvStatus && srvStatus.loading) {
       throw new Error("ម៉ូដែល OpenBMB VoxCPM2 កំពុងផ្ទុកចូល Memory សូមរង់ចាំបន្តិច (ប្រហែល ២០-៣០ វិនាទី) ដើម្បីបង្កើតសំឡេងដូចមនុស្សពិត ១០០%។");
     }
-    if (srvStatus && (srvStatus.loaded || srvStatus.available)) {
-      try {
-        logger.info(`[VoxCPM2] Forwarding speech synthesis to OpenBMB VoxCPM2 (Real Neural Cloner)...`);
-        const srvRes = await fetch(`${VOXCPM_SERVER_URL}/tts`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: cleanText,
-            profile_id: profile?.xttsProfileId || profile?.profileId,
-            voice_design: effectiveVoiceDesign,
-            reference_wav_path: profile?.referenceWavPath,
-            speed: spd,
-            language: lang,
-            lora_model: effectiveLora || undefined,
-          }),
-          signal: AbortSignal.timeout(180000),
-        });
-
-        if (srvRes.ok) {
-          const arrayBuf = await srvRes.arrayBuffer();
-          const buffer = Buffer.from(arrayBuf);
-          logger.info(`[VoxCPM2] OpenBMB VoxCPM2 Neural audio synthesized successfully: ${buffer.length} bytes @ 48kHz`);
-          return {
-            buffer,
-            mimeType: "audio/wav",
-            sampleRate: srvStatus.sampleRate || 48000,
-            model: "OpenBMB/VoxCPM2",
-            neural: true,
-          };
-        } else {
-          const errText = await srvRes.text().catch(() => "");
-          logger.warn(`[VoxCPM2] OpenBMB server returned ${srvRes.status}: ${errText}`);
-        }
-      } catch (srvErr) {
-        logger.warn(`[VoxCPM2] Local VoxCPM2 server call failed, using fallback: ${srvErr.message}`);
-      }
+    if (!srvStatus || (!srvStatus.loaded && !srvStatus.available)) {
+      throw new Error("ម៉ាស៊ីន OpenBMB VoxCPM2 Server (Port 3002) មិនទាន់ដំណើរការទេ។ សូមដំណើរការ Command: python backend/python/voxcpm_server.py ជាមុនសិន។");
     }
 
-    // ── Route 2: High-Quality DSP Hybrid Fallback ──────────────────────────
-    logger.info(`[VoxCPM2] Synthesizing (DSP): "${cleanText.slice(0, 50)}..." | lang=${lang} | speed=${spd}`);
-
-    // Step 1: Base phonetic speech (Google TTS)
-    const baseBuffer = await googleTtsService.synthesize(cleanText, {
-      lang,
-      speed: 1.0,
-    });
-    logger.info(`[VoxCPM2] Base TTS generated: ${baseBuffer.length} bytes`);
-
-    // Step 2: Build refined speaker-adaptive DSP chain
-    const filters = buildSynthesisFilterChain(profile, spd);
-    const filterString = filters.join(",");
-    logger.info(`[VoxCPM2] DSP chain (${filters.length} stages)`);
-
-    // Step 3: Apply DSP chain via FFmpeg (with graceful catch if FFmpeg not in PATH)
     try {
-      const outputWav = await runFfmpegWithFile(baseBuffer, [
-        "-af", filterString,
-        "-ac", "1",
-        "-ar", String(TARGET_SAMPLE_RATE),
-        "-f", "wav",
-      ]);
-      logger.info(`[VoxCPM2] Output WAV: ${outputWav.length} bytes @ 48kHz`);
+      logger.info(`[VoxCPM2] Forwarding speech synthesis to OpenBMB VoxCPM2 (Real Neural Cloner)...`);
+      const srvRes = await fetch(`${VOXCPM_SERVER_URL}/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: cleanText,
+          profile_id: profile?.xttsProfileId || profile?.profileId,
+          voice_design: effectiveVoiceDesign,
+          reference_wav_path: profile?.referenceWavPath,
+          speed: spd,
+          language: lang,
+          lora_model: effectiveLora || undefined,
+        }),
+        signal: AbortSignal.timeout(180000),
+      });
 
-      return {
-        buffer: outputWav,
-        mimeType: "audio/wav",
-        sampleRate: TARGET_SAMPLE_RATE,
-        model: VOXCPM2_VERSION,
-        dspStages: filters.length,
-      };
-    } catch (ffmpegErr) {
-      logger.warn(`[VoxCPM2] FFmpeg processing unavailable, delivering pristine base speech: ${ffmpegErr.message}`);
-      return {
-        buffer: baseBuffer,
-        mimeType: "audio/mpeg",
-        sampleRate: 24000,
-        model: "Base-TTS-Fallback",
-        dspStages: 0,
-      };
+      if (srvRes.ok) {
+        const arrayBuf = await srvRes.arrayBuffer();
+        const buffer = Buffer.from(arrayBuf);
+        logger.info(`[VoxCPM2] OpenBMB VoxCPM2 Neural audio synthesized successfully: ${buffer.length} bytes @ 48kHz`);
+        return {
+          buffer,
+          mimeType: "audio/wav",
+          sampleRate: srvStatus.sampleRate || 48000,
+          model: "OpenBMB/VoxCPM2",
+          neural: true,
+        };
+      } else {
+        const errText = await srvRes.text().catch(() => "");
+        logger.error(`[VoxCPM2] OpenBMB server returned ${srvRes.status}: ${errText}`);
+        throw new Error(`OpenBMB Server error (${srvRes.status}): ${errText}`);
+      }
+    } catch (srvErr) {
+      logger.error(`[VoxCPM2] Local VoxCPM2 server call failed: ${srvErr.message}`);
+      throw new Error(`បរាជ័យក្នុងការសំយោគ VoxCPM2៖ ${srvErr.message}`);
     }
   },
 };

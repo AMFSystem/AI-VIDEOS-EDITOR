@@ -18,6 +18,12 @@ import "./DubberPanel.css";
 
 // Engine configurations (Cloud AI with API Keys vs. Local Computer vs. Free Google Translation)
 const ENGINE_CONFIG = {
+  "pyvideotrans": {
+    name: "🎬 PyVideoTrans (All-in-One Video Dubber & Alignment)",
+    provider: "pyvideotrans",
+    type: "local",
+    description: "Full Pipeline: Whisper + Translation + Voice Dubbing + Auto Audio Alignment",
+  },
   "google-translate": {
     name: "Google Translate (ផ្លូវការ Google ត្រឹមត្រូវ 100%)",
     provider: "google",
@@ -424,7 +430,8 @@ export function DubberPanel({
 
   // Transcribe Video Audio directly and Translate to Khmer Subtitles on Timeline
   const handleTranscribeAndTranslateVideo = async () => {
-    if (!uploadedFile) {
+    const fileToProcess = uploadedFile || sourceAudioBlob;
+    if (!fileToProcess) {
       notify("សូមផ្ទុកឡើង ឬជ្រើសរើសឯកសារវីដេអូជាមុនសិន");
       uploadFileInputRef.current?.click();
       return;
@@ -444,7 +451,7 @@ export function DubberPanel({
       notify("កំពុងស្រង់សំឡេង 16kHz ចេញពីវីដេអូ...");
 
       // Ultra-fast, lightweight 16kHz mono audio extraction
-      const audioBlobToProcess = await dubberService.extractOptimizedAudio(uploadedFile);
+      const audioBlobToProcess = await dubberService.extractOptimizedAudio(fileToProcess);
 
       setProcessingStatus(
         isFreeEngine
@@ -706,6 +713,10 @@ export function DubberPanel({
                 localStorage.setItem("ai_video_editor_dubber_engine", val);
               }}
             >
+              <optgroup label="🎬 PyVideoTrans (All-in-One Video Dubber & Alignment)">
+                <option value="pyvideotrans">🎬 PyVideoTrans Engine (ASR + Translation + Sync Dubbing + BGM)</option>
+              </optgroup>
+
               <optgroup label="🌐 Google Translation (ផ្លូវការ Google - ត្រឹមត្រូវ 100%)">
                 <option value="google-translate">🌐 Google Translate (លឿនបំផុត & ត្រឹមត្រូវ 100% គ្មាន Key)</option>
               </optgroup>

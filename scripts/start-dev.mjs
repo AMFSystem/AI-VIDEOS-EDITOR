@@ -30,6 +30,8 @@ function checkPortOpen(port, host = "127.0.0.1") {
 let backend = null;
 let frontend = null;
 let pythonProcess = null;
+let f5ttsProcess = null;
+let pyvideotransProcess = null;
 
 async function bootstrap() {
   // 1. Check & Start Node.js Backend Service (Port 3001)
@@ -64,6 +66,25 @@ async function bootstrap() {
     });
   }
 
+  // Determine python command and virtual environment path
+  const venvBinDir = isWindows ? "Scripts" : "bin";
+  const venvExe = isWindows ? "python.exe" : "python";
+  const backendPythonVenv = path.join(process.cwd(), "backend", "python", ".venv", venvBinDir, venvExe);
+  const backendVenv = path.join(process.cwd(), "backend", ".venv", venvBinDir, venvExe);
+  const rootVenv = path.join(process.cwd(), ".venv", venvBinDir, venvExe);
+  const py311Path = path.join(process.env.LOCALAPPDATA || "", "Programs", "Python", "Python311", "python.exe");
+
+  let pythonCmd = isWindows ? "python" : "python3";
+  if (fs.existsSync(backendPythonVenv)) {
+    pythonCmd = backendPythonVenv;
+  } else if (fs.existsSync(backendVenv)) {
+    pythonCmd = backendVenv;
+  } else if (fs.existsSync(rootVenv)) {
+    pythonCmd = rootVenv;
+  } else if (isWindows && fs.existsSync(py311Path)) {
+    pythonCmd = py311Path;
+  }
+
   // 3. Check & Start Python OpenBMB VoxCPM2 Server (Port 3002)
   const voxcpmScriptPath = path.join(process.cwd(), "backend", "python", "voxcpm_server.py");
   const xttsScriptPath = path.join(process.cwd(), "backend", "python", "xtts_server.py");
@@ -78,25 +99,6 @@ async function bootstrap() {
     if (pythonRunning) {
       console.log("\x1b[32m%s\x1b[0m", `[Python ${serverLabel}] ✅ Service is already running on port 3002! (Reusing active instance)`);
     } else {
-      const venvBinDir = isWindows ? "Scripts" : "bin";
-      const venvExe = isWindows ? "python.exe" : "python";
-      const backendPythonVenv = path.join(process.cwd(), "backend", "python", ".venv", venvBinDir, venvExe);
-      const backendVenv = path.join(process.cwd(), "backend", ".venv", venvBinDir, venvExe);
-      const rootVenv = path.join(process.cwd(), ".venv", venvBinDir, venvExe);
-      const py311Path = path.join(process.env.LOCALAPPDATA || "", "Programs", "Python", "Python311", "python.exe");
-
-      let pythonCmd = isWindows ? "python" : "python3";
-      if (fs.existsSync(backendPythonVenv)) {
-        pythonCmd = backendPythonVenv;
-        console.log("\x1b[32m%s\x1b[0m", `[Python ${serverLabel}] Using virtual environment at: ${backendPythonVenv}`);
-      } else if (fs.existsSync(backendVenv)) {
-        pythonCmd = backendVenv;
-      } else if (fs.existsSync(rootVenv)) {
-        pythonCmd = rootVenv;
-      } else if (isWindows && fs.existsSync(py311Path)) {
-        pythonCmd = py311Path;
-      }
-
       try {
         pythonProcess = spawn(pythonCmd, [pythonScriptPath], {
           stdio: "inherit",
@@ -120,12 +122,76 @@ async function bootstrap() {
     }
   }
 
+  // 4. Check & Start Python F5-TTS Server (Port 3003)
+  const f5ttsScriptPath = path.join(process.cwd(), "backend", "python", "f5tts_server.py");
+  let f5ttsRunning = false;
+
+  if (fs.existsSync(f5ttsScriptPath)) {
+    f5ttsRunning = await checkPortOpen(3003);
+    if (f5ttsRunning) {
+      console.log("\x1b[32m%s\x1b[0m", "[Python F5-TTS] ✅ Service is already running on port 3003! (Reusing active instance)");
+    } else {
+      try {
+        f5ttsProcess = spawn(pythonCmd, [f5ttsScriptPath], {
+          stdio: "inherit",
+          shell: false,
+        });
+
+        f5ttsProcess.on("error", (err) => {
+          console.log("\x1b[33m%s\x1b[0m", `[Python F5-TTS Notice] Could not start F5-TTS server: ${err.message}`);
+          f5ttsProcess = null;
+        });
+
+        f5ttsProcess.on("exit", (code) => {
+          if (code !== 0 && code !== null) {
+            console.log("\x1b[33m%s\x1b[0m", `[Python F5-TTS] Service stopped (code ${code}).`);
+          }
+        });
+      } catch (err) {
+        console.log("\x1b[33m%s\x1b[0m", `[Python F5-TTS] Could not spawn F5-TTS: ${err.message}`);
+      }
+    }
+  }
+
+  // 5. Check & Start Python PyVideoTrans Server (Port 3004)
+  const pyvideotransScriptPath = path.join(process.cwd(), "backend", "python", "pyvideotrans_server.py");
+  let pyvideotransRunning = false;
+
+  if (fs.existsSync(pyvideotransScriptPath)) {
+    pyvideotransRunning = await checkPortOpen(3004);
+    if (pyvideotransRunning) {
+      console.log("\x1b[32m%s\x1b[0m", "[Python PyVideoTrans] ✅ Service is already running on port 3004! (Reusing active instance)");
+    } else {
+      try {
+        pyvideotransProcess = spawn(pythonCmd, [pyvideotransScriptPath], {
+          stdio: "inherit",
+          shell: false,
+        });
+
+        pyvideotransProcess.on("error", (err) => {
+          console.log("\x1b[33m%s\x1b[0m", `[Python PyVideoTrans Notice] Could not start PyVideoTrans server: ${err.message}`);
+          pyvideotransProcess = null;
+        });
+
+        pyvideotransProcess.on("exit", (code) => {
+          if (code !== 0 && code !== null) {
+            console.log("\x1b[33m%s\x1b[0m", `[Python PyVideoTrans] Service stopped (code ${code}).`);
+          }
+        });
+      } catch (err) {
+        console.log("\x1b[33m%s\x1b[0m", `[Python PyVideoTrans] Could not spawn PyVideoTrans: ${err.message}`);
+      }
+    }
+  }
+
   // If services were already running, keep this terminal process active and show helpful guide
   if (backendRunning && frontendRunning) {
     console.log("\n\x1b[36m%s\x1b[0m", "✨ All AI Video Editor services are currently running & ready:");
-    console.log("  ➜ Frontend: \x1b[32mhttp://localhost:5173\x1b[0m");
-    console.log("  ➜ Backend:  \x1b[32mhttp://127.0.0.1:3001\x1b[0m");
-    console.log("  ➜ VoxCPM2:  \x1b[32mhttp://127.0.0.1:3002\x1b[0m");
+    console.log("  ➜ Frontend:     \x1b[32mhttp://localhost:5173\x1b[0m");
+    console.log("  ➜ Backend:      \x1b[32mhttp://127.0.0.1:3001\x1b[0m");
+    console.log("  ➜ VoxCPM2:      \x1b[32mhttp://127.0.0.1:3002\x1b[0m");
+    console.log("  ➜ F5-TTS:       \x1b[32mhttp://127.0.0.1:3003\x1b[0m");
+    console.log("  ➜ PyVideoTrans: \x1b[32mhttp://127.0.0.1:3004\x1b[0m");
     console.log("\n\x1b[90m%s\x1b[0m", "👉 Open http://localhost:5173 in your browser to use the app.");
     console.log("\x1b[90m%s\x1b[0m", "👉 To restart all services fresh, run: npm run restart");
     console.log("\x1b[90m%s\x1b[0m", "Press Ctrl+C to exit this monitor.");
@@ -139,6 +205,8 @@ function handleExit(code) {
   if (backend && !backend.killed) backend.kill();
   if (frontend && !frontend.killed) frontend.kill();
   if (pythonProcess && !pythonProcess.killed) pythonProcess.kill();
+  if (f5ttsProcess && !f5ttsProcess.killed) f5ttsProcess.kill();
+  if (pyvideotransProcess && !pyvideotransProcess.killed) pyvideotransProcess.kill();
   process.exit(code || 0);
 }
 

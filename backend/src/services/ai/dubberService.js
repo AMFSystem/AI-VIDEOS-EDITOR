@@ -9,6 +9,7 @@
 import { synthesizeGeminiSpeech, pcmToWavBuffer } from "./geminiService.js";
 import { voxcpmService } from "./voxcpmService.js";
 import { elevenlabsService } from "./elevenlabsService.js";
+import { f5ttsService } from "./f5ttsService.js";
 
 /**
  * Robust JSON parser that handles markdown code fences, trailing commas, and wrapping text
@@ -118,8 +119,8 @@ export async function translateStoryScript({
     throw new Error("សូមបញ្ចូលអត្ថបទ ឬសាច់រឿងដែលត្រូវបកប្រែ");
   }
 
-  // If user selected Google Translate or has no API key, use official Google Translate!
-  if (model === "google-translate" || !apiKey || !apiKey.trim()) {
+  // If user selected Google Translate, PyVideoTrans, or has no API key, use official Google Translate!
+  if (model === "google-translate" || model === "pyvideotrans" || !apiKey || !apiKey.trim()) {
     return await translateWithGoogle({ text, sourceLang, targetLang });
   }
 
@@ -538,13 +539,24 @@ export async function synthesizeDubbingSpeech({
 
   // Case 2: VoxCPM2 Offline 48kHz
   if (engine === "voxcpm2" || profile?.model?.includes("VoxCPM")) {
-    const wavBuffer = await voxcpmService.synthesizeSpeech({
+    const res = await voxcpmService.synthesizeSpeech({
       text: cleanText,
       profile,
       speed,
       language: profile.language || "km",
     });
-    return { audioBuffer: wavBuffer, mimeType: "audio/wav" };
+    return { audioBuffer: res?.buffer || res, mimeType: "audio/wav" };
+  }
+
+  // Case 2.5: F5-TTS Flow Matching Diffusion (24kHz Studio Quality)
+  if (engine === "f5tts" || profile?.model?.includes("F5-TTS")) {
+    const res = await f5ttsService.synthesizeSpeech({
+      text: cleanText,
+      profile,
+      speed,
+      language: profile?.language || "km",
+    });
+    return { audioBuffer: res.buffer, mimeType: res.mimeType || "audio/wav" };
   }
 
   // Case 3: ElevenLabs

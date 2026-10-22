@@ -1,11 +1,21 @@
-# XTTS v2 + FreeVC24 Zero-Shot Neural Voice Cloning Requirements
-# Python 3.11 recommended for Windows compatibility
+# Voice Cloning Microservices Requirements (OpenBMB VoxCPM2, F5-TTS, XTTS v2)
+# Python 3.10 - 3.11 recommended
 fastapi>=0.100.0
 uvicorn>=0.23.0
 pydantic>=2.0.0
 numpy<2.0.0
 scipy>=1.10.0
+soundfile>=0.12.1
 torch>=2.1.0
 torchaudio>=2.1.0
 torchcodec
+
+# F5-TTS Flow Matching Diffusion Voice Cloning (SWivid/F5-TTS)
+# GitHub: https://github.com/SWivid/F5-TTS
+f5-tts>=0.1.0
+
+# PyVideoTrans All-in-One Video Dubber & Alignment (jianchang512/pyvideotrans)
+# GitHub: https://github.com/jianchang512/pyvideotrans
+
+# Optional engines
 coqui-tts>=0.24.0

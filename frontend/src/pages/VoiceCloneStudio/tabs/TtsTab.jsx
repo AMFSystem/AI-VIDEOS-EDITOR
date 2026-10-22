@@ -48,7 +48,9 @@ export function TtsTab({
               <span className="tts-voice-title">
                 {activeProfile ? activeProfile.name : "មិនទាន់បានជ្រើសរើសសំឡេងក្លូន"}
               </span>
-              {activeProfile?.engine === "voxcpm2" ? (
+              {activeProfile?.engine === "f5tts" ? (
+                <span className="f5tts-tag">🌟 F5-TTS Flow Matching Diffusion</span>
+              ) : activeProfile?.engine === "voxcpm2" ? (
                 <span className="voxcpm-tag">🌟 VoxCPM2 48kHz Neural Diffusion</span>
               ) : activeProfile?.elevenlabsVoiceId || activeProfile?.engine === "elevenlabs" ? (
                 <span className="elevenlabs-tag">ElevenLabs Neural 100%</span>
@@ -75,7 +77,11 @@ export function TtsTab({
             </div>
             <span className="tts-voice-sub">
               {activeProfile
-                ? activeProfile.engine === "voxcpm2"
+                ? activeProfile.engine === "f5tts"
+                  ? `ម៉ូដែល F5-TTS Flow Matching Diffusion (24kHz Studio / Zero-Shot) · ភាសា៖ ${
+                      activeProfile.language === "km" ? "ខ្មែរ" : "អន្តរជាតិ"
+                    }`
+                  : activeProfile.engine === "voxcpm2"
                   ? `ម៉ូដែល OpenBMB VoxCPM2 48kHz (Offline / ឥតគិតថ្លៃ) · ភាសា៖ ${
                       activeProfile.language === "km" ? "ខ្មែរ" : "អន្តរជាតិ"
                     }`

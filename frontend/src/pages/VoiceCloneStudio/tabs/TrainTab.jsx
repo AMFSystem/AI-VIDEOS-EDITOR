@@ -23,6 +23,7 @@ import {
   getVoxCpmTrainingStatus,
   stopVoxCpmTraining,
   synthesizeWithVoxCpm,
+  DEFAULT_VOXCPM_PROMPTS,
 } from "../../../lib/voxcpmRuntime.js";
 
 function blobToBase64(blob) {
@@ -89,7 +90,30 @@ function audioBufferToWavBlob(buffer, startSec, endSec) {
     offset += 2;
   }
 
-  return new Blob([view], { type: "audio/wav" });
+  return new Blob([arrayBuffer], { type: "audio/wav" });
+}
+
+// Convert any recorded WebM or uploaded audio format into clean 16kHz Mono WAV
+async function blobTo16kWavBlob(blob) {
+  if (!blob) return null;
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      // Use default audio context (hardware rate 44.1k/48k) to avoid Safari NotSupportedError
+      const audioCtx = new AudioContextClass();
+      try {
+        const decoded = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+        const wavBlob = audioBufferToWavBlob(decoded, 0, decoded.duration);
+        if (wavBlob) return wavBlob;
+      } finally {
+        await audioCtx.close().catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.warn("Direct browser audio conversion note:", err);
+  }
+  return blob;
 }
 
 // Automatically split a long voice recording into speech segments
@@ -166,9 +190,18 @@ export function TrainTab({
   notify = (msg) => alert(msg),
   setActiveTab,
 }) {
-  // Prompts & Samples State
-  const [prompts, setPrompts] = useState([]);
-  const [samples, setSamples] = useState([]); // Array of { id, text, audioBlob, duration, audioUrl }
+  // Prompts & Samples State (initialized with fallback prompts so UI is never 0/0)
+  const [prompts, setPrompts] = useState(DEFAULT_VOXCPM_PROMPTS || []);
+  const [samples, setSamples] = useState(() =>
+    (DEFAULT_VOXCPM_PROMPTS || []).map((p) => ({
+      id: p.id,
+      category: p.category,
+      text: p.text,
+      audioBlob: null,
+      duration: 0,
+      audioUrl: null,
+    }))
+  );
   const [recordingId, setRecordingId] = useState(null);
   const [recordingElapsed, setRecordingElapsed] = useState(0);
   const mediaRecorderRef = useRef(null);
@@ -184,14 +217,14 @@ export function TrainTab({
   const [modelName, setModelName] = useState(
     activeProfile ? `${activeProfile.name.toLowerCase().replace(/\s+/g, "_")}_lora` : "khmer_voice_lora"
   );
-  const [selectedSteps, setSelectedSteps] = useState(300);
+  const [selectedSteps, setSelectedSteps] = useState(50);
   const [learningRate, setLearningRate] = useState(0.0001);
 
   // Live Training State
   const [trainingStatus, setTrainingStatus] = useState({
     status: "idle",
     step: 0,
-    total_steps: 300,
+    total_steps: 50,
     progress: 0,
     loss: null,
     eta_seconds: null,
@@ -216,16 +249,19 @@ export function TrainTab({
       .then((data) => {
         if (data?.prompts && data.prompts.length > 0) {
           setPrompts(data.prompts);
-          // Initialize empty samples structure
-          setSamples(
-            data.prompts.map((p) => ({
-              id: p.id,
-              category: p.category,
-              text: p.text,
-              audioBlob: null,
-              duration: 0,
-              audioUrl: null,
-            }))
+          // Preserve any already recorded/uploaded samples
+          setSamples((prev) =>
+            data.prompts.map((p, idx) => {
+              const existing = prev.find((s) => s.id === p.id) || prev[idx];
+              return {
+                id: p.id,
+                category: p.category,
+                text: existing?.text || p.text,
+                audioBlob: existing?.audioBlob || null,
+                duration: existing?.duration || 0,
+                audioUrl: existing?.audioUrl || null,
+              };
+            })
           );
         }
       })
@@ -249,9 +285,19 @@ export function TrainTab({
       interval = setInterval(async () => {
         try {
           const st = await getVoxCpmTrainingStatus();
-          setTrainingStatus(st);
-          if (st.status === "completed" && onModelTrained) {
-            onModelTrained(st.output_file || modelName);
+          if (st && st.status) {
+            setTrainingStatus((prev) => ({
+              ...prev,
+              ...st,
+              loss: typeof st.loss === "number" ? st.loss : (st.loss === null ? null : prev.loss),
+              progress: typeof st.progress === "number" ? st.progress : prev.progress,
+              step: typeof st.step === "number" ? st.step : prev.step,
+              total_steps: typeof st.total_steps === "number" ? st.total_steps : prev.total_steps,
+              logs: Array.isArray(st.logs) && st.logs.length > 0 ? st.logs : prev.logs,
+            }));
+            if (st.status === "completed" && onModelTrained) {
+              onModelTrained(st.output_file || modelName);
+            }
           }
         } catch (e) {
           console.warn("Poll status error:", e);
@@ -343,15 +389,54 @@ export function TrainTab({
 
     const url = URL.createObjectURL(file);
     const audio = new Audio(url);
-    audio.onloadedmetadata = () => {
+    const updateDuration = (dur = 5) => {
       setSamples((prev) =>
         prev.map((s) =>
           s.id === sampleId
-            ? { ...s, audioBlob: file, audioUrl: url, duration: audio.duration }
+            ? { ...s, audioBlob: file, audioUrl: url, duration: dur }
             : s
         )
       );
     };
+    audio.onloadedmetadata = () => updateDuration(audio.duration || 5);
+    audio.onerror = () => updateDuration(5);
+    updateDuration(5);
+  };
+
+  // Handle uploading multiple audio files directly at once
+  const handleMultipleAudioUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    try {
+      setSamples((prev) => {
+        const base = prev.length > 0 ? [...prev] : (DEFAULT_VOXCPM_PROMPTS || []).map((p) => ({
+          id: p.id,
+          category: p.category,
+          text: p.text,
+          audioBlob: null,
+          duration: 0,
+          audioUrl: null,
+        }));
+        return base.map((s, idx) => {
+          if (idx < files.length) {
+            const file = files[idx];
+            const url = URL.createObjectURL(file);
+            return {
+              ...s,
+              audioBlob: file,
+              audioUrl: url,
+              duration: 5,
+            };
+          }
+          return s;
+        });
+      });
+      notify(`🎉 បានបញ្ចូលឯកសារសំឡេងចំនួន ${files.length} សំណាកដោយជោគជ័យ!`);
+    } catch (err) {
+      notify(`ការបញ្ចូលសំឡេងបរាជ័យ: ${err.message}`);
+    } finally {
+      e.target.value = "";
+    }
   };
 
   // Handle uploading a single long audio file and auto-splitting into segments
@@ -360,13 +445,22 @@ export function TrainTab({
     if (!file) return;
     setIsSplittingAudio(true);
     try {
-      const segments = await splitAudioFileIntoSegments(file, samples.length || 8);
+      const targetCount = samples.length > 0 ? samples.length : (DEFAULT_VOXCPM_PROMPTS?.length || 8);
+      const segments = await splitAudioFileIntoSegments(file, targetCount);
       if (!segments || segments.length === 0) {
         throw new Error("មិនអាចវិភាគឯកសារសំឡេងនេះបានទេ");
       }
 
-      setSamples((prev) =>
-        prev.map((s, idx) => {
+      setSamples((prev) => {
+        const base = prev.length > 0 ? [...prev] : (DEFAULT_VOXCPM_PROMPTS || []).map((p) => ({
+          id: p.id,
+          category: p.category,
+          text: p.text,
+          audioBlob: null,
+          duration: 0,
+          audioUrl: null,
+        }));
+        return base.map((s, idx) => {
           if (idx < segments.length) {
             const seg = segments[idx];
             const url = URL.createObjectURL(seg.blob);
@@ -378,8 +472,8 @@ export function TrainTab({
             };
           }
           return s;
-        })
-      );
+        });
+      });
 
       notify(`🎉 បានកាត់បំបែកឯកសារសំឡេងជា ${segments.length} សំណាកដោយស្វ័យប្រវត្តិរួចរាល់!`);
     } catch (err) {
@@ -446,37 +540,84 @@ export function TrainTab({
     }
 
     setIsSubmitting(true);
+
+    // 1. Immediately show Section 1 monitor card & real-time log terminal
+    setTrainingStatus({
+      status: "preparing",
+      step: 0,
+      total_steps: selectedSteps,
+      progress: 0,
+      loss: null,
+      eta_seconds: null,
+      elapsed_seconds: 0,
+      logs: [
+        `🚀 ចាប់ផ្តើមដំណើរការបង្វឹក LoRA: '${modelName.trim()}'`,
+        `📦 ចំនួនសំណាកសំឡេង: ${readySamples.length} សំណាក | កម្រិតបង្វឹក: ${selectedSteps} Steps`,
+        "⏳ កំពុងរៀបចំ និងត្រួតពិនិត្យទិន្នន័យសំឡេង (16kHz PCM)...",
+      ],
+      error: null,
+      output_file: null,
+      device: "mps",
+    });
+
     try {
       const payloadSamples = await Promise.all(
-        readySamples.map(async (s) => ({
-          text: s.text,
-          audioBase64: await blobToBase64(s.audioBlob),
-        }))
+        readySamples.map(async (s) => {
+          const wavBlob = await blobTo16kWavBlob(s.audioBlob);
+          return {
+            text: s.text,
+            audioBase64: await blobToBase64(wavBlob || s.audioBlob),
+          };
+        })
       );
 
-      const res = await startVoxCpmTraining({
-        modelName: modelName.trim(),
-        samples: payloadSamples,
-        steps: selectedSteps,
-        learningRate,
-      });
+      let res;
+      try {
+        res = await startVoxCpmTraining({
+          modelName: modelName.trim(),
+          samples: payloadSamples,
+          steps: selectedSteps,
+          learningRate,
+        });
+      } catch (firstErr) {
+        // If server had a stuck process, auto-stop and retry once seamlessly!
+        if (firstErr.message && (firstErr.message.includes("ដំណើរការ") || firstErr.message.includes("active"))) {
+          try {
+            await stopVoxCpmTraining();
+            res = await startVoxCpmTraining({
+              modelName: modelName.trim(),
+              samples: payloadSamples,
+              steps: selectedSteps,
+              learningRate,
+            });
+          } catch (retryErr) {
+            throw firstErr;
+          }
+        } else {
+          throw firstErr;
+        }
+      }
 
-      setTrainingStatus({
+      setTrainingStatus((prev) => ({
+        ...prev,
         status: "training",
         step: 0,
         total_steps: selectedSteps,
-        progress: 0,
-        loss: null,
-        eta_seconds: null,
-        elapsed_seconds: 0,
-        logs: ["🚀 កំពុងរៀបចំ និងចាប់ផ្តើមដំណើរការបង្វឹក LoRA..."],
-        error: null,
-        output_file: null,
-        device: "mps",
-      });
+        logs: [
+          ...(prev?.logs || []),
+          "⚡ Server បានទទួលសំណាកជោគជ័យ! កំពុងចាប់ផ្តើមបង្វឹក Diffusion Transformer...",
+        ],
+      }));
 
-      notify("🎯 ចាប់ផ្តើមបង្វឹកសំឡេង LoRA ដោយជោគជ័យ! លោកអ្នកអាចតាមដាន Progress នៅលើផ្ទាំងនេះផ្ទាល់។");
+      notify("🎯 ចាប់ផ្តើមបង្វឹកសំឡេង LoRA ដោយជោគជ័យ! លោកអ្នកអាចតាមដាន Progress និង Terminal Logs នៅលើផ្ទាំងនេះផ្ទាល់។");
     } catch (err) {
+      console.error("Start training error:", err);
+      setTrainingStatus((prev) => ({
+        ...prev,
+        status: "error",
+        error: err.message || "បរាជ័យក្នុងការចាប់ផ្តើម",
+        logs: [...(prev?.logs || []), `❌ បរាជ័យក្នុងការចាប់ផ្តើម: ${err.message}`],
+      }));
       notify(`បរាជ័យក្នុងការចាប់ផ្តើម: ${err.message}`);
     } finally {
       setIsSubmitting(false);
@@ -562,16 +703,16 @@ export function TrainTab({
           <div className="lora-progress-section">
             <div className="lora-progress-meta">
               <span className="lora-progress-percent">
-                {trainingStatus.progress?.toFixed(1) || 0}%
+                {typeof trainingStatus?.progress === "number" ? trainingStatus.progress.toFixed(1) : "0"}%
               </span>
               <span className="lora-step-counter">
-                Step <strong>{trainingStatus.step}</strong> / {trainingStatus.total_steps}
+                Step <strong>{trainingStatus?.step ?? 0}</strong> / {trainingStatus?.total_steps ?? selectedSteps}
               </span>
             </div>
             <div className="lora-progress-track">
               <div
                 className="lora-progress-fill"
-                style={{ width: `${trainingStatus.progress || 0}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, trainingStatus?.progress || 0))}%` }}
               />
             </div>
           </div>
@@ -581,13 +722,15 @@ export function TrainTab({
             <div className="lora-metric-card">
               <span className="lora-metric-label">Loss (កម្រិតលម្អៀង)</span>
               <span className="lora-metric-val">
-                {trainingStatus.loss !== null ? trainingStatus.loss.toFixed(4) : "--"}
+                {typeof trainingStatus?.loss === "number" && !isNaN(trainingStatus.loss)
+                  ? trainingStatus.loss.toFixed(4)
+                  : "--"}
               </span>
             </div>
             <div className="lora-metric-card">
               <span className="lora-metric-label">ពេលវេលានៅសល់ (ETA)</span>
               <span className="lora-metric-val">
-                {trainingStatus.eta_seconds !== null
+                {typeof trainingStatus?.eta_seconds === "number" && !isNaN(trainingStatus.eta_seconds)
                   ? `${Math.ceil(trainingStatus.eta_seconds / 60)} នាទី`
                   : isTrainingActive
                   ? "កំពុងគណនា..."
@@ -597,7 +740,7 @@ export function TrainTab({
             <div className="lora-metric-card">
               <span className="lora-metric-label">រយៈពេល Train សរុប</span>
               <span className="lora-metric-val">
-                {formatDuration(trainingStatus.elapsed_seconds)}
+                {formatDuration(trainingStatus?.elapsed_seconds || 0)}
               </span>
             </div>
           </div>
@@ -698,7 +841,7 @@ export function TrainTab({
           </div>
         </div>
 
-        {/* Toolbar: Single Long Audio Upload & Clear */}
+        {/* Toolbar: Single Long Audio Upload, Multi-Files Upload & Clear */}
         <div className="lora-dataset-toolbar">
           <div className="lora-toolbar-left">
             <label className={`lora-batch-upload-btn ${isSplittingAudio ? "is-loading" : ""}`}>
@@ -718,6 +861,19 @@ export function TrainTab({
                 accept="audio/*"
                 style={{ display: "none" }}
                 onChange={handleLongAudioUpload}
+                disabled={isSplittingAudio || isTrainingActive}
+              />
+            </label>
+
+            <label className="lora-multi-upload-btn" title="ជ្រើសរើសឯកសារសំឡេងជាច្រើនក្នុងពេលតែមួយ">
+              <UploadSimple size={16} weight="bold" />
+              <span>Upload ច្រើនឯកសារ (Multi-Files)</span>
+              <input
+                type="file"
+                accept="audio/*"
+                multiple
+                style={{ display: "none" }}
+                onChange={handleMultipleAudioUpload}
                 disabled={isSplittingAudio || isTrainingActive}
               />
             </label>
@@ -809,12 +965,13 @@ export function TrainTab({
                     </button>
                   )}
 
-                  {/* Upload file fallback */}
+                  {/* Upload file button on card */}
                   <label
-                    className="lora-icon-action-btn file-upload-label"
-                    title="Upload File សំឡេង"
+                    className={`lora-card-upload-btn ${hasAudio ? "has-file" : ""}`}
+                    title="Upload File សំឡេងសម្រាប់សំណាកនេះ"
                   >
                     <UploadSimple size={15} weight="bold" />
+                    <span>Upload File</span>
                     <input
                       type="file"
                       accept="audio/*"
@@ -878,9 +1035,10 @@ export function TrainTab({
                 onChange={(e) => setSelectedSteps(Number(e.target.value))}
                 disabled={isTrainingActive}
               >
-                <option value={100}>100 Steps - តេស្តសាកល្បងរហ័ស</option>
-                <option value={300}>300 Steps - ណែនាំ (Recommended)</option>
-                <option value={500}>500 Steps - គុណភាពខ្ពស់ Studio Pro</option>
+                <option value={30}>30 Steps - លឿនរហ័សលើ Mac (~3-5 នាទី)</option>
+                <option value={50}>50 Steps - ល្អប្រសើរបំផុតលើ Mac (~6-8 នាទី - ណែនាំ)</option>
+                <option value={100}>100 Steps - គុណភាពខ្ពស់ Studio (~15 នាទី)</option>
+                <option value={200}>200 Steps - កម្រិតស៊ីជម្រៅ Deep Fine-tune</option>
               </select>
             </div>
           </div>
@@ -903,8 +1061,8 @@ export function TrainTab({
                   <Sparkle size={20} weight="fill" />
                   <span>
                     {recordedCount === 0
-                      ? "សូមថតសំឡេងជាមុនសិន"
-                      : `ចាប់ផ្តើមបង្វឹកសំឡេងផ្ទាល់ខ្លួន (${recordedCount} សំណាក)`}
+                      ? "✨ សូម Upload ឬថតសំឡេងជាមុនសិន"
+                      : `🚀 ចាប់ផ្តើមបង្វឹកសំឡេងផ្ទាល់ខ្លួន (${recordedCount} សំណាក)`}
                   </span>
                 </>
               )}

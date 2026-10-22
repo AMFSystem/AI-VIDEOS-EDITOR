@@ -9,9 +9,12 @@ import {
   verifyGeminiApiKey,
   synthesizeGeminiSpeech,
   generateGeminiScript,
+  analyzeGeminiVocalPersona,
 } from "../../services/ai/geminiService.js";
 import { config } from "../../config/index.js";
 import { voxcpmService } from "../../services/ai/voxcpmService.js";
+import { f5ttsService } from "../../services/ai/f5ttsService.js";
+import { pyvideotransService } from "../../services/ai/pyvideotransService.js";
 
 export const aiController = {
   async transcribe(req, res) {
@@ -172,7 +175,7 @@ export const aiController = {
 
   async geminiTts(req, res) {
     const apiKey = req.body?.apiKey || config.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    const { text, voiceName, audioBase64, referenceMimeType, vocalStyle } = req.body;
+    const { text, voiceName, audioBase64, referenceMimeType, vocalStyle, vocalPersona } = req.body;
     if (!apiKey) {
       return res.status(400).json({ error: "Google Gemini API Key គឺចាំបាច់" });
     }
@@ -188,10 +191,34 @@ export const aiController = {
         audioBase64,
         mimeType: referenceMimeType || "audio/wav",
         vocalStyle,
+        vocalPersona: vocalPersona || "",
       });
       res.setHeader("Content-Type", mimeType);
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.send(buffer);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async geminiAnalyzeVoice(req, res) {
+    const apiKey = req.body?.apiKey || config.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const { audioBase64, mimeType = "audio/wav", language = "km" } = req.body;
+    if (!apiKey) {
+      return res.status(400).json({ error: "Google Gemini API Key គឺចាំបាច់" });
+    }
+    if (!audioBase64) {
+      return res.status(400).json({ error: "ទិន្នន័យសំឡេងគឺចាំបាច់" });
+    }
+
+    try {
+      const persona = await analyzeGeminiVocalPersona({
+        apiKey,
+        audioBase64,
+        mimeType,
+        language,
+      });
+      res.json({ success: true, persona });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -327,6 +354,105 @@ export const aiController = {
       res.setHeader("Content-Type", mimeType);
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.send(buffer);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // F5-TTS Flow Matching Diffusion Voice Cloner & TTS
+  // ─────────────────────────────────────────────────────────────────────────────
+  async f5ttsStatus(_req, res) {
+    try {
+      const status = await f5ttsService.checkServerStatus();
+      res.json(status);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async f5ttsClone(req, res) {
+    const { name, audioBase64, mimeType = "audio/wav", refText = "", language = "km" } = req.body;
+    if (!audioBase64) {
+      return res.status(400).json({ error: "ទិន្នន័យសំឡេង (audioBase64) គឺចាំបាច់" });
+    }
+
+    try {
+      const base64Clean = audioBase64.replace(/^data:[^;]+;base64,/, "");
+      const audioBuffer = Buffer.from(base64Clean, "base64");
+      const profile = await f5ttsService.extractProfile({
+        name,
+        audioBuffer,
+        mimeType,
+        refText,
+        language,
+      });
+      res.json({ success: true, profile });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async f5ttsTts(req, res) {
+    const { text, profile, speed = 1.0, language = "km", nfeStep = 32, cfgStrength = 2.0 } = req.body;
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ error: "អត្ថបទត្រូវនិយាយគឺចាំបាច់" });
+    }
+
+    try {
+      const { buffer, mimeType } = await f5ttsService.synthesizeSpeech({
+        text,
+        profile,
+        speed: parseFloat(speed) || 1.0,
+        language,
+        nfeStep: parseInt(nfeStep, 10) || 32,
+        cfgStrength: parseFloat(cfgStrength) || 2.0,
+      });
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.send(buffer);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // PyVideoTrans Video Translation, Alignment & Dubber Pipeline
+  // ─────────────────────────────────────────────────────────────────────────────
+  async pyvideotransStatus(_req, res) {
+    try {
+      const status = await pyvideotransService.checkStatus();
+      res.json(status);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async pyvideotransAlignDub(req, res) {
+    const { segments, preserveBgm = true, bgmVolume = 0.25, voiceVolume = 1.0 } = req.body;
+    if (!segments || segments.length === 0) {
+      return res.status(400).json({ error: "បញ្ជី segments គឺចាំបាច់" });
+    }
+
+    try {
+      const { buffer, mimeType } = await pyvideotransService.alignAndMixDubbing({
+        segments,
+        preserveBgm,
+        bgmVolume,
+        voiceVolume,
+      });
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.send(buffer);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async pyvideotransSetupRepo(_req, res) {
+    try {
+      const result = await pyvideotransService.setupRepo();
+      res.json(result);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
