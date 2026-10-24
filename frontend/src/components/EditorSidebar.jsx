@@ -84,7 +84,7 @@ export function EditorSidebar({ model: d }) {
         ) : null}
       </div>
 
-      <aside className={`media-panel ${d.mobilePanel === "tools" && d.selectedLibraryAssetId ? "has-mobile-asset-actions" : ""} ${d.mobilePanel === "tools" && d.activeTool === "stickers" ? "has-mobile-sticker-actions" : ""}`}>
+      <aside className={`media-panel ${d.activeTool === "dubber" ? "is-dubber-tool" : ""} ${d.mobilePanel === "tools" && d.selectedLibraryAssetId ? "has-mobile-asset-actions" : ""} ${d.mobilePanel === "tools" && d.activeTool === "stickers" ? "has-mobile-sticker-actions" : ""}`}>
         {d.activeTool === "media" ? (
           <MediaPanel
             t={d.t}
@@ -139,6 +139,8 @@ export function EditorSidebar({ model: d }) {
             sourceAudioDuration={d.sourceAudioDuration}
             sourceAudioName={d.sourceAudioName}
             applyAssetToTrack={d.applyAssetToTrack}
+            handleAssetPointerDown={d.handleAssetPointerDown}
+            setUserAssets={d.setUserAssets}
             onOpenVoiceStudio={d.onOpenVoiceStudio}
             setCaptionSegments={d.setCaptionSegments}
             setCaptionsEnabled={d.setCaptionsEnabled}

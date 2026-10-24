@@ -2570,6 +2570,31 @@ export function VoiceSynthesisPanel({
         </div>
       </div>
 
+      <div className="tts-templates-row" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", margin: "6px 0 12px 0" }}>
+        <span style={{ fontSize: "11px", color: "#64748b" }}>អត្ថបទគំរូ៖</span>
+        <button
+          className="tts-template-chip"
+          type="button"
+          onClick={() => updateScript("សួស្តីបងប្អូនទាំងអស់គ្នា! នេះគឺជាការសាកល្បងសំឡេងកូនរបស់ខ្ញុំ ដំណើរការយ៉ាងរលូន និងពិរោះរណ្តំ។")}
+        >
+          🔥 ស្វាគមន៍
+        </button>
+        <button
+          className="tts-template-chip"
+          type="button"
+          onClick={() => updateScript("សូមជួយចុចគាំទ្រ ចុចចែករំលែក និងតាមដានដើម្បីទទួលបានវីដេអូថ្មីៗ!")}
+        >
+          ⭐ គាំទ្រ និងចែករំលែក
+        </button>
+        <button
+          className="tts-template-chip"
+          type="button"
+          onClick={() => updateScript("រឿងនិទាននេះនិយាយអំពីការតស៊ូព្យាយាម និងភាពជោគជ័យដ៏អស្ចារ្យក្នុងជីវិត។")}
+        >
+          📖 និទានរឿង
+        </button>
+      </div>
+
       <div className="voice-header">
         <label className="field-label">{t("chooseVoice")}</label>
         <div className="menu-anchor">

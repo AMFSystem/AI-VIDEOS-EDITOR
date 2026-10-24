@@ -17,7 +17,7 @@ export const mediaService = {
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        "x-filename": file.name,
+        "x-filename": encodeURIComponent(file.name),
       },
       body: file,
     });

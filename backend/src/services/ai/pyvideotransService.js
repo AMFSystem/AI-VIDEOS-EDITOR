@@ -1,89 +1,262 @@
+import fs from "node:fs";
+import path from "node:path";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { logger } from "../../utils/logger.js";
 
-const PYVIDEOTRANS_PORT = process.env.PYVIDEOTRANS_PORT || 3004;
-const PYVIDEOTRANS_URL = `http://127.0.0.1:${PYVIDEOTRANS_PORT}`;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const BACKEND_DIR = path.resolve(__dirname, "../../../");
+const PYTHON_DIR = path.resolve(BACKEND_DIR, "python");
+const PYVIDEOTRANS_DIR = path.resolve(PYTHON_DIR, "pyvideotrans");
+const RUNNER_SCRIPT = path.resolve(PYTHON_DIR, "pyvideotrans_runner.py");
+const PARAMS_PATH = path.resolve(PYVIDEOTRANS_DIR, "videotrans", "params.json");
+const CFG_PATH = path.resolve(PYVIDEOTRANS_DIR, "videotrans", "cfg.json");
 
 export const pyvideotransService = {
   /**
-   * Health and capability status of PyVideoTrans microservice
+   * Read configuration files (params.json and cfg.json) from PyVideoTrans
+   */
+  async getConfig() {
+    let params = {};
+    let cfg = {};
+
+    try {
+      if (fs.existsSync(PARAMS_PATH)) {
+        params = JSON.parse(fs.readFileSync(PARAMS_PATH, "utf-8"));
+      }
+    } catch (err) {
+      logger.warn(`[PyVideoTrans] Could not parse params.json: ${err.message}`);
+    }
+
+    try {
+      if (fs.existsSync(CFG_PATH)) {
+        cfg = JSON.parse(fs.readFileSync(CFG_PATH, "utf-8"));
+      }
+    } catch (err) {
+      logger.warn(`[PyVideoTrans] Could not parse cfg.json: ${err.message}`);
+    }
+
+    return { params, cfg };
+  },
+
+  /**
+   * Save configuration updates to PyVideoTrans params.json and cfg.json
+   */
+  async saveConfig(updates = {}) {
+    const { params: newParams, cfg: newCfg } = updates;
+    let savedParams = false;
+    let savedCfg = false;
+
+    if (newParams && typeof newParams === "object") {
+      try {
+        let existing = {};
+        if (fs.existsSync(PARAMS_PATH)) {
+          try {
+            existing = JSON.parse(fs.readFileSync(PARAMS_PATH, "utf-8"));
+          } catch {}
+        }
+        const merged = { ...existing, ...newParams };
+        fs.writeFileSync(PARAMS_PATH, JSON.stringify(merged, null, 2), "utf-8");
+        savedParams = true;
+      } catch (err) {
+        logger.error(`[PyVideoTrans] Failed to save params.json: ${err.message}`);
+        throw new Error(`Failed to save params.json: ${err.message}`);
+      }
+    }
+
+    if (newCfg && typeof newCfg === "object") {
+      try {
+        let existing = {};
+        if (fs.existsSync(CFG_PATH)) {
+          try {
+            existing = JSON.parse(fs.readFileSync(CFG_PATH, "utf-8"));
+          } catch {}
+        }
+        const merged = { ...existing, ...newCfg };
+        fs.writeFileSync(CFG_PATH, JSON.stringify(merged, null, 2), "utf-8");
+        savedCfg = true;
+      } catch (err) {
+        logger.error(`[PyVideoTrans] Failed to save cfg.json: ${err.message}`);
+        throw new Error(`Failed to save cfg.json: ${err.message}`);
+      }
+    }
+
+    return {
+      success: true,
+      savedParams,
+      savedCfg,
+      message: "PyVideoTrans configuration updated successfully",
+    };
+  },
+
+  /**
+   * Health and capability status of original PyVideoTrans engine
    */
   async checkStatus() {
-    try {
-      const res = await fetch(`${PYVIDEOTRANS_URL}/status`, {
-        signal: AbortSignal.timeout(3000),
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Server not reachable
-    }
+    const hasRepo = fs.existsSync(path.resolve(PYVIDEOTRANS_DIR, "cli.py"));
     return {
-      available: false,
+      available: hasRepo,
       engine: "pyvideotrans",
-      name: "PyVideoTrans Video Dubber",
-      github: "https://github.com/jianchang512/pyvideotrans",
-      hint: "PyVideoTrans server is offline. Run 'python backend/python/pyvideotrans_server.py' to launch.",
+      name: "PyVideoTrans 100% Native Engine",
+      repoDir: PYVIDEOTRANS_DIR,
+      features: [
+        "faster-whisper-local",
+        "google-translate-free",
+        "microsoft-translate-free",
+        "edge-tts-free-khmer",
+        "atempo-sync-alignment",
+        "vocal-bgm-separation",
+        "hard-soft-subtitles",
+      ],
     };
   },
 
   /**
-   * Auto-align and synchronize dubbed segments to exact video timecodes
+   * Execute full video translation, recognition, dubbing and assembly pipeline
+   * using 100% official pyvideotrans engine.
    */
-  async alignAndMixDubbing({ segments, preserveBgm = true, bgmVolume = 0.25, voiceVolume = 1.0 }) {
-    if (!segments || segments.length === 0) {
-      throw new Error("បញ្ជី Segments គឺចាំបាច់");
+  async runTranslation(options, onEvent = () => {}) {
+    const {
+      name,
+      sourceLang = "zh-cn",
+      targetLang = "km",
+      voiceRole = "Piseth(Male/KH)",
+      modelName = "tiny",
+      recognType = 0,
+      translateType = 0,
+      ttsType = 0,
+      voiceRate = "+0%",
+      volume = "+0%",
+      pitch = "+0Hz",
+      voiceAutoRate = true,
+      videoAutoRate = false,
+      isSeparate = false,
+      embedBgm = true,
+      backaudioVolume = 0.8,
+      cuda = false,
+      subtitleType = 2,
+    } = options;
+
+    if (!name || !fs.existsSync(name)) {
+      throw new Error(`File not found: ${name}`);
     }
 
-    const srvStatus = await this.checkStatus();
-    if (!srvStatus.available) {
-      logger.warn("[PyVideoTrans] Server offline, falling back to basic audio assembly");
-      throw new Error("PyVideoTrans Server មិនទាន់ដំណើរការ (Port 3004)");
-    }
+    const runId = `pyvt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const tempDir = path.resolve(BACKEND_DIR, "storage", "temp", runId);
+    fs.mkdirSync(tempDir, { recursive: true });
 
-    logger.info(`[PyVideoTrans] Aligning and mixing ${segments.length} dubbed audio segments...`);
-    const res = await fetch(`${PYVIDEOTRANS_URL}/align-dub`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        segments,
-        preserveBgm,
-        bgmVolume,
-        voiceVolume,
-      }),
-      signal: AbortSignal.timeout(180000), // 3 min timeout for long video mixing
-    });
+    const targetDir = path.resolve(tempDir, "output");
+    fs.mkdirSync(targetDir, { recursive: true });
 
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`PyVideoTrans audio alignment failed: ${err}`);
-    }
+    // Safeguard: CUDA is strictly for NVIDIA GPUs on Linux/Windows.
+    // On macOS (Darwin), CUDA does not exist; disable is_cuda to prevent CTranslate2 CUDA errors.
+    const isDarwin = process.platform === "darwin";
+    const effectiveCuda = isDarwin ? false : Boolean(cuda);
 
-    const arrayBuf = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuf);
-    logger.info(`[PyVideoTrans] Aligned master audio generated: ${buffer.length} bytes @ 24kHz`);
-    return {
-      buffer,
-      mimeType: "audio/wav",
-      sampleRate: 24000,
+    const configPayload = {
+      name: path.resolve(name),
+      target_dir: targetDir,
+      cache_folder: path.resolve(tempDir, "cache"),
+      source_language_code: sourceLang === "auto" ? "auto" : sourceLang,
+      target_language_code: targetLang || "km",
+      recogn_type: Number(recognType) || 0,
+      model_name: modelName || "tiny",
+      translate_type: Number(translateType) || 0,
+      tts_type: Number(ttsType) || 0,
+      voice_role: voiceRole || "Piseth(Male/KH)",
+      voice_rate: String(voiceRate).includes("%") ? voiceRate : `${voiceRate >= 0 ? "+" : ""}${voiceRate}%`,
+      volume: String(volume).includes("%") ? volume : `${volume >= 0 ? "+" : ""}${volume}%`,
+      pitch: String(pitch).includes("Hz") ? pitch : `${pitch >= 0 ? "+" : ""}${pitch}Hz`,
+      voice_autorate: Boolean(voiceAutoRate),
+      video_autorate: Boolean(videoAutoRate),
+      is_separate: Boolean(isSeparate),
+      embed_bgm: Boolean(embedBgm),
+      backaudio_volume: parseFloat(backaudioVolume) || 0.8,
+      is_cuda: effectiveCuda,
+      subtitle_type: Number(subtitleType) || 0,
+      clear_cache: false,
     };
-  },
 
-  /**
-   * Clone or update PyVideoTrans repository
-   */
-  async setupRepo() {
-    try {
-      const res = await fetch(`${PYVIDEOTRANS_URL}/setup-repo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ branch: "main" }),
-        signal: AbortSignal.timeout(120000),
+    const configPath = path.resolve(tempDir, "config.json");
+    fs.writeFileSync(configPath, JSON.stringify(configPayload, null, 2), "utf-8");
+
+    logger.info(`[PyVideoTrans] Starting native task for ${path.basename(name)} (${sourceLang} -> ${targetLang})`);
+
+    return new Promise((resolve, reject) => {
+      const dyldFallback = ["/opt/homebrew/lib", "/usr/local/lib", process.env.DYLD_FALLBACK_LIBRARY_PATH].filter(Boolean).join(":");
+
+      const child = spawn("uv", ["run", "--no-sync", "python", RUNNER_SCRIPT, "--config", configPath], {
+        cwd: PYVIDEOTRANS_DIR,
+        env: {
+          ...process.env,
+          PYTHONUNBUFFERED: "1",
+          DYLD_FALLBACK_LIBRARY_PATH: dyldFallback,
+        },
       });
-      return await res.json();
-    } catch (err) {
-      return { success: false, error: err.message };
-    }
+
+      let stdoutAccum = "";
+      let finalResult = null;
+      let lastErrorMessage = "";
+
+      child.stdout.on("data", (chunk) => {
+        const text = chunk.toString();
+        stdoutAccum += text;
+        const lines = text.split("\n");
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          if (trimmed.startsWith("__PYVT_EVENT__")) {
+            try {
+              const eventData = JSON.parse(trimmed.replace("__PYVT_EVENT__", ""));
+              if (eventData.type === "done") {
+                finalResult = eventData;
+              } else if (eventData.type === "error") {
+                lastErrorMessage = eventData.error;
+              }
+              onEvent(eventData);
+            } catch (err) {
+              logger.warn(`Failed to parse pyvt event: ${err.message}`);
+            }
+          } else {
+            // General stdout output
+            if (!trimmed.includes("Uninstalled") && !trimmed.includes("Installed")) {
+              onEvent({ type: "log", message: trimmed });
+            }
+          }
+        }
+      });
+
+      child.stderr.on("data", (chunk) => {
+        const errText = chunk.toString();
+        const lines = errText.split("\n");
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.includes("DEBUG") && !trimmed.includes("filelock")) {
+            onEvent({ type: "log", message: trimmed, isError: true });
+            lastErrorMessage = trimmed;
+          }
+        }
+      });
+
+      child.on("close", (code) => {
+        try { fs.unlinkSync(configPath); } catch {}
+
+        if (code === 0 && finalResult) {
+          logger.info(`[PyVideoTrans] Completed native dubbing task ${runId}`);
+          resolve(finalResult);
+        } else {
+          const err = lastErrorMessage || `PyVideoTrans execution failed with exit code ${code}`;
+          logger.error(`[PyVideoTrans] ${err}`);
+          reject(new Error(err));
+        }
+      });
+
+      child.on("error", (err) => {
+        logger.error(`[PyVideoTrans] Failed to spawn process: ${err.message}`);
+        reject(err);
+      });
+    });
   },
 };
-

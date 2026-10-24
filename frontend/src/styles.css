@@ -7179,11 +7179,19 @@ button:disabled {
 .generate-button {
   flex: 1;
   gap: 8px;
-  min-height: 38px;
-  color: #071616;
+  min-height: 42px;
+  color: #ffffff;
   font-size: 14px;
   font-weight: 780;
-  background: linear-gradient(135deg, #78a3ff 0%, #33ebd7 76%);
+  border-radius: 9px;
+  background: linear-gradient(90deg, #00f2fe 0%, #38bdf8 45%, #a855f7 100%);
+  box-shadow: 0 4px 18px rgba(0, 242, 254, 0.35);
+  transition: all 0.2s ease;
+}
+
+.generate-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px rgba(0, 242, 254, 0.45);
 }
 
 .secondary-download {

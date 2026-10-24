@@ -4,15 +4,27 @@ import { fileManager } from "../../services/storage/fileManager.js";
 
 export function handleRawStreamUpload(req, res, next) {
   // Streaming upload handler without heavy external dependencies
-  const filename = req.headers["x-filename"] || `upload_${Date.now()}.mp4`;
-  const targetPath = fileManager.getFilePath("uploads", filename);
+  const rawHeader = req.headers["x-filename"];
+  let filename = `upload_${Date.now()}.mp4`;
+  if (rawHeader) {
+    try {
+      filename = decodeURIComponent(rawHeader);
+    } catch {
+      filename = rawHeader;
+    }
+  }
+  // Sanitize filename for safe filesystem & ffmpeg compatibility
+  const safeBaseName = path.basename(filename).replace(/[^\w.\-\s]/g, "_").trim() || `media_${Date.now()}.mp4`;
+  const finalFilename = `${Date.now()}_${safeBaseName}`;
+  const targetPath = fileManager.getFilePath("uploads", finalFilename);
   const writeStream = fs.createWriteStream(targetPath);
 
   req.pipe(writeStream);
 
   writeStream.on("finish", () => {
     req.uploadedFile = {
-      filename,
+      filename: finalFilename,
+      originalName: filename,
       filePath: targetPath,
       size: writeStream.bytesWritten,
     };

@@ -134,22 +134,6 @@ export const f5ttsService = {
       throw new Error(`បរាជ័យក្នុងការចុះឈ្មោះសំឡេង F5-TTS៖ ${err.message}`);
     }
   },
-      model: "SWivid/F5-TTS",
-      sampleRate: TARGET_SAMPLE_RATE,
-      profileId,
-      name,
-      language,
-      refText,
-      duration: 5.0,
-      trainingQuality: {
-        score: 95,
-        stars: "⭐⭐⭐⭐⭐",
-        label: "Flow Matching Diffusion",
-        badge: "F5-TTS",
-        isDeep: true,
-      },
-    };
-  },
 
   /**
    * Synthesize speech using F5-TTS Flow Matching Diffusion

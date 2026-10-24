@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileManager } from "../../services/storage/fileManager.js";
 import { whisperService } from "../../services/ai/whisperService.js";
 import { audioStemService } from "../../services/ai/audioStemService.js";
 import { visionAIService } from "../../services/ai/visionAIService.js";
@@ -428,6 +431,112 @@ export const aiController = {
     }
   },
 
+  async pyvideotransGetConfig(_req, res) {
+    try {
+      const configData = await pyvideotransService.getConfig();
+      res.json(configData);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async pyvideotransSaveConfig(req, res) {
+    try {
+      const result = await pyvideotransService.saveConfig(req.body);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async pyvideotransProcess(req, res) {
+    const {
+      filePath,
+      sourceLang,
+      targetLang,
+      voiceRole,
+      modelName,
+      recognType,
+      translateType,
+      ttsType,
+      voiceRate,
+      volume,
+      pitch,
+      voiceAutoRate,
+      videoAutoRate,
+      isSeparate,
+      embedBgm,
+      backaudioVolume,
+      cuda,
+      subtitleType,
+    } = req.body;
+
+    if (!filePath || !fs.existsSync(filePath)) {
+      return res.status(400).json({ error: `File not found or missing: ${filePath}` });
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+
+    const sendSse = (data) => {
+      try {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      } catch {}
+    };
+
+    try {
+      const result = await pyvideotransService.runTranslation(
+        {
+          name: filePath,
+          sourceLang,
+          targetLang,
+          voiceRole,
+          modelName,
+          recognType,
+          translateType,
+          ttsType,
+          voiceRate,
+          volume,
+          pitch,
+          voiceAutoRate,
+          videoAutoRate,
+          isSeparate,
+          embedBgm,
+          backaudioVolume,
+          cuda,
+          subtitleType,
+        },
+        (event) => {
+          sendSse(event);
+        }
+      );
+
+      const convertToUrl = (absPath) => {
+        if (!absPath || !fs.existsSync(absPath)) return null;
+        const rel = path.relative(fileManager.baseDir, absPath);
+        return `/storage/${rel.split(path.sep).join("/")}`;
+      };
+
+      const finalPayload = {
+        type: "done",
+        ...result,
+        target_mp4_url: convertToUrl(result.target_mp4),
+        target_audio_url: convertToUrl(result.target_audio),
+        target_sub_url: convertToUrl(result.target_sub),
+        source_audio_url: convertToUrl(result.source_audio),
+        source_sub_url: convertToUrl(result.source_sub),
+      };
+
+      sendSse(finalPayload);
+      res.end();
+    } catch (err) {
+      sendSse({ type: "error", error: err.message });
+      res.end();
+    }
+  },
+
   async pyvideotransAlignDub(req, res) {
     const { segments, preserveBgm = true, bgmVolume = 0.25, voiceVolume = 1.0 } = req.body;
     if (!segments || segments.length === 0) {
@@ -449,12 +558,167 @@ export const aiController = {
     }
   },
 
+  async pyvideotransSeparateBgm(req, res) {
+    try {
+      if (!req.file && !req.body?.fileBase64) {
+        return res.status(400).json({ error: "ឯកសារ Media ឬ fileBase64 គឺចាំបាច់" });
+      }
+
+      let buffer;
+      if (req.file) {
+        buffer = req.file.buffer;
+      } else {
+        const cleanB64 = req.body.fileBase64.split(",").pop();
+        buffer = Buffer.from(cleanB64, "base64");
+      }
+
+      const bgmBuffer = await pyvideotransService.separateBgm(buffer, req.body?.filename || "input.mp4");
+      res.setHeader("Content-Type", "audio/wav");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.send(bgmBuffer);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
   async pyvideotransSetupRepo(_req, res) {
     try {
       const result = await pyvideotransService.setupRepo();
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: err.message });
+    }
+  },
+
+  async edgeTts(req, res) {
+    const { text, voice = "km-KH-PisethNeural", rate = "+0%", pitch = "+0Hz", volume = "+0%" } = req.body;
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ error: "Text is required" });
+    }
+
+    try {
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      const { spawn } = await import("node:child_process");
+
+      const cleanText = String(text).trim();
+      const tmpPath = path.join("/tmp", `edge_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.mp3`);
+      const pyProjectDir = path.join(process.cwd(), "backend", "python", "pyvideotrans");
+
+      const child = spawn("uv", [
+        "run",
+        "--project",
+        pyProjectDir,
+        "python",
+        "-m",
+        "edge_tts",
+        "--voice",
+        voice,
+        "--rate",
+        rate,
+        "--volume",
+        volume,
+        "--pitch",
+        pitch,
+        "--text",
+        cleanText,
+        "--write-media",
+        tmpPath,
+      ]);
+
+      child.on("close", (code) => {
+        if (code === 0 && fs.existsSync(tmpPath)) {
+          const audioBuffer = fs.readFileSync(tmpPath);
+          try { fs.unlinkSync(tmpPath); } catch {}
+          res.setHeader("Content-Type", "audio/mpeg");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          return res.send(audioBuffer);
+        }
+        res.status(500).json({ error: `Edge-TTS synthesis failed with code ${code}` });
+      });
+
+      child.on("error", (err) => {
+        res.status(500).json({ error: err.message });
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async translateText(req, res) {
+    const { text, texts, sourceLang = "zh-cn", targetLang = "km" } = req.body;
+    let inputLines = texts;
+    if (!inputLines || !Array.isArray(inputLines)) {
+      inputLines = text ? String(text).split("\n") : [];
+    }
+    if (inputLines.length === 0) {
+      return res.status(400).json({ error: "Text is required" });
+    }
+
+    const sl = sourceLang === "auto" ? "auto" : (sourceLang.toLowerCase().includes("zh") ? "zh-CN" : sourceLang);
+    const tl = targetLang || "km";
+
+    // 1. First attempt: Google Translate API (Batch query)
+    try {
+      const fullText = inputLines.join("\n");
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(fullText)}`;
+      const googleRes = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (googleRes.ok) {
+        const data = await googleRes.json();
+        if (data && data[0] && Array.isArray(data[0])) {
+          const translatedStr = data[0].map((item) => item[0]).join("");
+          const lines = translatedStr.split("\n");
+          const finalLines = inputLines.map((orig, i) => lines[i] || orig);
+          return res.json({ translatedText: translatedStr, lines: finalLines });
+        }
+      }
+    } catch {}
+
+    // 2. Second attempt: Microsoft Translate API
+    try {
+      const msUrl = `https://edge.microsoft.com/translate/translatetext?from=zh-Hans&to=${tl}&isEnterpriseClient=false`;
+      const msRes = await fetch(msUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0" },
+        body: JSON.stringify(inputLines),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (msRes.ok) {
+        const msData = await msRes.json();
+        if (Array.isArray(msData)) {
+          const lines = msData.map((item) => item?.translations?.[0]?.text || "");
+          const finalLines = inputLines.map((orig, i) => lines[i] || orig);
+          return res.json({ translatedText: finalLines.join("\n"), lines: finalLines });
+        }
+      }
+    } catch {}
+
+    // 3. Third attempt: Line-by-line fallback
+    try {
+      const translatedItems = await Promise.all(
+        inputLines.map(async (line) => {
+          if (!line.trim()) return "";
+          try {
+            const singleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(line)}`;
+            const sRes = await fetch(singleUrl, { signal: AbortSignal.timeout(4000) });
+            if (sRes.ok) {
+              const sData = await sRes.json();
+              return sData?.[0]?.[0]?.[0] || line;
+            }
+          } catch {}
+          return line;
+        })
+      );
+      return res.json({ translatedText: translatedItems.join("\n"), lines: translatedItems });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
     }
   },
 };

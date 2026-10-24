@@ -1,953 +1,1028 @@
-/* AI Story & Movie Dubber Panel CSS */
+/* PyVideoTrans 100% Exact Faithful Gradio WebUI Styling - Responsive & Fully Scrollable */
 
-.dubber-panel {
+/* Remove parent sidebar padding for Dubber so it owns the scroll container */
+.media-panel.is-dubber-tool,
+.media-panel:has(.pvt-exact-root) {
+  padding: 0 !important;
+  overflow: hidden !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+.pvt-exact-root {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-  color: #e2edf1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  width: 100%;
   height: 100%;
-  box-sizing: border-box;
-  font-family: "Kantumruy Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
-
-/* ========================================================
-   Upload Dropzone & File Card (Direct Video Input)
-   ======================================================== */
-.dubber-upload-dropzone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 22px 14px;
-  border-radius: 10px;
-  background: rgba(17, 24, 39, 0.65);
-  border: 1.5px dashed rgba(56, 189, 248, 0.35);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: center;
-  box-sizing: border-box;
-}
-
-.dubber-upload-dropzone:hover {
-  background: rgba(56, 189, 248, 0.08);
-  border-color: #38bdf8;
-  transform: translateY(-1px);
-}
-
-.dubber-upload-dropzone.is-dragging {
-  background: rgba(56, 189, 248, 0.14);
-  border-color: #38bdf8;
-  box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
-}
-
-.dubber-upload-icon-wrapper {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  color: #38bdf8;
-}
-
-.dubber-upload-title {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #f1f5f9;
-}
-
-.dubber-upload-hint {
-  font-size: 11px;
-  color: #94a3b8;
-  max-width: 240px;
-  line-height: 1.4;
-}
-
-/* Uploaded File Selected Card */
-.dubber-uploaded-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 9px;
-  background: rgba(14, 165, 233, 0.08);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  box-sizing: border-box;
-}
-
-.dubber-uploaded-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
+  max-height: 100%;
+  min-height: 0;
   flex: 1;
+  background: #0f172a;
+  color: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
 }
 
-.dubber-uploaded-icon {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 7px;
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
-  flex-shrink: 0;
-}
-
-.dubber-uploaded-details {
+/* Fullscreen Studio Portal Mode */
+.pvt-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 999999;
+  background: #090d16;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.dubber-uploaded-name {
-  font-size: 12px;
-  font-weight: 650;
-  color: #f8fafc;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  box-sizing: border-box;
 }
 
-.dubber-uploaded-meta {
-  font-size: 10.5px;
-  color: #7dd3fc;
+.pvt-fullscreen-overlay .pvt-exact-root {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 0;
+  background: #090d16;
 }
 
-.dubber-uploaded-actions {
-  display: flex;
+.pvt-fullscreen-close-btn {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
   flex-shrink: 0;
 }
 
-.dubber-change-file-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #cbd5e1;
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  font-family: inherit;
-}
-
-.dubber-change-file-btn:hover {
-  background: rgba(56, 189, 248, 0.2);
+.pvt-fullscreen-close-btn:hover {
+  background: #ef4444;
   color: #ffffff;
-  border-color: rgba(56, 189, 248, 0.4);
+  border-color: #ef4444;
 }
 
 /* ========================================================
-   Step Cards
+   Tabs Navigation (Top Bar) - Fully Responsive
    ======================================================== */
-.dubber-card {
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-  padding: 12px;
-  border-radius: 10px;
-  background: rgba(16, 23, 36, 0.65);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-  box-sizing: border-box;
-}
-
-.dubber-card-header {
+.pvt-exact-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 8px 10px;
+  background: #1e293b;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  gap: 6px;
+  min-width: 0;
 }
 
-.dubber-step-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #f1f5f9;
-}
-
-.dubber-step-num {
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: rgba(56, 189, 248, 0.2);
-  color: #38bdf8;
-  font-size: 11px;
-  font-weight: 700;
-  border: 1px solid rgba(56, 189, 248, 0.35);
-}
-
-.dubber-chip-ai {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 10px;
-  background: rgba(56, 189, 248, 0.12);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.28);
-}
-
-.dubber-link-btn {
+.pvt-exact-tabs {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.pvt-exact-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: transparent;
   border: none;
-  color: #38bdf8;
-  font-size: 11px;
+  color: #94a3b8;
+  font-size: 11.5px;
+  font-weight: 600;
   cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
 }
 
-.dubber-link-btn:hover {
-  background: rgba(56, 189, 248, 0.12);
-  color: #7dd3fc;
+.pvt-exact-tab:hover {
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.06);
 }
 
-/* Grid & Fields */
-.dubber-grid-fields {
+.pvt-exact-tab.is-active {
+  color: #ffffff;
+  background: #334155;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.pvt-fullscreen-toggle {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-/* Third field (Model selector) spans full width */
-.dubber-grid-fields .dubber-field:nth-child(3) {
-  grid-column: 1 / -1;
+.pvt-fullscreen-toggle:hover {
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
 }
 
-/* Local Whisper — Gemini Key for Translation */
-.dubber-local-translation-box {
+/* ========================================================
+   Main Body (Responsive Scroll Container)
+   ======================================================== */
+.pvt-exact-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(245, 158, 11, 0.06);
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  gap: 12px;
+  /* CRITICAL: 140px bottom padding ensures ALL bottom buttons and settings are 100% visible above the timeline! */
+  padding: 12px 12px 140px 12px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
 }
 
-.dubber-local-translation-header {
+/* Custom Sleek Scrollbar */
+.pvt-exact-body::-webkit-scrollbar {
+  width: 6px;
+}
+.pvt-exact-body::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+.pvt-exact-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+.pvt-exact-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5);
+}
+
+/* Fullscreen Studio: 2-Column Wide Layout */
+.pvt-exact-root.is-fullscreen .pvt-exact-body {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.25fr) minmax(300px, 0.85fr);
+  gap: 16px;
+  padding: 16px 20px 140px 20px;
+}
+
+.pvt-exact-left-col,
+.pvt-exact-right-col {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
-  font-weight: 600;
-  color: #fcd34d;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
 }
 
-.dubber-local-translation-hint {
-  font-size: 10.5px;
-  color: #fbbf24;
-  line-height: 1.4;
-}
-
-.dubber-local-translation-hint.is-ready {
-  color: #86efac;
-}
-
-.dubber-field {
+/* ========================================================
+   Gradio-Style Component Box (Bordered Card)
+   ======================================================== */
+.pvt-component-box {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-sizing: border-box;
 }
 
-.dubber-label-row {
+.pvt-component-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.pvt-component-header-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.dubber-field label {
-  font-size: 11px;
+.pvt-pulse-badge {
+  font-size: 10px;
   font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  padding: 2px 6px;
+  border-radius: 10px;
+  animation: pvt-pulse 1s infinite alternate;
+}
+
+@keyframes pvt-pulse {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+/* Select Dropdown */
+.pvt-exact-select {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.pvt-exact-select:focus {
+  border-color: #6366f1;
+}
+
+/* Checkbox Row (Responsive Wrapping) */
+.pvt-exact-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pvt-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #cbd5e1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pvt-checkbox-item input {
+  accent-color: #6366f1;
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+}
+
+/* Sliders Row (Responsive: 1-col on narrow, 3-col on wide) */
+.pvt-exact-sliders-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 900px) {
+  .pvt-exact-root.is-fullscreen .pvt-exact-sliders-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.pvt-slider-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pvt-slider-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
   color: #94a3b8;
 }
 
-.dubber-clear-btn {
-  background: none;
-  border: none;
-  color: #64748b;
-  font-size: 10.5px;
-  cursor: pointer;
-  padding: 0;
+.pvt-slider-label-row code {
+  color: #818cf8;
+  font-weight: 600;
+  font-family: monospace;
 }
 
-.dubber-clear-btn:hover {
+.pvt-range-slider {
+  width: 100%;
+  height: 6px;
+  accent-color: #6366f1;
+  cursor: pointer;
+}
+
+/* Accordions */
+.pvt-accordion-box {
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pvt-accordion-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pvt-accordion-bar:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.pvt-acc-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
   color: #cbd5e1;
 }
 
-.dubber-select {
-  width: 100%;
-  padding: 7px 9px;
-  background: #0b111e;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 7px;
-  color: #f1f5f9;
-  font-size: 11.5px;
-  font-family: inherit;
-  outline: none;
-  box-sizing: border-box;
-  cursor: pointer;
-  transition: border-color 0.16s ease;
+.pvt-accordion-content {
+  padding: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.dubber-select:focus {
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+.pvt-acc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: center;
 }
 
-.dubber-select optgroup {
-  background: #0b111e;
+@media (min-width: 900px) {
+  .pvt-exact-root.is-fullscreen .pvt-acc-grid {
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+  }
+}
+
+.pvt-mini-label {
+  display: block;
+  font-size: 10.5px;
   color: #94a3b8;
-  font-weight: 700;
-  font-size: 11px;
-  padding: 4px 0;
+  margin-bottom: 3px;
 }
 
-.dubber-select option {
+.pvt-mini-input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 5px;
   background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #f1f5f9;
-  font-size: 11.5px;
-  padding: 4px 8px;
+  font-size: 12px;
+  box-sizing: border-box;
 }
 
-/* Model Engine Status & API Key Configuration */
-.dubber-engine-status {
+.pvt-color-input {
+  width: 100%;
+  height: 32px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Video Player Area */
+.pvt-video-drop-area {
+  width: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pvt-empty-drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 14px;
+  width: 100%;
+  cursor: pointer;
+  text-align: center;
+}
+
+.pvt-empty-drop-zone.is-drag {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.pvt-drop-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.pvt-drop-sub {
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+.pvt-active-video-box {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.pvt-actual-video {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  background: #000000;
+}
+
+.pvt-native-video-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #111827;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pvt-v-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: #818cf8;
+  cursor: pointer;
+}
+
+.pvt-v-seeker {
+  flex: 1;
+  height: 4px;
+  accent-color: #6366f1;
+  cursor: pointer;
+}
+
+.pvt-v-time {
+  font-size: 10.5px;
+  font-family: monospace;
+  color: #cbd5e1;
+}
+
+.pvt-video-file-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 10px;
-  border-radius: 7px;
+  padding-top: 6px;
+}
+
+.pvt-file-badge {
   font-size: 11px;
-  box-sizing: border-box;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
 }
 
-.dubber-engine-status.is-local {
-  background: rgba(56, 189, 248, 0.08);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  color: #38bdf8;
-}
-
-.dubber-engine-status.is-ready {
-  background: rgba(34, 197, 94, 0.08);
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  color: #86efac;
-}
-
-.dubber-engine-status.is-missing {
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #fcd34d;
-}
-
-.dubber-key-toggle-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #cbd5e1;
+.pvt-mini-action-btn {
+  padding: 3px 8px;
   font-size: 10.5px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 5px;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s ease;
-  font-family: inherit;
-}
-
-.dubber-key-toggle-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-  color: #ffffff;
-}
-
-/* Inline Key Input Box */
-.dubber-key-input-box {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  box-sizing: border-box;
-}
-
-.dubber-key-input-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.dubber-key-input-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: #fcd34d;
-}
-
-.dubber-key-input-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.dubber-key-input {
-  flex: 1;
-  min-width: 0;
-  padding: 5px 8px;
-  background: #090e1a;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
-  color: #f8fafc;
-  font-size: 11px;
-  font-family: inherit;
-  outline: none;
-}
-
-.dubber-key-input:focus {
-  border-color: #f59e0b;
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
-}
-
-.dubber-key-save-btn {
-  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
-  border: none;
-  color: #ffffff;
-  padding: 5px 10px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s ease;
-}
-
-.dubber-key-save-btn:hover {
-  background: linear-gradient(135deg, #b45309 0%, #92400e 100%);
-}
-
-.dubber-select.is-voice-select {
-  border-color: rgba(56, 189, 248, 0.25);
-  background: rgba(11, 17, 30, 0.95);
-}
-
-.dubber-textarea {
-  width: 100%;
-  padding: 8px 10px;
-  background: #090e1a;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 7px;
-  color: #f8fafc;
-  font-size: 12px;
-  line-height: 1.5;
-  font-family: inherit;
-  outline: none;
-  resize: vertical;
-  min-height: 70px;
-  box-sizing: border-box;
-  transition: border-color 0.16s ease;
+  color: #e2e8f0;
+  cursor: pointer;
 }
 
-.dubber-textarea:focus {
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+.pvt-mini-action-btn.is-danger {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
-/* Primary Button */
-.dubber-btn-primary {
+/* Primary Start Processing Button */
+.pvt-start-processing-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 9px 14px;
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  gap: 8px;
+  width: 100%;
+  padding: 12px 18px;
+  margin-top: 6px;
+  border-radius: 8px;
+  background: #4f46e5;
   color: #ffffff;
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: 7px;
-  font-size: 12px;
-  font-weight: 650;
-  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  border: none;
   cursor: pointer;
-  transition: all 0.16s ease;
-  box-shadow: 0 3px 10px rgba(2, 132, 199, 0.25);
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
 }
 
-.dubber-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+.pvt-start-processing-btn:hover:not(:disabled) {
+  background: #4338ca;
+  transform: translateY(-1px);
 }
 
-.dubber-btn-primary:disabled {
-  opacity: 0.5;
+.pvt-start-processing-btn:disabled {
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
-/* Result Box */
-.dubber-result-box {
+/* ========================================================
+   Right Column (Execution Log, Video Preview, Output Files)
+   ======================================================== */
+.pvt-execution-console {
+  height: 180px;
+  overflow-y: auto;
+  background: #090d16;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #94a3b8;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pvt-log-text {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.pvt-log-text.is-heading {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.pvt-log-text.is-success {
+  color: #4ade80;
+}
+
+.pvt-log-text.is-err {
+  color: #f87171;
+}
+
+.pvt-empty-console {
+  color: #475569;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* Video Preview Container */
+.pvt-preview-video-container {
+  width: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pvt-preview-video-tag {
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+}
+
+.pvt-empty-preview-tag {
+  font-size: 11px;
+  color: #64748b;
+  padding: 20px;
+  text-align: center;
+}
+
+/* Output Files List */
+.pvt-output-files-box {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 9px;
-  background: rgba(14, 165, 233, 0.05);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: 8px;
-  box-sizing: border-box;
 }
 
-.dubber-result-header {
+.pvt-file-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 6px 10px;
+  background: #0f172a;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.dubber-result-title {
-  font-size: 11px;
-  font-weight: 650;
-  color: #38bdf8;
+.pvt-f-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
 }
 
-.dubber-char-count {
-  font-size: 10px;
+.pvt-f-name {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.pvt-f-size {
   color: #64748b;
+  font-size: 10.5px;
 }
 
-.dubber-icon-btn {
+.pvt-f-dl {
   display: grid;
   place-items: center;
   width: 22px;
   height: 22px;
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #cbd5e1;
+  border-radius: 4px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #818cf8;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pvt-f-dl:hover {
+  background: #6366f1;
+  color: #ffffff;
+}
+
+.pvt-empty-outputs-tag {
+  font-size: 11px;
+  color: #64748b;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* Add to Timeline Button */
+.pvt-add-timeline-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  margin-top: 6px;
+  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.dubber-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+.pvt-add-timeline-btn:hover {
+  background: #22c55e;
+  color: #052e16;
 }
 
-.dubber-textarea.is-result {
-  background: rgba(9, 14, 26, 0.9);
-  border-color: rgba(56, 189, 248, 0.25);
-  min-height: 85px;
-}
-
-.dubber-transcript-box {
+/* ========================================================
+   Channel Settings & Advanced Options Views
+   ======================================================== */
+.pvt-settings-body,
+.pvt-advanced-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 9px;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  gap: 14px;
+  padding: 12px 14px 140px 14px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   box-sizing: border-box;
 }
 
-.dubber-textarea.is-transcript {
-  background: rgba(10, 15, 26, 0.75);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: #cbd5e1;
-  min-height: 65px;
+.pvt-fullscreen-overlay .pvt-settings-body,
+.pvt-fullscreen-overlay .pvt-advanced-body {
+  padding: 24px 36px 100px 36px;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
 }
 
-/* Voice Profile Missing Alert */
-.dubber-no-voice-box {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px;
-  border-radius: 7px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  color: #fca5a5;
-  font-size: 11px;
-}
-
-.dubber-btn-small {
-  background: #0284c7;
-  border: none;
-  color: #fff;
-  padding: 3px 8px;
-  border-radius: 5px;
-  font-size: 10.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.dubber-btn-small:hover {
-  background: #0369a1;
-}
-
-/* Sliders */
-.dubber-slider-card {
+.pvt-tab-banner {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 6px 8px;
-  background: rgba(11, 18, 30, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 7px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px 14px;
 }
 
-.dubber-slider-header {
+.pvt-tab-banner-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pvt-tab-banner-desc {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.pvt-tab-banner-desc code {
+  color: #818cf8;
+  background: rgba(99, 102, 241, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* Save Bar (Sticky or In-Card) */
+.pvt-save-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 10.5px;
-  color: #94a3b8;
-}
-
-.dubber-slider-val {
-  color: #38bdf8;
-  font-weight: 600;
-}
-
-.dubber-slider-card input[type="range"] {
-  width: 100%;
-  accent-color: #38bdf8;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-  cursor: pointer;
-}
-
-/* Voice Generator Button */
-.dubber-btn-generate {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
+  gap: 10px;
   padding: 10px 14px;
-  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
-  color: #ffffff;
-  border: 1px solid rgba(45, 212, 191, 0.3);
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.pvt-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #6366f1;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
   font-size: 12px;
-  font-weight: 650;
-  font-family: inherit;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.16s ease;
-  box-shadow: 0 3px 12px rgba(13, 148, 136, 0.25);
+  transition: all 0.15s ease;
 }
 
-.dubber-btn-generate:hover:not(:disabled) {
-  background: linear-gradient(135deg, #047857 0%, #0f766e 100%);
-  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.38);
+.pvt-save-btn:hover:not(:disabled) {
+  background: #4f46e5;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
 }
 
-.dubber-btn-generate:disabled {
-  opacity: 0.5;
+.pvt-save-btn:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-/* Progress bar */
-.dubber-progress-wrap {
+.pvt-save-feedback {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #4ade80;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 4px;
 }
 
-.dubber-progress-bar {
-  width: 100%;
-  height: 5px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.dubber-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #38bdf8, #0ea5e9);
-  transition: width 0.25s ease;
-}
-
-.dubber-progress-status {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 10.5px;
-  color: #38bdf8;
-}
-
-/* ========================================================
-   Output Audio Card (Step 3)
-   ======================================================== */
-.dubber-output-card {
+/* Category Sections */
+.pvt-category-section {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(15, 23, 42, 0.88));
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  box-sizing: border-box;
 }
 
-.dubber-output-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.dubber-output-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.pvt-category-title {
   font-size: 12px;
   font-weight: 700;
-  color: #f1f5f9;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #cbd5e1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 6px;
+  margin-top: 6px;
 }
 
-.dubber-pulse-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #22c55e;
-  box-shadow: 0 0 8px #22c55e;
-}
-
-.dubber-voice-tag {
-  font-size: 10.5px;
-  color: #94a3b8;
-  padding: 2px 6px;
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.dubber-output-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-}
-
-.dubber-player-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-radius: 7px;
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  background: rgba(2, 132, 199, 0.3);
-  color: #38bdf8;
-  font-size: 11.5px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.16s ease;
-  white-space: nowrap;
-}
-
-.dubber-player-btn:hover {
-  background: rgba(2, 132, 199, 0.5);
-  color: #ffffff;
-}
-
-.dubber-player-btn.is-playing {
-  background: rgba(225, 29, 72, 0.25);
-  border-color: rgba(225, 29, 72, 0.4);
-  color: #fb7185;
-}
-
-.dubber-timeline-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 10px;
-  border-radius: 7px;
-  border: 1px solid rgba(34, 197, 94, 0.35);
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(16, 185, 129, 0.35));
-  color: #86efac;
-  font-size: 11.5px;
-  font-weight: 650;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.16s ease;
-  white-space: nowrap;
-}
-
-.dubber-timeline-btn:hover {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.35), rgba(16, 185, 129, 0.45));
-  color: #ffffff;
-}
-
-.dubber-download-btn {
+/* Cards Grid */
+.pvt-cards-grid {
   display: grid;
-  place-items: center;
-  width: 33px;
-  height: 33px;
-  border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: #cbd5e1;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.16s ease;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
-.dubber-download-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+@media (min-width: 768px) {
+  .pvt-cards-grid.is-multi-col {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
-/* ========================================================
-   Model Selection Header & Clean Status Cards
-   ======================================================== */
-.dubber-field-header-row {
+@media (min-width: 1200px) {
+  .pvt-cards-grid.is-multi-col {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1600px) {
+  .pvt-cards-grid.is-multi-col {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.pvt-channel-card {
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.pvt-channel-card.is-active-service {
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(30, 41, 59, 0.9);
+}
+
+.pvt-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 5px;
+  gap: 8px;
 }
 
-.dubber-field-header-row label {
-  margin: 0 !important;
-}
-
-.dubber-open-settings-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: rgba(56, 189, 248, 0.1);
-  border: 1px solid rgba(56, 189, 248, 0.28);
-  color: #38bdf8;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.16s ease;
-  font-family: inherit;
-}
-
-.dubber-open-settings-pill:hover {
-  background: rgba(56, 189, 248, 0.2);
-  border-color: #38bdf8;
-  color: #ffffff;
-  transform: translateY(-1px);
-}
-
-.dubber-model-status-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  box-sizing: border-box;
-  transition: all 0.2s ease;
-}
-
-.dubber-model-status-card.is-local {
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-}
-
-.dubber-model-status-card.is-cloud {
-  background: rgba(56, 189, 248, 0.08);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-}
-
-.dubber-status-icon {
-  font-size: 20px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.dubber-status-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.dubber-status-title {
+.pvt-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f1f5f9;
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  font-weight: 650;
-  color: #f1f5f9;
 }
 
-.dubber-model-status-card.is-local .dubber-status-title {
-  color: #34d399;
-}
-
-.dubber-status-desc {
-  font-size: 11px;
-  line-height: 1.4;
-  color: #94a3b8;
-}
-
-.dubber-active-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10px;
+.pvt-badge-free {
+  font-size: 9.5px;
   font-weight: 700;
-  color: #22c55e;
-  background: rgba(34, 197, 94, 0.12);
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
   border: 1px solid rgba(34, 197, 94, 0.3);
-  padding: 1px 6px;
-  border-radius: 10px;
-  letter-spacing: 0.3px;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
-.dubber-active-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #22c55e;
-  box-shadow: 0 0 6px #22c55e;
+.pvt-badge-api {
+  font-size: 9.5px;
+  font-weight: 700;
+  background: rgba(234, 179, 8, 0.15);
+  color: #fde047;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
-.dubber-status-gear-btn {
-  display: inline-flex;
-  align-items: center;
+.pvt-field-group {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
-  padding: 5px 9px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
-  color: #cbd5e1;
+}
+
+.pvt-field-label {
   font-size: 11px;
-  font-weight: 600;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.pvt-field-input,
+.pvt-field-select {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  font-size: 11.5px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.pvt-field-input:focus,
+.pvt-field-select:focus {
+  border-color: #6366f1;
+}
+
+.pvt-field-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.pvt-field-checkbox-row input[type="checkbox"] {
+  accent-color: #6366f1;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.pvt-field-checkbox-label {
+  font-size: 11.5px;
+  color: #e2e8f0;
+}
+
+.pvt-field-hint {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 1px;
+}
+
+/* ========================================================
+   Timeline Integration Cards & Drag-and-Drop
+   ======================================================== */
+.pvt-timeline-actions-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.pvt-timeline-buttons-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.pvt-add-video-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: #a5b4fc;
+  font-size: 11.5px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
-  font-family: inherit;
-  flex-shrink: 0;
 }
 
-.dubber-status-gear-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+.pvt-add-video-btn:hover {
+  background: #6366f1;
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.3);
 }
+
+.pvt-add-all-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pvt-add-all-btn:hover {
+  background: #22c55e;
+  color: #052e16;
+}
+
+

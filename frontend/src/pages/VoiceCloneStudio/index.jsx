@@ -324,13 +324,16 @@ export function VoiceCloneStudioPage({
   };
 
   // Local Voice Profiles state
-  const [profiles, setProfiles] = useState(() => (propVoiceProfiles || []).map(sanitizeProfile));
+  const [profiles, setProfiles] = useState(() =>
+    (propVoiceProfiles || []).map(sanitizeProfile)
+  );
   const [selectedProfileId, setSelectedProfileId] = useState(
     propSelectedVoiceProfileId || propVoiceProfiles?.[0]?.id || ""
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [showLibraryMobile, setShowLibraryMobile] = useState(false);
 
-  // Sync with external profiles if provided
+  // Sync with external profiles or indexedDB
   useEffect(() => {
     if (propVoiceProfiles && propVoiceProfiles.length > 0) {
       setProfiles(propVoiceProfiles.map(sanitizeProfile));
@@ -364,7 +367,7 @@ export function VoiceCloneStudioPage({
   // TTS State
   // -------------------------------------------------------------------------
   const [ttsText, setTtsText] = useState(
-    "សួស្តីបងប្អូនទាំងអស់គ្នា! នេះគឺជាការសាកល្បងសំឡេងក្លូនរបស់ខ្ញុំ ដំណើរការយ៉ាងរលូន និងពិរោះរណ្តំ។"
+    "នៅពេលយប់ជ្រៅ ខណៈកូនសិស្សទាំងអស់បានដេកលក់អស់ ព្រះសង្ឃអង្គនោះបានឮសំឡេងចម្លែកមួយ។ ពេលនោះគាត់បានក្រោកឡើង ហើយដើរទៅមើល... ស្រាប់តែឃើញស្រមោលខ្មៅមួយកំពុងឈរនៅមាត់ទ្វារ! សំឡេងដកដង្ហើមធំៗ ធ្វើឲ្យលោកព្រឺសម្បុរខ្ញាកៗ។"
   );
 
   // Default to Khmer Sophea or first matching voice
@@ -1548,12 +1551,16 @@ export function VoiceCloneStudioPage({
         />
       )}
 
-      {/* Top Navbar */}
+      {/* Top Navbar with Integrated Tabs & Fullscreen */}
       <VoiceStudioNavbar
         onBack={onBack}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
         activeProfile={activeProfile}
         isKeyValid={isKeyValid}
         isGeminiValid={isGeminiValid}
+        showLibraryMobile={showLibraryMobile}
+        setShowLibraryMobile={setShowLibraryMobile}
         onOpenKeyModal={() => {
           setActiveKeyTab("elevenlabs");
           setKeyInput(apiKey);
@@ -1572,21 +1579,24 @@ export function VoiceCloneStudioPage({
         }}
       />
 
-      {/* Main Grid Container */}
+      {/* Main Grid Container: Voice Library (Left) + Studio Workspace (Right) */}
       <div className="voice-studio-container">
         {/* Left Sidebar: Saved Voice Profiles (Local Computer) */}
         <VoiceProfilesSidebar
           profiles={profiles}
-          filteredProfiles={filteredProfiles}
           selectedProfileId={selectedProfileId}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          selectProfile={selectProfile}
+          selectProfile={(id) => {
+            selectProfile(id);
+            if (window.innerWidth < 860) {
+              setShowLibraryMobile(false);
+            }
+          }}
           handleExportProfile={handleExportProfile}
           handleDeleteProfile={handleDeleteProfile}
           setActiveTab={setActiveTab}
           handleImportProfileFile={handleImportProfileFile}
           notify={notify}
+          showLibraryMobile={showLibraryMobile}
         />
 
         {/* Right Main Workspaces */}

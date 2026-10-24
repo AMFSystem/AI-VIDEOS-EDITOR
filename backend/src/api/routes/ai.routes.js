@@ -41,7 +41,14 @@ aiRouter.post("/f5tts/tts", aiController.f5ttsTts);
 
 // PyVideoTrans Video Translation, Alignment & Dubber Pipeline
 aiRouter.get("/pyvideotrans/status", aiController.pyvideotransStatus);
+aiRouter.get("/pyvideotrans/config", aiController.pyvideotransGetConfig);
+aiRouter.post("/pyvideotrans/config", aiController.pyvideotransSaveConfig);
+aiRouter.post("/pyvideotrans/process", aiController.pyvideotransProcess);
 aiRouter.post("/pyvideotrans/align-dub", aiController.pyvideotransAlignDub);
+aiRouter.post("/pyvideotrans/separate-bgm", aiController.pyvideotransSeparateBgm);
 aiRouter.post("/pyvideotrans/setup-repo", aiController.pyvideotransSetupRepo);
+aiRouter.post("/edge-tts", aiController.edgeTts);
+aiRouter.post("/translate", aiController.translateText);
+
 
 
