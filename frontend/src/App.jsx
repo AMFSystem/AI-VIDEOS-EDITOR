@@ -17,6 +17,7 @@ import { NanoVsrRestorationDialog } from "./components/NanoVsrRestorationDialog.
 import { SmartDenoiseDialog } from "./components/SmartDenoiseDialog.jsx";
 import { WebMcpReview, WebMcpAiStatus } from "./components/WebMcpReview.jsx";
 import ProjectImportOverlay from "./components/ProjectImportOverlay.jsx";
+import { AIModelsManagerModal } from "./components/AIModelsManagerModal.jsx";
 import { UrlDownloaderPage, VoiceCloneStudioPage } from "./pages/index.js";
 import { downloaderService } from "./services/downloaderService.js";
 import {
@@ -204,6 +205,7 @@ export function App() {
     voiceFilter, voiceTab,
   } = useEditorUiState();
   const [exportError, setExportError] = useState(null);
+  const [showModelsManager, setShowModelsManager] = useState(false);
   const [userAssets, setUserAssets] = useState([]);
   const [timelineMarkers, setTimelineMarkers] = useState([]);
   const timelineMarkerEnd = useMemo(() => timelineMarkers.reduce(
@@ -1677,6 +1679,7 @@ export function App() {
         projectFileInputRef={projectFileInputRef}
         onOpenUrlDownloader={() => setActivePageView("url-downloader")}
         onOpenVoiceStudio={() => setActivePageView("voice-clone-studio")}
+        onOpenModelsManager={() => setShowModelsManager(true)}
       />
 
       <WebMcpReview agent={webMcp} language={activeLanguage} />
@@ -2212,8 +2215,14 @@ export function App() {
           language={activeLanguage}
           notify={notify}
           t={t}
+          onOpenModelsManager={() => setShowModelsManager(true)}
         />
       )}
+      <AIModelsManagerModal
+        isOpen={showModelsManager}
+        onClose={() => setShowModelsManager(false)}
+        notify={notify}
+      />
       <ExportProgressOverlay
         exporting={exporting}
         error={exportError}

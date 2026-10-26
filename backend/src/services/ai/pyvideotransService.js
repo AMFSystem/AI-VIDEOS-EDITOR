@@ -259,4 +259,57 @@ export const pyvideotransService = {
       });
     });
   },
+
+  /**
+   * Check / Setup PyVideoTrans repository status
+   */
+  async setupRepo() {
+    const isReady = fs.existsSync(path.resolve(PYVIDEOTRANS_DIR, "videotrans"));
+    return {
+      success: true,
+      isReady,
+      repoDir: PYVIDEOTRANS_DIR,
+      runnerScript: RUNNER_SCRIPT,
+      message: isReady ? "PyVideoTrans is configured and ready" : "PyVideoTrans repository not found",
+    };
+  },
+
+  /**
+   * Separate BGM / Instrumental track from audio/video buffer
+   */
+  async separateBgm(buffer, filename = "input.mp4") {
+    const tmpInput = path.resolve(BACKEND_DIR, "storage", "temp", `stem_in_${Date.now()}_${filename}`);
+    const tmpOutput = path.resolve(BACKEND_DIR, "storage", "temp", `stem_out_${Date.now()}.wav`);
+
+    fs.writeFileSync(tmpInput, buffer);
+
+    return new Promise((resolve, reject) => {
+      // Use FFmpeg vocal attenuation / center-channel cancellation filter for fast BGM isolation
+      const args = [
+        "-y",
+        "-i", tmpInput,
+        "-af", "pan=stereo|c0=c0-c1|c1=c1-c0",
+        "-c:a", "pcm_s16le",
+        tmpOutput,
+      ];
+
+      const proc = spawn("ffmpeg", args);
+      proc.on("close", (code) => {
+        try { fs.unlinkSync(tmpInput); } catch {}
+        if (code === 0 && fs.existsSync(tmpOutput)) {
+          const outBuffer = fs.readFileSync(tmpOutput);
+          try { fs.unlinkSync(tmpOutput); } catch {}
+          resolve(outBuffer);
+        } else {
+          try { fs.unlinkSync(tmpOutput); } catch {}
+          reject(new Error(`BGM separation failed with exit code ${code}`));
+        }
+      });
+      proc.on("error", (err) => {
+        try { fs.unlinkSync(tmpInput); } catch {}
+        try { fs.unlinkSync(tmpOutput); } catch {}
+        reject(err);
+      });
+    });
+  },
 };

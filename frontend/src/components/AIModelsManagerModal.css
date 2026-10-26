@@ -1,0 +1,569 @@
+/* ==========================================================================
+   AI Models Manager - Right Slide-over Drawer & Clean Lined Layout
+   ========================================================================== */
+
+/* Backdrop overlay */
+.models-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(3, 7, 18, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: flex-end;
+  animation: modelsOverlayFade 0.22s ease-out;
+}
+
+@keyframes modelsOverlayFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Right Slide-over Panel (Drawer) */
+.models-drawer-panel {
+  width: 560px;
+  max-width: 96vw;
+  height: 100vh;
+  background: #0c101c;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -16px 0 45px rgba(0, 0, 0, 0.75);
+  color: #f1f5f9;
+  font-family: inherit;
+  animation: modelsSlideFromRight 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes modelsSlideFromRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* ==========================================================================
+   1. DRAWER HEADER (With Bottom Border Line)
+   ========================================================================== */
+.models-drawer-header {
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 20, 36, 0.95);
+}
+
+.models-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.models-brand-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(147, 51, 234, 0.2));
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #60a5fa;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
+}
+
+.models-brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.models-brand-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.models-brand-title h2 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.models-badge-offline {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 1px 7px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+}
+
+.models-brand-sub {
+  font-size: 12.5px;
+  color: #94a3b8;
+  margin: 2px 0 0;
+  font-weight: 400;
+}
+
+.models-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.models-header-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.models-header-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.models-header-btn.close:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+/* ==========================================================================
+   2. CATEGORY FILTER TABS (With Line Underneath)
+   ========================================================================== */
+.models-drawer-tabs {
+  padding: 10px 22px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 20, 36, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+}
+
+.models-filter-tab {
+  padding: 6px 13px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 12.5px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.models-filter-tab:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.models-filter-tab.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.tab-count {
+  font-size: 10.5px;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+}
+
+/* ==========================================================================
+   4. MODELS LIST (Structured Rows With Clean Lines)
+   ========================================================================== */
+.models-drawer-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 22px;
+}
+
+.models-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* Container for rows */
+.models-rows-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Individual Model Item Row (Clean Card / Box with precise lines) */
+.model-row-item {
+  background: rgba(18, 24, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.18s ease;
+  position: relative;
+}
+
+.model-row-item:hover {
+  background: rgba(23, 31, 54, 0.9);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+/* Ready State */
+.model-row-item.is-ready {
+  border-color: rgba(34, 197, 94, 0.25);
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.04), rgba(18, 24, 42, 0.85));
+}
+
+/* Active Downloading State */
+.model-row-item.is-active-download {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.05), rgba(18, 24, 42, 0.85));
+}
+
+/* Row Top: Category Tag + Name + Status Indicator */
+.model-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.model-row-title-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.model-cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.model-row-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Status Pill */
+.model-status-indicator {
+  display: flex;
+  align-items: center;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.status-pill.ready {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.status-pill.downloading {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.status-pill.uninstalled {
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.status-dot.green {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+}
+
+.status-dot.blue {
+  background: #38bdf8;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+}
+
+.status-dot.gray {
+  background: #64748b;
+}
+
+.pulsing {
+  animation: dotPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes dotPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.3);
+  }
+}
+
+/* Middle: Description */
+.model-row-desc {
+  font-size: 12.5px;
+  color: #94a3b8;
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* Progress bar block */
+.model-row-progress-block {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.model-progress-bar-track {
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.model-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8, #818cf8);
+  border-radius: 3px;
+  transition: width 0.25s ease;
+}
+
+.model-progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #38bdf8;
+}
+
+.model-progress-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.model-progress-pct {
+  font-weight: 700;
+}
+
+/* Bottom Line: Metadata ID + Action Buttons (Clean Divider Line) */
+.model-row-actions-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 10px;
+}
+
+.model-row-meta-id {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+}
+
+.model-badge-tag {
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.model-code-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #64748b;
+}
+
+/* Action Buttons */
+.model-row-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-btn-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.model-btn-download:hover {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.45);
+  transform: translateY(-1px);
+}
+
+.model-btn-downloading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+  cursor: not-allowed;
+}
+
+.model-btn-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.model-btn-delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+/* ==========================================================================
+   5. DRAWER FOOTER (With Top Line Border)
+   ========================================================================== */
+.models-drawer-footer {
+  padding: 12px 22px;
+  background: rgba(10, 14, 25, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.models-drawer-footer p {
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.models-drawer-footer strong {
+  color: #e2e8f0;
+}
+
+/* Utilities */
+.is-spinning {
+  animation: spinCircle 1s linear infinite;
+}
+
+@keyframes spinCircle {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .models-drawer-panel {
+    width: 100vw;
+    max-width: 100vw;
+  }
+  .models-drawer-header {
+    padding: 14px 16px;
+  }
+  .models-filter-pills {
+    padding: 10px 14px;
+    gap: 6px;
+    overflow-x: auto;
+  }
+  .model-card-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .model-card-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

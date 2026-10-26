@@ -27,5 +27,8 @@ export const config = {
   openAiApiKey: process.env.OPENAI_API_KEY || "",
   geminiApiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.VITE_GEMINI_API_KEY || "",
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY || "",
+  modelsDir: process.env.AI_MODELS_DIR
+    ? path.resolve(process.env.AI_MODELS_DIR)
+    : path.resolve(rootDir, "ai_clone/models"),
 };
 

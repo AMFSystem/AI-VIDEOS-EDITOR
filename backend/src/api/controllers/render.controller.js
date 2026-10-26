@@ -1,7 +1,10 @@
 import path from "node:path";
 import { renderEngine } from "../../services/ffmpeg/renderEngine.js";
+import { buildFilterComplex } from "../../services/ffmpeg/filterGraphBuilder.js";
 import { socketManager } from "../../sockets/socketManager.js";
 import { fileManager } from "../../services/storage/fileManager.js";
+import { jobQueue } from "../../jobs/jobQueue.js";
+import { processRenderJob } from "../../jobs/renderWorker.js";
 
 export const renderController = {
   async startRender(req, res) {
@@ -10,21 +13,44 @@ export const renderController = {
     const outputFilename = `export_${jobId}.mp4`;
     const outputPath = fileManager.getFilePath("exports", outputFilename);
 
-    // Simple default render args or build from timeline
-    const args = ["-y", "-f", "lavfi", "-i", "color=c=black:s=1920x1080:d=5", "-c:v", "libx264", outputPath];
+    let args = [];
+    let duration = Number(settings?.duration) || 5;
+
+    // Build FFmpeg arguments from timeline clips if provided
+    if (timeline && Array.isArray(timeline.clips) && timeline.clips.length > 0) {
+      const { inputs, filterComplex } = buildFilterComplex(timeline);
+      args = ["-y", ...inputs];
+      if (filterComplex) {
+        args.push("-filter_complex", filterComplex);
+      }
+      args.push("-c:v", settings?.videoCodec || "libx264", outputPath);
+    } else {
+      // Default fallback test pattern
+      args = ["-y", "-f", "lavfi", "-i", `color=c=black:s=1920x1080:d=${duration}`, "-c:v", "libx264", outputPath];
+    }
 
     res.json({ success: true, jobId, outputFilename });
 
-    renderEngine
-      .renderTimeline(jobId, args, 5, (prog) => {
-        socketManager.broadcast("render:progress", { jobId, ...prog });
-      })
-      .then(() => {
-        socketManager.broadcast("render:complete", { jobId, outputPath });
-      })
-      .catch((err) => {
-        socketManager.broadcast("render:error", { jobId, error: err.message });
-      });
+    // Enqueue job via JobQueue
+    jobQueue.addJob(jobId, () => {
+      return processRenderJob(
+        { jobId, args, duration },
+        (prog) => {
+          socketManager.broadcast("render:progress", { jobId, ...prog });
+        }
+      )
+        .then(() => {
+          socketManager.broadcast("render:complete", { jobId, outputPath, outputFilename });
+        })
+        .catch((err) => {
+          socketManager.broadcast("render:error", { jobId, error: err.message });
+          throw err;
+        });
+    });
+  },
+
+  getQueueStatus(_req, res) {
+    res.json({ success: true, queue: jobQueue.getStatus() });
   },
 
   cancelRender(req, res) {

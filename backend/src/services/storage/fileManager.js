@@ -9,6 +9,7 @@ export class FileManager {
       uploads: path.join(this.baseDir, "uploads"),
       proxies: path.join(this.baseDir, "proxies"),
       ai_cache: path.join(this.baseDir, "ai_cache"),
+      projects: path.join(this.baseDir, "projects"),
       temp: path.join(this.baseDir, "temp"),
       exports: path.join(this.baseDir, "exports"),
     };

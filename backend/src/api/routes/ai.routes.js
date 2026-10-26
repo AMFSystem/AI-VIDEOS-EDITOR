@@ -23,22 +23,6 @@ aiRouter.post("/gemini/tts", aiController.geminiTts);
 aiRouter.post("/gemini/analyze-voice", aiController.geminiAnalyzeVoice);
 aiRouter.post("/gemini/generate-script", aiController.geminiGenerateScript);
 
-// VoxCPM2 OpenBMB 48kHz Neural Diffusion Cloner & TTS
-aiRouter.get("/voxcpm/status", aiController.voxcpmStatus);
-aiRouter.post("/voxcpm/clone", aiController.voxcpmClone);
-aiRouter.post("/voxcpm/tts", aiController.voxcpmTts);
-aiRouter.get("/voxcpm/lora/models", aiController.voxcpmLoraModels);
-aiRouter.post("/voxcpm/lora/load", aiController.voxcpmLoraLoad);
-aiRouter.get("/voxcpm/train/prompts", aiController.voxcpmTrainPrompts);
-aiRouter.post("/voxcpm/train/start", aiController.voxcpmTrainStart);
-aiRouter.get("/voxcpm/train/status", aiController.voxcpmTrainStatus);
-aiRouter.post("/voxcpm/train/stop", aiController.voxcpmTrainStop);
-
-// F5-TTS Flow Matching Diffusion Voice Cloner & TTS
-aiRouter.get("/f5tts/status", aiController.f5ttsStatus);
-aiRouter.post("/f5tts/clone", aiController.f5ttsClone);
-aiRouter.post("/f5tts/tts", aiController.f5ttsTts);
-
 // PyVideoTrans Video Translation, Alignment & Dubber Pipeline
 aiRouter.get("/pyvideotrans/status", aiController.pyvideotransStatus);
 aiRouter.get("/pyvideotrans/config", aiController.pyvideotransGetConfig);
@@ -49,6 +33,18 @@ aiRouter.post("/pyvideotrans/separate-bgm", aiController.pyvideotransSeparateBgm
 aiRouter.post("/pyvideotrans/setup-repo", aiController.pyvideotransSetupRepo);
 aiRouter.post("/edge-tts", aiController.edgeTts);
 aiRouter.post("/translate", aiController.translateText);
+
+// Local AI Model Hub & Manager
+aiRouter.get("/models", aiController.getModelsStatus);
+aiRouter.post("/models/download/:id", aiController.downloadModel);
+aiRouter.get("/models/progress/:id", aiController.streamModelProgress);
+aiRouter.delete("/models/:id", aiController.deleteModel);
+
+// Deep Voice Training Pipeline
+aiRouter.post("/training/prepare", aiController.prepareVoiceTraining);
+aiRouter.post("/training/start", aiController.startVoiceTraining);
+aiRouter.get("/training/status/:id", aiController.getVoiceTrainingStatus);
+aiRouter.get("/training/models", aiController.listTrainedVoiceModels);
 
 
 

@@ -1,12 +1,86 @@
 {
   "name": "ai-video-editor-desktop",
   "version": "1.0.0",
-  "description": "Desktop wrapper for AI Video Editor",
+  "description": "Desktop Application for AI Video Editor",
+  "author": "AI Video Editor Team",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder -mw"
   },
   "devDependencies": {
-    "electron": "^34.2.0"
+    "electron": "34.5.8",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.aivideoeditor.desktop",
+    "productName": "AI Video Editor",
+    "electronVersion": "34.5.8",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      {
+        "from": "../frontend/dist",
+        "to": "dist"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "../backend/src",
+        "to": "backend/src"
+      },
+      {
+        "from": "../backend/package.json",
+        "to": "backend/package.json"
+      },
+      {
+        "from": "../backend/node_modules",
+        "to": "backend/node_modules"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.video",
+      "target": [
+        "dmg",
+        "zip",
+        "dir"
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AI Video Editor"
+    }
   }
 }

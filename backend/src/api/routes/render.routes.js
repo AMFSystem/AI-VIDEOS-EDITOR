@@ -4,6 +4,7 @@ import { validateTimelineMiddleware } from "../middlewares/validateSchema.js";
 
 export const renderRouter = Router();
 
+renderRouter.get("/queue", renderController.getQueueStatus);
 renderRouter.post("/start", validateTimelineMiddleware, renderController.startRender);
 renderRouter.post("/cancel/:jobId", renderController.cancelRender);
 renderRouter.get("/download/:jobId", renderController.downloadRender);

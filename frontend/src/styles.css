@@ -237,6 +237,64 @@ button:disabled {
   gap: 10px;
 }
 
+.topbar-feature-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 7px;
+  font-weight: 550;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.topbar-url-btn {
+  border: 1px solid rgba(48, 240, 219, 0.35);
+  background: rgba(48, 240, 219, 0.08);
+  color: #30f0db;
+}
+
+.topbar-url-btn:hover {
+  background: rgba(48, 240, 219, 0.18);
+  border-color: rgba(48, 240, 219, 0.6);
+  color: #38bdf8;
+}
+
+.topbar-voice-btn {
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  background: rgba(168, 85, 247, 0.1);
+  color: #c084fc;
+}
+
+.topbar-voice-btn:hover {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.65);
+  color: #e9d5ff;
+}
+
+.topbar-models-btn {
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.1);
+  color: #60a5fa;
+}
+
+.topbar-models-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.65);
+  color: #93c5fd;
+}
+
+@media (max-width: 1240px) {
+  .topbar-feature-btn span {
+    display: none;
+  }
+  .topbar-feature-btn {
+    padding: 6px 9px;
+  }
+}
+
 .divider {
   width: 1px;
   height: 19px;

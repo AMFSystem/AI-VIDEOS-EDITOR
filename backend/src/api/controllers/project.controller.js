@@ -6,7 +6,7 @@ export const projectController = {
   async saveProject(req, res) {
     const { id, projectData } = req.body;
     const projectId = id || `project_${Date.now()}`;
-    const filePath = fileManager.getFilePath("temp", `${projectId}.json`);
+    const filePath = fileManager.getFilePath("projects", `${projectId}.json`);
 
     try {
       await fs.writeFile(filePath, JSON.stringify(projectData, null, 2), "utf8");
@@ -18,10 +18,17 @@ export const projectController = {
 
   async loadProject(req, res) {
     const { id } = req.params;
-    const filePath = fileManager.getFilePath("temp", `${id}.json`);
+    let filePath = fileManager.getFilePath("projects", `${id}.json`);
 
     try {
-      const content = await fs.readFile(filePath, "utf8");
+      let content;
+      try {
+        content = await fs.readFile(filePath, "utf8");
+      } catch {
+        // Fallback check in temp directory for legacy saved projects
+        filePath = fileManager.getFilePath("temp", `${id}.json`);
+        content = await fs.readFile(filePath, "utf8");
+      }
       res.json({ success: true, projectData: JSON.parse(content) });
     } catch {
       res.status(404).json({ error: `Project ${id} not found` });
@@ -30,12 +37,26 @@ export const projectController = {
 
   async deleteProject(req, res) {
     const { id } = req.params;
-    const filePath = fileManager.getFilePath("temp", `${id}.json`);
+    const projectPath = fileManager.getFilePath("projects", `${id}.json`);
+    const tempPath = fileManager.getFilePath("temp", `${id}.json`);
     try {
-      await fs.unlink(filePath);
+      try {
+        await fs.unlink(projectPath);
+      } catch {
+        await fs.unlink(tempPath);
+      }
       res.json({ success: true, id });
     } catch {
       res.status(404).json({ error: `Project ${id} not found` });
+    }
+  },
+
+  async listProjects(_req, res) {
+    try {
+      const files = await fileManager.listFiles("projects");
+      res.json({ success: true, projects: files });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
   },
 };

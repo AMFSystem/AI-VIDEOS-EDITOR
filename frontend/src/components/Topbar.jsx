@@ -4,6 +4,7 @@ import {
   ArrowCounterClockwise,
   CaretDown,
   CircleNotch,
+  Cpu,
   Database,
   DownloadSimple,
   FileArrowDown,
@@ -62,6 +63,7 @@ export function Topbar({
   projectFileInputRef,
   onOpenUrlDownloader,
   onOpenVoiceStudio,
+  onOpenModelsManager,
 }) {
   const exportAnchorRef = useRef(null);
   const ratioAnchorRef = useRef(null);
@@ -234,56 +236,40 @@ export function Topbar({
 
       <div className="topbar-actions">
         <button
-          className="ghost-action"
+          className="ghost-action topbar-feature-btn topbar-url-btn"
           type="button"
           title={t("downloadFromUrlHint", "Download video/audio from web URL (YouTube, TikTok, FB, IG, X, Vimeo...)")}
           onClick={(event) => {
             onOpenUrlDownloader?.();
             releasePointerActivatedFocus(event);
           }}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            padding: "5px 11px",
-            borderRadius: "7px",
-            border: "1px solid rgba(48, 240, 219, 0.35)",
-            background: "rgba(48, 240, 219, 0.08)",
-            color: "#30f0db",
-            fontWeight: "550",
-            fontSize: "12px",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
         >
           <DownloadSimple size={15} weight="bold" />
           <span>{t("downloadUrlTool", "URL Download")}</span>
         </button>
         <button
-          className="ghost-action"
+          className="ghost-action topbar-feature-btn topbar-voice-btn"
           type="button"
           title={t("voiceCloneStudioHint", "ស្ទូឌីយោក្លូនសំឡេង និងបម្លែងអត្ថបទទៅជាសំឡេង")}
           onClick={(event) => {
             onOpenVoiceStudio?.();
             releasePointerActivatedFocus(event);
           }}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            padding: "5px 11px",
-            borderRadius: "7px",
-            border: "1px solid rgba(168, 85, 247, 0.4)",
-            background: "rgba(168, 85, 247, 0.1)",
-            color: "#c084fc",
-            fontWeight: "550",
-            fontSize: "12px",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
         >
           <MicrophoneStage size={15} weight="bold" />
           <span>{t("voiceCloneStudio", "ក្លូនសំឡេង AI")}</span>
+        </button>
+        <button
+          className="ghost-action topbar-feature-btn topbar-models-btn"
+          type="button"
+          title={t("aiModelsManagerHint", "ទាញយក និងគ្រប់គ្រង AI Models ក្នុងម៉ាស៊ីន (Offline)")}
+          onClick={(event) => {
+            onOpenModelsManager?.();
+            releasePointerActivatedFocus(event);
+          }}
+        >
+          <Cpu size={15} weight="bold" />
+          <span>{t("aiModels", "AI Models")}</span>
         </button>
         <button className="preview-button" type="button" title={`${t("shortcutPlayPause")} · Space`} onClick={(event) => { handlePlayToggle(); releasePointerActivatedFocus(event); }}>
           {isPlaying ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}
@@ -388,6 +374,36 @@ export function Topbar({
                     ))}
                   </dl>
                 </section>
+                <div style={{ padding: "8px 0", borderTop: "1px solid rgba(255,255,255,0.08)", marginTop: "8px", marginBottom: "8px" }}>
+                  <button
+                    type="button"
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 12px",
+                      background: "rgba(59, 130, 246, 0.12)",
+                      border: "1px solid rgba(59, 130, 246, 0.3)",
+                      borderRadius: "6px",
+                      color: "#93c5fd",
+                      fontSize: "13px",
+                      fontWeight: "500",
+                      cursor: "pointer",
+                      transition: "background 0.15s ease"
+                    }}
+                    onClick={() => {
+                      setShowSettings(false);
+                      onOpenModelsManager?.();
+                    }}
+                  >
+                    <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <Cpu size={16} weight="bold" />
+                      <span>{t("aiModelsManager", "AI Models Manager · គ្រប់គ្រង Model")}</span>
+                    </span>
+                    <span style={{ fontSize: "11px", opacity: 0.7, padding: "2px 6px", background: "rgba(255,255,255,0.1)", borderRadius: "4px" }}>Offline</span>
+                  </button>
+                </div>
                 <div ref={modelCacheControlRef} className="model-cache-control">
                   {modelCacheInspection.state !== "idle" ? (
                     <div className={`model-cache-result is-${modelCacheInspection.state}`} role="status" aria-live="polite">

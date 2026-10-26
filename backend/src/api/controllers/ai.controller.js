@@ -15,9 +15,9 @@ import {
   analyzeGeminiVocalPersona,
 } from "../../services/ai/geminiService.js";
 import { config } from "../../config/index.js";
-import { voxcpmService } from "../../services/ai/voxcpmService.js";
-import { f5ttsService } from "../../services/ai/f5ttsService.js";
 import { pyvideotransService } from "../../services/ai/pyvideotransService.js";
+import { modelManager, modelEvents } from "../../services/ai/modelManager.js";
+import { voiceTrainingManager } from "../../services/ai/voiceTrainingManager.js";
 
 export const aiController = {
   async transcribe(req, res) {
@@ -242,183 +242,6 @@ export const aiController = {
     }
   },
 
-  async voxcpmStatus(_req, res) {
-    try {
-      const status = await voxcpmService.getStatus();
-      res.json(status);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-
-  async voxcpmClone(req, res) {
-    const { name, audioBase64, mimeType = "audio/wav", language = "km" } = req.body;
-    if (!audioBase64) {
-      return res.status(400).json({ error: "ទិន្នន័យសំឡេង (audioBase64) គឺចាំបាច់" });
-    }
-
-    try {
-      const base64Clean = audioBase64.replace(/^data:[^;]+;base64,/, "");
-      const audioBuffer = Buffer.from(base64Clean, "base64");
-      const profile = await voxcpmService.extractProfile({
-        name,
-        audioBuffer,
-        mimeType,
-        language,
-      });
-      res.json({ success: true, profile });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-
-  async voxcpmLoraModels(_req, res) {
-    try {
-      const data = await voxcpmService.getLoraModels();
-      res.json(data);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-
-  async voxcpmLoraLoad(req, res) {
-    const { modelName } = req.body;
-    if (!modelName) {
-      return res.status(400).json({ error: "ឈ្មោះ LoRA modelName គឺចាំបាច់" });
-    }
-    try {
-      const data = await voxcpmService.loadLora(modelName);
-      res.json({ success: true, ...data });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-
-  async voxcpmTrainPrompts(_req, res) {
-    try {
-      const data = await voxcpmService.getTrainingPrompts();
-      res.json(data);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-
-  async voxcpmTrainStart(req, res) {
-    const { modelName, samples, steps = 300, learningRate = 0.0001 } = req.body;
-    if (!modelName || !samples || samples.length === 0) {
-      return res.status(400).json({ error: "modelName និង samples គឺចាំបាច់" });
-    }
-    try {
-      const data = await voxcpmService.startTraining({
-        modelName,
-        samples,
-        steps,
-        learningRate,
-      });
-      res.json(data);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-
-  async voxcpmTrainStatus(_req, res) {
-    try {
-      const data = await voxcpmService.getTrainingStatus();
-      res.json(data);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-
-  async voxcpmTrainStop(_req, res) {
-    try {
-      const data = await voxcpmService.stopTraining();
-      res.json(data);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-
-
-  async voxcpmTts(req, res) {
-    const { text, profile, speed = 1.0, language = "km", loraModel = "" } = req.body;
-    if (!text || !String(text).trim()) {
-      return res.status(400).json({ error: "អត្ថបទត្រូវនិយាយគឺចាំបាច់" });
-    }
-
-    try {
-      const { buffer, mimeType } = await voxcpmService.synthesizeSpeech({
-        text,
-        profile,
-        speed: parseFloat(speed) || 1.0,
-        language,
-        loraModel: loraModel || profile?.loraModel,
-      });
-      res.setHeader("Content-Type", mimeType);
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.send(buffer);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // F5-TTS Flow Matching Diffusion Voice Cloner & TTS
-  // ─────────────────────────────────────────────────────────────────────────────
-  async f5ttsStatus(_req, res) {
-    try {
-      const status = await f5ttsService.checkServerStatus();
-      res.json(status);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-
-  async f5ttsClone(req, res) {
-    const { name, audioBase64, mimeType = "audio/wav", refText = "", language = "km" } = req.body;
-    if (!audioBase64) {
-      return res.status(400).json({ error: "ទិន្នន័យសំឡេង (audioBase64) គឺចាំបាច់" });
-    }
-
-    try {
-      const base64Clean = audioBase64.replace(/^data:[^;]+;base64,/, "");
-      const audioBuffer = Buffer.from(base64Clean, "base64");
-      const profile = await f5ttsService.extractProfile({
-        name,
-        audioBuffer,
-        mimeType,
-        refText,
-        language,
-      });
-      res.json({ success: true, profile });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-
-  async f5ttsTts(req, res) {
-    const { text, profile, speed = 1.0, language = "km", nfeStep = 32, cfgStrength = 2.0 } = req.body;
-    if (!text || !String(text).trim()) {
-      return res.status(400).json({ error: "អត្ថបទត្រូវនិយាយគឺចាំបាច់" });
-    }
-
-    try {
-      const { buffer, mimeType } = await f5ttsService.synthesizeSpeech({
-        text,
-        profile,
-        speed: parseFloat(speed) || 1.0,
-        language,
-        nfeStep: parseInt(nfeStep, 10) || 32,
-        cfgStrength: parseFloat(cfgStrength) || 2.0,
-      });
-      res.setHeader("Content-Type", mimeType);
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.send(buffer);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
-
   // ─────────────────────────────────────────────────────────────────────────────
   // PyVideoTrans Video Translation, Alignment & Dubber Pipeline
   // ─────────────────────────────────────────────────────────────────────────────
@@ -604,12 +427,9 @@ export const aiController = {
       const cleanText = String(text).trim();
       const tmpPath = path.join("/tmp", `edge_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.mp3`);
       const pyProjectDir = path.join(process.cwd(), "backend", "python", "pyvideotrans");
+      const pyVenvBin = path.join(pyProjectDir, ".venv", "bin", "python");
 
-      const child = spawn("uv", [
-        "run",
-        "--project",
-        pyProjectDir,
-        "python",
+      const ttsArgs = [
         "-m",
         "edge_tts",
         "--voice",
@@ -624,7 +444,11 @@ export const aiController = {
         cleanText,
         "--write-media",
         tmpPath,
-      ]);
+      ];
+
+      const child = fs.existsSync(pyVenvBin)
+        ? spawn(pyVenvBin, ttsArgs)
+        : spawn("uv", ["run", "--project", pyProjectDir, "python", ...ttsArgs]);
 
       child.on("close", (code) => {
         if (code === 0 && fs.existsSync(tmpPath)) {
@@ -719,6 +543,112 @@ export const aiController = {
       return res.json({ translatedText: translatedItems.join("\n"), lines: translatedItems });
     } catch (e) {
       res.status(500).json({ error: e.message });
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Local AI Model Manager (Download, Status & Deletion)
+  // ─────────────────────────────────────────────────────────────────────────────
+  async getModelsStatus(_req, res) {
+    try {
+      const data = modelManager.getStatus();
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async downloadModel(req, res) {
+    try {
+      const { id } = req.params;
+      const state = await modelManager.downloadModel(id);
+      res.json({ success: true, state });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async streamModelProgress(req, res) {
+    const { id } = req.params;
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    if (typeof res.flushHeaders === "function") res.flushHeaders();
+
+    // Send current initial state
+    const current = modelManager.getStatus().models.find((m) => m.id === id);
+    if (current) {
+      res.write(`data: ${JSON.stringify(current)}\n\n`);
+    }
+
+    const onProgress = (state) => {
+      res.write(`data: ${JSON.stringify(state)}\n\n`);
+      if (state.status === "ready" || state.status === "error") {
+        res.end();
+      }
+    };
+
+    modelEvents.on(`progress:${id}`, onProgress);
+
+    req.on("close", () => {
+      modelEvents.off(`progress:${id}`, onProgress);
+    });
+  },
+
+  async deleteModel(req, res) {
+    try {
+      const { id } = req.params;
+      const result = modelManager.deleteModel(id);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async prepareVoiceTraining(req, res) {
+    try {
+      const { audioPath, modelName, language } = req.body;
+      if (!audioPath || !modelName) {
+        return res.status(400).json({ error: "audioPath and modelName are required" });
+      }
+      const result = await voiceTrainingManager.prepareDataset({ audioPath, modelName, language });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async startVoiceTraining(req, res) {
+    try {
+      const { datasetId, modelName, epochs, batchSize, learningRate, engine } = req.body;
+      if (!datasetId || !modelName) {
+        return res.status(400).json({ error: "datasetId and modelName are required" });
+      }
+      const job = voiceTrainingManager.startTraining({ datasetId, modelName, epochs, batchSize, learningRate, engine });
+      const { _proc, ...safeJob } = job;
+      res.json(safeJob);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async getVoiceTrainingStatus(req, res) {
+    try {
+      const { id } = req.params;
+      const job = voiceTrainingManager.getJobStatus(id);
+      if (!job) return res.status(404).json({ error: "Training job not found" });
+      res.json(job);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async listTrainedVoiceModels(req, res) {
+    try {
+      const models = voiceTrainingManager.listTrainedModels();
+      res.json(models);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
   },
 };

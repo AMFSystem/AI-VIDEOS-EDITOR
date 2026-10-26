@@ -36,6 +36,10 @@ export default defineConfig({
   server: {
     headers: isolationHeaders,
     proxy: {
+      "/api/v1": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
       "/api": {
         target: "http://127.0.0.1:3001",
         changeOrigin: true,
@@ -52,6 +56,10 @@ export default defineConfig({
   preview: {
     headers: isolationHeaders,
     proxy: {
+      "/api/v1": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
       "/api": {
         target: "http://127.0.0.1:3001",
         changeOrigin: true,

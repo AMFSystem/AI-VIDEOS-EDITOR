@@ -8,11 +8,17 @@ __pycache__/
 # build output
 dist/
 blob-report/
+desktop/release/
 
 # AI model weights are hosted externally and downloaded at runtime.
 public/models/
 backend/storage/
 storage/
+backend/python/output/
+backend/python/tmp/
+backend/ai_clone/tmp/
+backend/ai_clone/data/voices/
+backend/ai_clone/data/clone_jobs/
 
 # local QA captures and generated media
 AGENTS.md
@@ -54,6 +60,12 @@ desktop.ini
 
 # Python training workdir & large model checkpoints
 backend/python/training_workdir/
+backend/ai_clone/models/
+backend/ai_clone/data/
 *.pth
 *.safetensors
+*.bin
+*.onnx
+*.tflite
 *.tfevents.*
+

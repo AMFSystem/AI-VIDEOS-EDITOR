@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { config } from "../../config/index.js";
 import { detectGpuCapabilities } from "../../config/gpuDetector.js";
 import { parseFfmpegProgress } from "../../utils/timeParser.js";
+import { killProcessSafely } from "../../utils/processKiller.js";
 
 export class RenderEngine {
   constructor() {
@@ -38,7 +39,7 @@ export class RenderEngine {
   cancelRender(jobId) {
     const proc = this.activeJobs.get(jobId);
     if (proc) {
-      proc.kill("SIGTERM");
+      killProcessSafely(proc);
       this.activeJobs.delete(jobId);
       return true;
     }
