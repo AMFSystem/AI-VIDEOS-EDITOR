@@ -521,12 +521,75 @@ async function runTranscription(
   };
 }
 
+async function tryLocalAiBackendStt(blob, { preferredLanguage = "auto", timelineOffset = 0, onProgress, signal } = {}) {
+  throwIfAborted(signal);
+  onProgress?.({ progress: 12, phase: "កំពុងភ្ជាប់ទៅកាន់ Local AI STT Service..." });
+  const formData = new FormData();
+  formData.append("file", blob, "timeline_audio.wav");
+  formData.append("language", preferredLanguage || "auto");
+
+  onProgress?.({ progress: 28, phase: `កំពុងដំណើរការ Local AI Whisper (${preferredLanguage || "auto"})...` });
+  const response = await fetch("/api/v1/stt", {
+    method: "POST",
+    body: formData,
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Local AI STT response status: ${response.status}`);
+  }
+
+  const data = await response.json();
+  let rawSegments = Array.isArray(data.segments) ? data.segments : [];
+  if (rawSegments.length === 0 && data.text?.trim()) {
+    const phrases = data.text
+      .split(/(?<=[.!?。！？\n])\s+/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    const dur = data.duration || 5;
+    const piece = dur / Math.max(1, phrases.length);
+    rawSegments = phrases.map((text, idx) => ({
+      start: idx * piece,
+      end: (idx + 1) * piece,
+      text,
+    }));
+  }
+
+  if (rawSegments.length === 0) {
+    throw new Error("Local AI STT returned empty transcription");
+  }
+
+  onProgress?.({ progress: 95, phase: "កំពុងបញ្ចូល Subtitles ទៅក្នុង Timeline..." });
+  const segments = rawSegments.map((s) => ({
+    id: makeId("caption"),
+    start: Number((timelineOffset + (s.start || 0)).toFixed(2)),
+    end: Number((timelineOffset + (s.end || (s.start + 2))).toFixed(2)),
+    text: normalizeAsrText(s.text?.trim() || "", data.detected_language || preferredLanguage),
+  })).filter((s) => s.text);
+
+  return {
+    segments,
+    text: segments.map((s) => s.text).join("\n"),
+    duration: data.duration || 0,
+    language: data.detected_language || preferredLanguage,
+    languageDetected: Boolean(data.detected_language),
+    model: "Local AI Whisper",
+  };
+}
+
 export async function transcribeAudioToCaptionSegments(blob, options = {}) {
   if (transcriptionActive) throw Object.assign(new Error("EDITOR_BUSY"), { code: "EDITOR_BUSY" });
   transcriptionActive = true;
   try {
-    return await runTranscription(blob, options);
+    try {
+      return await tryLocalAiBackendStt(blob, options);
+    } catch (backendError) {
+      console.warn("Local AI backend STT unavailable, using in-browser Whisper fallback:", backendError);
+      options.onProgress?.({ progress: 10, phase: "Local AI មិនទាន់ឆ្លើយតប — ប្តូរទៅកាន់ In-Browser Local Whisper..." });
+      return await runTranscription(blob, options);
+    }
   } finally {
     transcriptionActive = false;
   }
 }
+

@@ -31,9 +31,17 @@ import {
   ArrowRight,
   CircleNotch,
   Minus,
+  ArrowsClockwise,
+  Key,
+  MagicWand,
   ShieldCheck,
-  ArrowsClockwise
 } from "@phosphor-icons/react";
+import {
+  getStoredGeminiKey,
+  setStoredGeminiKey,
+  verifyGeminiKey,
+  directVoiceoverWithGemini,
+} from "../../lib/geminiRuntime.js";
 import "./VoiceCloneStudioPage.css";
 
 // --- Preset Characters (Empty: Default voices removed per user request) ---
@@ -57,6 +65,7 @@ const EMOTIONS = [
 
 const STYLES = [
   { id: "professional", label: "👔 Professional" },
+  { id: "sponsor", label: "📢 ស្ពតពាណិជ្ជកម្ម (Sponsor)" },
   { id: "dramatic", label: "🎭 រឿងភាគ/បុរាណ (Dramatic)" },
   { id: "news", label: "🎙️ ព័ត៌មាន (News)" },
   { id: "cinematic", label: "🎬 ភាពយន្ត (Cinematic)" },
@@ -103,7 +112,7 @@ export function VoiceCloneStudioPage({
   const [showAdvancedModal, setShowAdvancedModal] = useState(false);
   const [ttsSpeed, setTtsSpeed] = useState(1.0);
   const [ttsPitch, setTtsPitch] = useState(1.0);
-  const [ttsModelEngine, setTtsModelEngine] = useState("voxcpm2"); // "voxcpm2" | "f5_tts" | "kokoro" | "mms"
+  const [ttsModelEngine, setTtsModelEngine] = useState("auto"); // "auto" | "voxcpm2" | "omnivoice" | "mms"
   const [cloneModelEngine, setCloneModelEngine] = useState("voxcpm2"); // "voxcpm2" | "omnivoice"
 
   // Text Area Input
@@ -125,6 +134,18 @@ export function VoiceCloneStudioPage({
 
   // History State
   const [historyItems, setHistoryItems] = useState([]);
+
+  // --- AI Auto Director (Gemini + Local Engine) State ---
+  const [geminiApiKey, setGeminiApiKey] = useState(() => getStoredGeminiKey() || "");
+  const [showGeminiKeyModal, setShowGeminiKeyModal] = useState(false);
+  const [tempGeminiKey, setTempGeminiKey] = useState("");
+  const [isVerifyingKey, setIsVerifyingKey] = useState(false);
+  const [keyVerifyStatus, setKeyVerifyStatus] = useState(null);
+  const [isDirecting, setIsDirecting] = useState(false);
+  const [directorNotes, setDirectorNotes] = useState(null);
+  const [detectedScriptType, setDetectedScriptType] = useState(null);
+  const [originalScriptBeforeDirect, setOriginalScriptBeforeDirect] = useState(null);
+  const [autoDirectOnGenerate, setAutoDirectOnGenerate] = useState(true);
 
   // Audio Preview State for Cards
   const [previewPlayingId, setPreviewPlayingId] = useState(null);
@@ -367,6 +388,29 @@ export function VoiceCloneStudioPage({
     return allVoices.find((v) => v.id === selectedVoiceId) || allVoices[0] || null;
   }, [allVoices, selectedVoiceId]);
 
+  // Detect if activeVoice is a custom cloned voice, trained neural model, or has audio references
+  const isCustomVoice = useMemo(() => {
+    if (!activeVoice) return false;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(activeVoice.id));
+    const isTrained = String(activeVoice.id).startsWith("trained_");
+    const isSavedBackendVoice = isUuid || isTrained || (Array.isArray(apiVoices) && apiVoices.some((v) => v.id === activeVoice.id));
+    return Boolean(
+      activeVoice.category === "custom" ||
+      isSavedBackendVoice ||
+      activeVoice.audioBlob ||
+      activeVoice.audioUrl ||
+      activeVoice.isTrainedModel
+    );
+  }, [activeVoice, apiVoices]);
+
+  // Dynamically resolved synthesis engine for Auto-Detect mode
+  const activeResolvedEngine = useMemo(() => {
+    if (ttsModelEngine === "auto") {
+      return isCustomVoice ? "voxcpm2" : "mms";
+    }
+    return ttsModelEngine;
+  }, [ttsModelEngine, isCustomVoice]);
+
   // Keep selectedVoiceId in sync when voices change
   useEffect(() => {
     if (allVoices.length > 0) {
@@ -513,13 +557,60 @@ export function VoiceCloneStudioPage({
     });
   };
 
-  // Generate Voice Handler (Full Integration with Clone and TTS backend)
+  // Handle Style Selection with Smart Presets for Local AI Engine
+  const handleStyleChange = (newStyle) => {
+    setSelectedStyle(newStyle);
+    if (newStyle === "sponsor") {
+      setTtsSpeed(1.10);
+      setTtsPitch(1.05);
+      if (selectedEmotion === "none") {
+        setSelectedEmotion("happy");
+      }
+    } else if (newStyle === "dramatic") {
+      setTtsSpeed(0.95);
+      setTtsPitch(0.95);
+    } else if (newStyle === "news") {
+      setTtsSpeed(1.05);
+      setTtsPitch(1.00);
+    } else if (newStyle === "cinematic") {
+      setTtsSpeed(0.90);
+      setTtsPitch(0.95);
+    } else if (newStyle === "casual") {
+      setTtsSpeed(1.00);
+      setTtsPitch(1.00);
+    } else if (newStyle === "professional") {
+      setTtsSpeed(1.00);
+      setTtsPitch(1.00);
+    }
+  };
+
+  // Handle Emotion Selection with Acoustic Inflection Presets
+  const handleEmotionChange = (newEmotion) => {
+    setSelectedEmotion(newEmotion);
+    if (newEmotion === "happy") {
+      setTtsPitch(1.05);
+    } else if (newEmotion === "sad") {
+      setTtsSpeed(0.90);
+      setTtsPitch(0.95);
+    } else if (newEmotion === "angry") {
+      setTtsSpeed(1.05);
+      setTtsPitch(1.05);
+    } else if (newEmotion === "whisper") {
+      setTtsSpeed(0.90);
+      setTtsPitch(0.95);
+    }
+  };
+
+  // Generate Voice Handler (Full Integration with Auto-Detect Clone/TTS + Gemini Auto-Director)
   const handleGenerateVoice = async () => {
     if (!ttsText.trim()) {
       notify("សូមបញ្ចូលអត្ថបទជាមុនសិន!", "warning");
       return;
     }
-    if (!activeVoice && ttsModelEngine !== "mms") {
+
+    const resolvedEngine = activeResolvedEngine;
+
+    if (!activeVoice && resolvedEngine !== "mms") {
       notify("សូមជ្រើសរើស ឬបង្កើតសំឡេង (Add Voice) ជាមុនសិន!", "warning");
       return;
     }
@@ -532,14 +623,18 @@ export function VoiceCloneStudioPage({
     const abortCtrl = new AbortController();
     abortControllerRef.current = abortCtrl;
 
-    const engineName = ttsModelEngine === "voxcpm2"
+    const baseEngineName = resolvedEngine === "voxcpm2"
       ? "✨ VoxCPM2 (OpenBMB 48kHz Studio)"
-      : ttsModelEngine === "omnivoice"
+      : resolvedEngine === "omnivoice"
       ? "⚡ OmniVoice (F5-TTS Neural)"
       : "🎙️ Meta MMS-TTS Khmer Offline";
 
+    const displayEngineLabel = ttsModelEngine === "auto"
+      ? `⚡ Auto-Detect (${resolvedEngine === "voxcpm2" ? "VoxCPM2 48kHz" : "Meta MMS-TTS"})`
+      : baseEngineName;
+
     setGenerationStage("Connecting Neural Engine...");
-    setGenerationStatusText(`កំពុងរៀបចំការផលិតសំឡេងជាមួយ ${engineName}...`);
+    setGenerationStatusText(`កំពុងរៀបចំការផលិតសំឡេងជាមួយ ${displayEngineLabel}...`);
 
     const startTime = Date.now();
     const timerInterval = setInterval(() => {
@@ -555,9 +650,9 @@ export function VoiceCloneStudioPage({
         setGenerationStage("Extracting Speaker Acoustic Features & Phonemes...");
       } else if (progressSim < 55) {
         setGenerationStage(
-          ttsModelEngine === "voxcpm2"
+          resolvedEngine === "voxcpm2"
             ? "Continuous 48kHz Flow-Matching Diffusion..."
-            : ttsModelEngine === "omnivoice"
+            : resolvedEngine === "omnivoice"
             ? "F5-TTS Neural Audio Synthesis..."
             : "Synthesizing Khmer Speech Phonemes..."
         );
@@ -569,9 +664,77 @@ export function VoiceCloneStudioPage({
     }, 600);
 
     try {
+      let scriptToSynthesize = ttsText.trim();
+
+      // Step A: Integrated 1-Click AI Auto-Director (Gemini + Local AI)
+      if (autoDirectOnGenerate && geminiApiKey && scriptToSynthesize) {
+        setGenerationStage("🎬 Gemini AI Director: កំពុងវិភាគ និងកែលម្អចង្វាក់ដកដង្ហើម...");
+        setGenerationStatusText("Gemini AI Director កំពុងកែលម្អអត្ថបទ និងលៃលកអារម្មណ៍...");
+        try {
+          const directorResult = await directVoiceoverWithGemini({
+            apiKey: geminiApiKey,
+            text: scriptToSynthesize,
+            targetLanguage: selectedLang,
+            voiceName: activeVoice?.name || "Khmer AI Voice",
+            currentStyle: selectedStyle,
+            currentEmotion: selectedEmotion,
+            currentSpeed: ttsSpeed,
+            currentPitch: ttsPitch,
+            engine: resolvedEngine,
+          });
+
+          if (directorResult) {
+            if (directorResult.directedText && directorResult.directedText.trim()) {
+              if (!originalScriptBeforeDirect) {
+                setOriginalScriptBeforeDirect(scriptToSynthesize);
+              }
+              scriptToSynthesize = directorResult.directedText.trim();
+              setTtsText(scriptToSynthesize);
+            }
+            if (directorResult.suggestedStyle || directorResult.selectedStyle) {
+              const rawSt = String(directorResult.suggestedStyle || directorResult.selectedStyle).toLowerCase();
+              const matchedSt = STYLES.find(
+                (s) =>
+                  s.id === rawSt ||
+                  rawSt.includes(s.id) ||
+                  ((rawSt.includes("sponsor") || rawSt.includes("commercial") || rawSt.includes("ad") || rawSt.includes("ស្ពត") || rawSt.includes("ពាណិជ្ជកម្ម")) && s.id === "sponsor") ||
+                  (rawSt.includes("horror") && s.id === "dramatic")
+              );
+              if (matchedSt) setSelectedStyle(matchedSt.id);
+            }
+            if (directorResult.suggestedEmotion || directorResult.selectedEmotion) {
+              const rawEm = String(directorResult.suggestedEmotion || directorResult.selectedEmotion).toLowerCase();
+              const matchedEm = EMOTIONS.find(
+                (e) => e.id === rawEm || rawEm.includes(e.id) || (rawEm.includes("whisper") && e.id === "whisper")
+              );
+              if (matchedEm) setSelectedEmotion(matchedEm.id);
+            }
+            const recSpeed = Number(directorResult.suggestedSpeed ?? directorResult.speed);
+            if (!isNaN(recSpeed) && recSpeed > 0) setTtsSpeed(Math.max(0.7, Math.min(1.4, recSpeed)));
+            const recPitch = Number(directorResult.suggestedPitch ?? directorResult.pitch);
+            if (!isNaN(recPitch) && recPitch > 0) setTtsPitch(Math.max(0.8, Math.min(1.2, recPitch)));
+            if (directorResult.directorNotes || directorResult.notes) {
+              setDirectorNotes(directorResult.directorNotes || directorResult.notes);
+            }
+            if (directorResult.textType || directorResult.detectedType) {
+              setDetectedScriptType(directorResult.textType || directorResult.detectedType);
+            }
+          }
+        } catch (dirErr) {
+          console.warn("Auto-Director pre-step warning:", dirErr);
+        }
+      }
+
+      // Sanitize pause tags into authentic Khmer sentence marks so Local AI doesn't spell out "pause"
+      const cleanScriptForLocalEngine = scriptToSynthesize
+        .replace(/\[pause\s*[\d.]+s?\]/gi, "។ ")
+        .replace(/\s*([,។!?])\s*/g, "$1 ")
+        .replace(/\s+/g, " ")
+        .trim();
+
       let blob = null;
 
-      if (ttsModelEngine === "mms") {
+      if (resolvedEngine === "mms") {
         // --- 1. STRICT EXECUTION: META MMS-TTS (Khmer Offline) ---
         setGenerationStatusText("AI Meta MMS-TTS (Khmer Offline 16kHz) កំពុងសំយោគសំឡេង...");
         
@@ -585,7 +748,7 @@ export function VoiceCloneStudioPage({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              text: ttsText.trim(),
+              text: cleanScriptForLocalEngine,
               lang: selectedLang === "auto" ? "km" : selectedLang,
               speed: Math.max(0.5, Math.min(2.0, ttsSpeed))
             }),
@@ -609,14 +772,14 @@ export function VoiceCloneStudioPage({
         const isTrained = String(activeVoice?.id).startsWith("trained_");
         const isSavedBackendVoice = isUuid || isTrained || apiVoices.some((v) => v.id === activeVoice?.id);
 
-        setGenerationStatusText(`កំពុងបញ្ជូនសំណើទៅកាន់ ${engineName}...`);
+        setGenerationStatusText(`កំពុងបញ្ជូនសំណើទៅកាន់ ${displayEngineLabel}...`);
 
         const formData = new FormData();
-        formData.append("text", ttsText.trim());
+        formData.append("text", cleanScriptForLocalEngine);
         formData.append("consent", "true");
         formData.append("lang", selectedLang);
         formData.append("speed", String(Math.max(0.5, Math.min(2.0, ttsSpeed))));
-        formData.append("model", ttsModelEngine || "voxcpm2"); // Strictly chosen model
+        formData.append("model", resolvedEngine || "voxcpm2"); // Auto-detected or strictly chosen model
 
         if (isSavedBackendVoice) {
           formData.append("voice_id", activeVoice.id);
@@ -647,11 +810,11 @@ export function VoiceCloneStudioPage({
 
         if (!cloneRes.ok) {
           const errData = await cloneRes.json().catch(() => ({}));
-          throw new Error(errData.detail || `បរាជ័យក្នុងការចាប់ផ្ដើម ${engineName} (HTTP ${cloneRes.status})`);
+          throw new Error(errData.detail || `បរាជ័យក្នុងការចាប់ផ្ដើម ${displayEngineLabel} (HTTP ${cloneRes.status})`);
         }
 
         let job = await cloneRes.json();
-        setGenerationStatusText(`ស្ថានភាព ${engineName}: ${job.status}...`);
+        setGenerationStatusText(`ស្ថានភាព ${displayEngineLabel}: ${job.status}...`);
 
         let attempts = 0;
         const maxAttempts = 360;
@@ -659,7 +822,7 @@ export function VoiceCloneStudioPage({
           await new Promise((r) => setTimeout(r, 1000));
           if (abortCtrl.signal.aborted) throw new Error("ការផលិតសំឡេងត្រូវបានបោះបង់");
           attempts++;
-          if (attempts > maxAttempts) throw new Error(`${engineName} ប្រើពេលយូរហួសកំណត់`);
+          if (attempts > maxAttempts) throw new Error(`${displayEngineLabel} ប្រើពេលយូរហួសកំណត់`);
 
           const pollRes = await fetch(`/api/v1/clone/jobs/${job.job_id}`, {
             headers: { Authorization: `Bearer ${BONDETH_AUTH_TOKEN}` },
@@ -675,23 +838,23 @@ export function VoiceCloneStudioPage({
             }
             setGenerationStatusText(
               job.status === "running"
-                ? `${engineName}: ${job.stage || "កំពុងសំយោគសំឡេង..."}`
+                ? `${displayEngineLabel}: ${job.stage || "កំពុងសំយោគសំឡេង..."}`
                 : `ស្ថិតក្នុងជួររង់ចាំ (Queue #${job.queue_position || 1})...`
             );
           }
         }
 
         if (job.status === "failed") {
-          throw new Error(job.error || `${engineName} បានបរាជ័យក្នុងការសំយោគសំឡេង`);
+          throw new Error(job.error || `${displayEngineLabel} បានបរាជ័យក្នុងការសំយោគសំឡេង`);
         }
 
         setGenerationStage("Finalizing Waveform Output...");
-        setGenerationStatusText(`កំពុងទាញយកសំឡេងដែលបានផលិតដោយ ${engineName}...`);
+        setGenerationStatusText(`កំពុងទាញយកសំឡេងដែលបានផលិតដោយ ${displayEngineLabel}...`);
         const audioRes = await fetch(`/api/v1/clone/jobs/${job.job_id}/audio`, {
           headers: { Authorization: `Bearer ${BONDETH_AUTH_TOKEN}` },
           signal: abortCtrl.signal,
         });
-        if (!audioRes.ok) throw new Error(`មិនអាចទាញយកសំឡេងដែលបានផលិតពី ${engineName} បានទេ`);
+        if (!audioRes.ok) throw new Error(`មិនអាចទាញយកសំឡេងដែលបានផលិតពី ${displayEngineLabel} បានទេ`);
         blob = await audioRes.blob();
       }
 
@@ -714,9 +877,9 @@ export function VoiceCloneStudioPage({
       setHistoryItems((prev) => [
         {
           id: `hist_${Date.now()}`,
-          voiceName: activeVoice?.name || "AI Voice",
+          voiceName: activeVoice?.name || (resolvedEngine === "mms" ? "Meta MMS Khmer" : "AI Cloned Voice"),
           avatar: activeVoice?.avatar || "/assets/voice-avatars/characters/officer.png",
-          text: ttsText.trim(),
+          text: scriptToSynthesize,
           url: audioUrl,
           blob: blob,
           timestamp: new Date().toLocaleTimeString(),
@@ -725,7 +888,7 @@ export function VoiceCloneStudioPage({
         ...prev
       ]);
 
-      notify(`បានផលិតសំឡេងដោយជោគជ័យ 100% ជាមួយ ${engineName}!`, "success");
+      notify(`បានផលិតសំឡេងដោយជោគជ័យ 100% ជាមួយ ${displayEngineLabel}!`, "success");
     } catch (err) {
       notify("បញ្ហាផលិតសំឡេង: " + err.message, "error");
     } finally {
@@ -1210,6 +1373,116 @@ export function VoiceCloneStudioPage({
     notify("AI បានជួយកែសម្រួលអត្ថបទឱ្យកាន់តែមានអត្ថន័យ!", "info");
   };
 
+  // --- AI Auto Director Handlers (Gemini + Local Engine) ---
+  const handleOpenGeminiKeyModal = () => {
+    setTempGeminiKey(geminiApiKey || getStoredGeminiKey() || "");
+    setKeyVerifyStatus(null);
+    setShowGeminiKeyModal(true);
+  };
+
+  const handleSaveGeminiKey = async () => {
+    setIsVerifyingKey(true);
+    setKeyVerifyStatus(null);
+    try {
+      const res = await verifyGeminiKey(tempGeminiKey);
+      if (res.valid) {
+        setStoredGeminiKey(tempGeminiKey);
+        setGeminiApiKey(tempGeminiKey);
+        setKeyVerifyStatus({ valid: true, msg: "Google Gemini API Key ត្រឹមត្រូវ!" });
+        notify("បានរក្សាទុក Google Gemini API Key ដោយជោគជ័យ!", "success");
+        setTimeout(() => setShowGeminiKeyModal(false), 700);
+      } else {
+        setKeyVerifyStatus({ valid: false, msg: res.error || "API Key មិនត្រឹមត្រូវ" });
+        notify(res.error || "API Key មិនត្រឹមត្រូវ", "error");
+      }
+    } catch (err) {
+      setKeyVerifyStatus({ valid: false, msg: err.message });
+      notify("បរាជ័យក្នុងការផ្ទៀងផ្ទាត់: " + err.message, "error");
+    } finally {
+      setIsVerifyingKey(false);
+    }
+  };
+
+  const handleAutoDirectScript = async () => {
+    if (!ttsText.trim()) {
+      notify("សូមសរសេរ ឬបិទភ្ជាប់អត្ថបទមុននឹងឱ្យ AI Director វិភាគ!", "warning");
+      return;
+    }
+
+    const currentKey = (geminiApiKey || getStoredGeminiKey() || "").trim();
+    if (!currentKey) {
+      handleOpenGeminiKeyModal();
+      notify("សូមភ្ជាប់ Google Gemini API Key ដើម្បីប្រើ AI Auto Director!", "info");
+      return;
+    }
+
+    setIsDirecting(true);
+    try {
+      setOriginalScriptBeforeDirect(ttsText);
+      const direction = await directVoiceoverWithGemini({
+        apiKey: currentKey,
+        text: ttsText,
+        currentStyle: selectedStyle,
+        currentEmotion: selectedEmotion,
+        currentSpeed: ttsSpeed,
+        currentPitch: ttsPitch,
+        engine: activeResolvedEngine,
+      });
+
+      if (direction) {
+        console.log("AI Auto Director result:", direction);
+        if (direction.directedText) {
+          setTtsText(direction.directedText);
+        }
+        if (direction.textType) {
+          setDetectedScriptType(direction.textType);
+        }
+        if (direction.suggestedStyle) {
+          const rawStyle = String(direction.suggestedStyle).toLowerCase();
+          const matchedStyle = STYLES.find(
+            (s) =>
+              s.id === rawStyle ||
+              rawStyle.includes(s.id) ||
+              ((rawStyle.includes("sponsor") || rawStyle.includes("commercial") || rawStyle.includes("ad") || rawStyle.includes("ស្ពត") || rawStyle.includes("ពាណិជ្ជកម្ម")) && s.id === "sponsor") ||
+              (rawStyle.includes("horror") && s.id === "dramatic")
+          );
+          if (matchedStyle) setSelectedStyle(matchedStyle.id);
+        }
+        if (direction.suggestedEmotion) {
+          const rawEmo = String(direction.suggestedEmotion).toLowerCase();
+          const matchedEmo = EMOTIONS.find(
+            (e) => e.id === rawEmo || rawEmo.includes(e.id) || (rawEmo.includes("whisper") && e.id === "whisper")
+          );
+          if (matchedEmo) setSelectedEmotion(matchedEmo.id);
+        }
+        if (direction.suggestedSpeed) {
+          setTtsSpeed(Math.max(0.7, Math.min(1.4, Number(direction.suggestedSpeed))));
+        }
+        if (direction.suggestedPitch) {
+          setTtsPitch(Math.max(0.8, Math.min(1.2, Number(direction.suggestedPitch))));
+        }
+        if (direction.directorNotes) {
+          setDirectorNotes(direction.directorNotes);
+        }
+        notify("🎬 AI Auto Director បានកែលម្អចង្វាក់ដកដង្ហើម និងប៉ារ៉ាម៉ែត្រដោយជោគជ័យ!", "success");
+      }
+    } catch (err) {
+      console.error("Directing error:", err);
+      notify("AI Director បរាជ័យ: " + err.message, "error");
+    } finally {
+      setIsDirecting(false);
+    }
+  };
+
+  const handleRevertScript = () => {
+    if (originalScriptBeforeDirect) {
+      setTtsText(originalScriptBeforeDirect);
+      setOriginalScriptBeforeDirect(null);
+      setDirectorNotes(null);
+      notify("បានស្ដារអត្ថបទដើមឡើងវិញ", "info");
+    }
+  };
+
   // Download Audio
   const handleDownload = (urlToDownload, fileNamePrefix = "AI_Voice") => {
     const targetUrl = urlToDownload || generatedAudioUrl;
@@ -1679,6 +1952,7 @@ export function VoiceCloneStudioPage({
                   value={ttsModelEngine}
                   onChange={(e) => setTtsModelEngine(e.target.value)}
                 >
+                  <option value="auto">⚡ Auto-Detect (Voice Clone & TTS Smart)</option>
                   <option value="voxcpm2">✨ VoxCPM2 (OpenBMB 48kHz)</option>
                   <option value="omnivoice">⚡ OmniVoice (F5-TTS Neural)</option>
                   <option value="mms">🎙️ Meta MMS-TTS (Khmer Offline)</option>
@@ -1705,7 +1979,7 @@ export function VoiceCloneStudioPage({
                 <select
                   className="vs-select"
                   value={selectedEmotion}
-                  onChange={(e) => setSelectedEmotion(e.target.value)}
+                  onChange={(e) => handleEmotionChange(e.target.value)}
                 >
                   {EMOTIONS.map((em) => (
                     <option key={em.id} value={em.id}>{em.label}</option>
@@ -1719,7 +1993,7 @@ export function VoiceCloneStudioPage({
                 <select
                   className="vs-select"
                   value={selectedStyle}
-                  onChange={(e) => setSelectedStyle(e.target.value)}
+                  onChange={(e) => handleStyleChange(e.target.value)}
                 >
                   {STYLES.map((st) => (
                     <option key={st.id} value={st.id}>{st.label}</option>
@@ -1803,32 +2077,24 @@ export function VoiceCloneStudioPage({
               </div>
             </div>
 
-            {/* Action Bar (Prompt Helper, Pause, Sample, Generate Button) */}
+            {/* Action Bar (Auto-Director Toggle + Generate Button) */}
             <div className="vs-action-bar">
-              <div className="vs-prompt-helpers">
+              <div className="vs-action-bar-left">
                 <button
                   type="button"
-                  className="vs-helper-btn"
-                  onClick={handleAiPromptHelper}
+                  className={`vs-auto-direct-toggle-pill ${autoDirectOnGenerate ? "active" : ""}`}
+                  onClick={() => setAutoDirectOnGenerate((prev) => !prev)}
+                  title={
+                    autoDirectOnGenerate
+                      ? "AI Auto-Director: បើក (Gemini នឹងជួយកែសម្រួលចង្វាក់ដកដង្ហើម និងអារម្មណ៍ស្វ័យប្រវត្តិតាមអត្ថបទពេល Generate)"
+                      : "AI Auto-Director: បិទ (សំយោគដោយផ្ទាល់ជាមួយ Local AI)"
+                  }
                 >
-                  <Sparkle size={14} weight="fill" color="#a855f7" />
-                  <span>AI Prompt Helper</span>
-                </button>
-                <button
-                  type="button"
-                  className="vs-helper-btn"
-                  onClick={handleInsertPause}
-                >
-                  <Pause size={14} weight="bold" />
-                  <span>Insert Pause</span>
-                </button>
-                <button
-                  type="button"
-                  className="vs-helper-btn"
-                  onClick={handleCycleSampleText}
-                >
-                  <Plus size={14} weight="bold" />
-                  <span>Sample Text</span>
+                  <Sparkle size={15} weight="fill" color={autoDirectOnGenerate ? "#c084fc" : "#94a3b8"} />
+                  <span className="vs-toggle-label">
+                    Auto-Director & Smart Clone: <strong>{autoDirectOnGenerate ? "ON" : "OFF"}</strong>
+                  </span>
+                  <span className={`vs-toggle-dot ${autoDirectOnGenerate ? "active" : ""}`} />
                 </button>
               </div>
 
@@ -1895,7 +2161,7 @@ export function VoiceCloneStudioPage({
                   </div>
 
                   {/* 3D Dynamic Glowing Orb */}
-                  <div className={`vs-3d-progress-orb vs-orb-${ttsModelEngine || "voxcpm2"}`}>
+                  <div className={`vs-3d-progress-orb vs-orb-${activeResolvedEngine || "voxcpm2"}`}>
                     <div className="vs-3d-progress-orb-glow" />
                     <div className="vs-3d-progress-orb-inner-ring" />
                     <div className="vs-3d-orb-content">
@@ -1938,10 +2204,12 @@ export function VoiceCloneStudioPage({
                   <div className="vs-3d-metrics-pills">
                     <div className="vs-3d-metric-badge">
                       <span>ម៉ូដែល AI:</span>
-                      <strong style={{ color: ttsModelEngine === "voxcpm2" ? "#38bdf8" : ttsModelEngine === "omnivoice" ? "#f59e0b" : "#a855f7" }}>
-                        {ttsModelEngine === "voxcpm2"
+                      <strong style={{ color: activeResolvedEngine === "voxcpm2" ? "#38bdf8" : activeResolvedEngine === "omnivoice" ? "#f59e0b" : "#a855f7" }}>
+                        {ttsModelEngine === "auto"
+                          ? `⚡ Auto (${activeResolvedEngine === "voxcpm2" ? "VoxCPM2 48kHz" : "Meta MMS-TTS"})`
+                          : activeResolvedEngine === "voxcpm2"
                           ? "✨ VoxCPM2 48kHz Studio"
-                          : ttsModelEngine === "omnivoice"
+                          : activeResolvedEngine === "omnivoice"
                           ? "⚡ OmniVoice F5-TTS"
                           : "🎙️ Meta MMS-TTS Khmer"}
                       </strong>
@@ -1956,24 +2224,82 @@ export function VoiceCloneStudioPage({
               document.body
             )}
 
-            {/* AI Director Section */}
+            {/* AI Director Section (Gemini Auto-Director + Local Engine) */}
             <div className="vs-director-section">
               <div className="vs-section-header-row">
                 <div className="vs-section-title">
                   <Brain size={18} weight="fill" color="#c084fc" />
                   <span>AI Director Overview</span>
+                  {geminiApiKey ? (
+                    <span className="vs-director-gemini-badge active" title="Gemini Cloud AI Active">
+                      <Sparkle size={11} weight="fill" color="#a855f7" />
+                      Gemini Auto-Director
+                    </span>
+                  ) : (
+                    <span className="vs-director-gemini-badge inactive" title="ភ្ជាប់ Gemini Key ដើម្បីដំណើរការ Smart Directing">
+                      Gemini (No Key)
+                    </span>
+                  )}
                 </div>
-                <div className="vs-status-pill">
-                  <div className="vs-status-dot"></div>
-                  <span>Ready</span>
+
+                <div className="vs-director-header-actions">
+                  <button
+                    type="button"
+                    className="vs-director-key-btn"
+                    onClick={handleOpenGeminiKeyModal}
+                    title="កំណត់ Google Gemini API Key"
+                  >
+                    <Key size={13} weight="bold" />
+                    <span>{geminiApiKey ? "Gemini Key ✓" : "Connect Key"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="vs-director-action-btn"
+                    onClick={handleAutoDirectScript}
+                    disabled={isDirecting || !ttsText.trim()}
+                    title="ឱ្យ Gemini វិភាគ និងសម្រួលចង្វាក់ដកដង្ហើមខ្មែរសម្រាប់ Local AI"
+                  >
+                    {isDirecting ? (
+                      <>
+                        <CircleNotch size={14} className="vs-spin" />
+                        <span>Directing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <MagicWand size={14} weight="fill" />
+                        <span>Auto-Direct Script</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
+
+              {/* Director Advice Banner if present */}
+              {directorNotes && (
+                <div className="vs-director-notes-banner">
+                  <div className="vs-director-notes-body">
+                    <Sparkle size={15} weight="fill" color="#c084fc" />
+                    <span><strong>AI Director Advice:</strong> {directorNotes}</span>
+                  </div>
+                  {originalScriptBeforeDirect && (
+                    <button
+                      type="button"
+                      className="vs-director-revert-pill"
+                      onClick={handleRevertScript}
+                      title="ស្ដារអត្ថបទដើមវិញ"
+                    >
+                      ↩ Revert Original
+                    </button>
+                  )}
+                </div>
+              )}
 
               <div className="vs-director-grid">
                 <div className="vs-director-card">
                   <span className="vs-director-label">TEXT TYPE</span>
                   <span className="vs-director-val">
-                    {ttsText.includes("ព្រះ") || ttsText.includes("ស្ដេច") ? "Historical Drama" : "Narrative Script"}
+                    {detectedScriptType || (ttsText.includes("ព្រះ") || ttsText.includes("ស្ដេច") ? "Historical Drama" : "Narrative Script")}
                   </span>
                 </div>
                 <div className="vs-director-card">
@@ -1985,12 +2311,14 @@ export function VoiceCloneStudioPage({
                 </div>
                 <div className="vs-director-card">
                   <span className="vs-director-label">READING SPEED</span>
-                  <span className="vs-director-val">{ttsSpeed.toFixed(1)}x · Pitch {ttsPitch.toFixed(2)}x</span>
+                  <span className="vs-director-val">{ttsSpeed.toFixed(2)}x · Pitch {ttsPitch.toFixed(2)}x</span>
                 </div>
                 <div className="vs-director-card">
                   <span className="vs-director-label">SYNTHESIS ENGINE</span>
                   <span className="vs-director-val">
-                    {ttsModelEngine === "voxcpm2"
+                    {ttsModelEngine === "auto"
+                      ? `⚡ Auto (${activeResolvedEngine === "voxcpm2" ? "VoxCPM2 48kHz" : "Meta MMS-TTS"})`
+                      : ttsModelEngine === "voxcpm2"
                       ? "VoxCPM2 48kHz Studio"
                       : ttsModelEngine === "omnivoice"
                       ? "OmniVoice (F5-TTS Neural)"
@@ -2000,13 +2328,119 @@ export function VoiceCloneStudioPage({
                   </span>
                 </div>
                 <div className="vs-director-card">
-                  <span className="vs-director-label">LANGUAGE</span>
+                  <span className="vs-director-label">LANGUAGE & PROSODY</span>
                   <span className="vs-director-val">
-                    {selectedLang === "auto" ? "Auto Detect" : selectedLang.toUpperCase()}
+                    {selectedLang === "auto" ? "KM (Auto-Paced)" : `${selectedLang.toUpperCase()} (Paced)`}
                   </span>
                 </div>
               </div>
             </div>
+
+            {/* Gemini API Key Modal */}
+            {showGeminiKeyModal && typeof document !== "undefined" &&
+              createPortal(
+                <div className="vs-modal-backdrop" onClick={() => setShowGeminiKeyModal(false)}>
+                  <div className="vs-gemini-modal" onClick={(e) => e.stopPropagation()}>
+                    <div className="vs-gemini-modal-header">
+                      <div className="vs-gemini-modal-title">
+                        <Brain size={22} weight="fill" color="#c084fc" />
+                        <div>
+                          <h3>Google Gemini API Key Setup</h3>
+                          <p>ដំណើរការ Gemini AI Auto Director ជាមួយម៉ាស៊ីន Local AI</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="vs-gemini-modal-close"
+                        onClick={() => setShowGeminiKeyModal(false)}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div className="vs-gemini-modal-body">
+                      <div className="vs-gemini-benefit-card">
+                        <Sparkle size={18} weight="fill" color="#a855f7" />
+                        <div>
+                          <strong>តើ Gemini ជួយអ្វីខ្លះដល់ Local AI?</strong>
+                          <p>
+                            Gemini វិភាគអត្ថបទខ្មែរ បន្ថែមសញ្ញាផ្អាកដកដង្ហើមតាមចង្វាក់មនុស្សពិត
+                            និងកែសម្រួលល្បឿន Speed & Pitch ដោយស្វ័យប្រវត្តិតាមមនោសញ្ចេតនាសាច់រឿង!
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="vs-gemini-input-group">
+                        <label>Google Gemini API Key</label>
+                        <div className="vs-gemini-input-wrap">
+                          <Key size={16} className="vs-gemini-key-icon" />
+                          <input
+                            type="password"
+                            value={tempGeminiKey}
+                            onChange={(e) => setTempGeminiKey(e.target.value)}
+                            placeholder="AIzaSy..."
+                            className="vs-gemini-key-input"
+                          />
+                        </div>
+                        <div className="vs-gemini-hint">
+                          ទទួលបាន API Key ឥតគិតថ្លៃ (100% Free):{" "}
+                          <a
+                            href="https://aistudio.google.com/app/apikey"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Google AI Studio ↗
+                          </a>
+                        </div>
+                      </div>
+
+                      {keyVerifyStatus && (
+                        <div
+                          className={`vs-gemini-verify-badge ${
+                            keyVerifyStatus.valid ? "valid" : "invalid"
+                          }`}
+                        >
+                          {keyVerifyStatus.valid ? (
+                            <CheckCircle size={16} weight="fill" color="#10b981" />
+                          ) : (
+                            <X size={16} weight="bold" color="#ef4444" />
+                          )}
+                          <span>{keyVerifyStatus.msg}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="vs-gemini-modal-footer">
+                      <button
+                        type="button"
+                        className="vs-gemini-btn-cancel"
+                        onClick={() => setShowGeminiKeyModal(false)}
+                      >
+                        បោះបង់
+                      </button>
+                      <button
+                        type="button"
+                        className="vs-gemini-btn-save"
+                        onClick={handleSaveGeminiKey}
+                        disabled={isVerifyingKey || !tempGeminiKey.trim()}
+                      >
+                        {isVerifyingKey ? (
+                          <>
+                            <CircleNotch size={16} className="vs-spin" />
+                            <span>កំពុងផ្ទៀងផ្ទាត់...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check size={16} weight="bold" />
+                            <span>រក្សាទុក & ភ្ជាប់ Key</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>,
+                document.body
+              )}
 
             {/* Generated Audio Section */}
             <div className="vs-audio-section">

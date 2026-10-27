@@ -32,16 +32,25 @@ class SttResponse(BaseModel):
     transcription_id: uuid.UUID | None = None  # set when saved to a signed-in user's history
 
 
+SUPPORTED_LANGUAGES = {
+    "auto", "km", "en", "zh", "vi", "th", "ja", "ko", "fr", "es", "de", "ru", "id", "it", "pt", "ar", "hi"
+}
+
+
 @router.post("", response_model=SttResponse)
 async def speech_to_text(
     request: Request,
     file: UploadFile = File(..., description="Audio file (.wav, .mp3, .m4a, .webm, ...)"),
-    language: Literal["auto", "km", "en"] = Form("auto"),
+    language: str = Form("auto"),
     settings: Settings = Depends(get_settings),
     stt: SttService = Depends(get_stt_service),
     user: User | None = Depends(get_optional_user),
 ) -> SttResponse:
-    """Public. When called with a bearer token, the result is also saved to your history."""
+    """Public. Supports Khmer (fine-tuned) and multi-language Faster-Whisper."""
+    lang_clean = (language or "auto").lower().strip()
+    if lang_clean not in SUPPORTED_LANGUAGES:
+        raise HTTPException(422, f"Unsupported language '{language}'. Supported: {', '.join(sorted(SUPPORTED_LANGUAGES))}")
+
     async with saved_upload(file, settings.tmp_dir, settings.max_upload_mb) as path:
         try:
             # Whisper is CPU/GPU-bound; keep it off the event loop.

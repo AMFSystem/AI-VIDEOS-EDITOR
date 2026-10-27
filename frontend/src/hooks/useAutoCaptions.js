@@ -25,38 +25,72 @@ export function localizeAutoCaptionPhase(phase, t) {
 export function useAutoCaptions(d) {
   return useCallback(async (options = {}) => {
     const inputBlob = options.blob ?? d.sourceAudioBlob;
-    const timelineOffset = Number.isFinite(options.start) ? options.start : d.sourceAudioStart;
+    const timelineOffset = Number.isFinite(options.start) ? options.start : (d.sourceAudioStart || 0);
     if (d.status === "generating" || d.status === "captioning") return;
-    if (d.trackLocks.caption) return void d.notify(d.t("captionTrackLocked"));
+    if (d.trackLocks?.caption) return void d.notify(d.t("captionTrackLocked"));
     if (!inputBlob) return void d.notify(d.t("autoCaptionsNeedsSource"));
-    d.setStatus("captioning"); d.setStatusText(d.t("autoCaptionsPreparing")); d.setProgress(4); d.setActiveTool("audio");
+    d.setStatus("captioning"); d.setStatusText(d.t("autoCaptionsPreparing")); d.setProgress(4); d.setActiveTool("caption");
     try {
       const clipBlob = Number.isFinite(options.duration)
         ? await sliceAudioBlob(inputBlob, options.sourceStart || 0, options.duration)
         : inputBlob;
+      const targetLanguage = options.language || d.uiLanguage || "auto";
       const result = await transcribeAudioToCaptionSegments(clipBlob, {
-        preferredLanguage: d.uiLanguage, timelineOffset, grouping: options.grouping,
-        onProgress: ({ progress, phase }) => { d.setProgress((current) => Math.max(current, progress)); d.setStatusText(localizeAutoCaptionPhase(phase, d.t)); },
+        preferredLanguage: targetLanguage,
+        timelineOffset,
+        grouping: options.grouping || "phrases",
+        onProgress: ({ progress, phase }) => {
+          d.setProgress((current) => Math.max(current, progress));
+          d.setStatusText(localizeAutoCaptionPhase(phase, d.t));
+        },
       });
+
+      // Apply chosen CapCut template style if provided
+      if (options.template?.style) {
+        if (typeof d.setCaptionStyle === "function") {
+          d.setCaptionStyle((prev) => ({ ...prev, ...options.template.style }));
+        }
+        if (typeof d.setCaptionStylePresetId === "function") {
+          d.setCaptionStylePresetId(options.template.id);
+        }
+        if (options.template.captionSize && typeof d.setCaptionSize === "function") {
+          d.setCaptionSize(options.template.captionSize);
+        }
+      }
+
       d.setCaptionSegments((segments) => {
         const combined = (options.append ? [...segments, ...result.segments] : result.segments)
           .sort((a, b) => (a.start || 0) - (b.start || 0));
-        let inheritedFontId = d.captionStyle?.fontId || "default";
+        let inheritedFontId = options.template?.style?.fontId || d.captionStyle?.fontId || "default";
         return combined.map((segment) => {
           inheritedFontId = segment.fontId || inheritedFontId;
-          return segment.fontId ? segment : { ...segment, fontId: inheritedFontId };
+          return {
+            ...segment,
+            fontId: segment.fontId || inheritedFontId,
+            ...(options.template?.style ? { styleOverrides: { ...(segment.styleOverrides || {}), ...options.template.style } } : {}),
+          };
         });
       });
       d.setScript((script) => options.append && script ? `${script}\n${result.text}` : result.text);
-      d.setSelectedSegmentId(result.segments[0]?.id ?? ""); d.setSelectedTrack("caption"); d.setActiveTool("caption");
-      d.setCaptionsEnabled(true); d.setTrackVisibility((visibility) => ({ ...visibility, caption: true }));
+      d.setSelectedSegmentId(result.segments[0]?.id ?? "");
+      d.setSelectedTrack("caption");
+      d.setActiveTool("caption");
+      d.setCaptionsEnabled(true);
+      d.setTrackVisibility((visibility) => ({ ...visibility, caption: true }));
       const complete = d.t("autoCaptionsComplete").replace("{count}", result.segments.length);
-      d.setStatus("done"); d.setStatusText(complete); d.setProgress(100);
-      d.seekTo(result.segments[0]?.start ?? timelineOffset); d.notify(complete);
+      d.setStatus("done");
+      d.setStatusText(complete);
+      d.setProgress(100);
+      d.seekTo(result.segments[0]?.start ?? timelineOffset);
+      d.notify(`✨ ${complete} (Local AI Multi-Language)`);
     } catch (error) {
-      console.error(error); d.setStatus("error"); d.setStatusText(/ASR_WORD_TIMING_UNAVAILABLE|alignment_heads|attentions|token-level timestamps/i.test(error?.message || "")
+      console.error(error);
+      d.setStatus("error");
+      d.setStatusText(/ASR_WORD_TIMING_UNAVAILABLE|alignment_heads|attentions|token-level timestamps/i.test(error?.message || "")
         ? d.t("captionTimingUnavailable") : d.t("autoCaptionsFailed"));
-      d.setProgress(0); d.notify(d.t("autoCaptionsFailedHint"));
+      d.setProgress(0);
+      d.notify(d.t("autoCaptionsFailedHint"));
     }
   }, [d]);
 }
+

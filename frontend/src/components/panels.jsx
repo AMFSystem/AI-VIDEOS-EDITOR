@@ -1,5 +1,9 @@
 import { CaptionGroupingControl } from "./CaptionGroupingControl.jsx";
-import { getCaptionEditingCopy, getCaptionSpacingCopy } from "../i18nCaptionEditing.js";
+import { SilenceRemovalPanel } from "./SilenceRemovalPanel.jsx";
+import { VoiceEffectPanel } from "./VoiceEffectPanel.jsx";
+import { AutoZoomPanel } from "./AutoZoomPanel.jsx";
+import { TransitionsPanel } from "./TransitionsPanel.jsx";
+import { TextStudioPanel } from "./TextStudioPanel.jsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 
@@ -10,6 +14,8 @@ import {
   CaretLeft,
   CaretRight,
   Check,
+  CheckCircle,
+  CircleNotch,
   CloudArrowUp,
   ClosedCaptioning,
   Diamond,
@@ -25,6 +31,7 @@ import {
   PersonSimpleRun,
   Scan,
   Scissors,
+  Sparkle,
   Trash,
   Waveform,
   X,
@@ -54,6 +61,13 @@ import {
   getCaptionStylePreset,
   resolveCaptionSizeForSegment,
 } from "../lib/captionStyles.js";
+import {
+  CAPCUT_CAPTION_TEMPLATES,
+  AUTO_CAPTION_LANGUAGES,
+  getCaptionTemplateById,
+} from "../lib/captionTemplates.js";
+import { getCaptionEditingCopy, getCaptionSpacingCopy } from "../i18nCaptionEditing.js";
+
 import {
   detectGeminiNanoVectorSupport,
   generateVectorWithGeminiNano,
@@ -1036,6 +1050,74 @@ function AssetRow({ asset, selected, t, downloadState }) {
   );
 }
 
+function renderCapCutCardAnimation(templateId) {
+  switch (templateId) {
+    case "rubah-glow":
+      return (
+        <div className="capcut-anim-rubah" aria-hidden="true">
+          Rubah
+        </div>
+      );
+    case "cyan-fox":
+      return (
+        <div className="capcut-anim-bluefox" aria-hidden="true">
+          <span>Быстрая коричневая</span>
+          <span className="fox-active">лиса</span>
+        </div>
+      );
+    case "bold-sticker-el":
+      return (
+        <div className="capcut-anim-el" aria-hidden="true">
+          EL
+        </div>
+      );
+    case "der-schnelle":
+      return (
+        <div className="capcut-anim-derschnelle" aria-hidden="true">
+          <span className="schnelle-badge">DER</span>
+          <span>SCHNELLE</span>
+          <span>BRAUNE</span>
+        </div>
+      );
+    case "bubble-the":
+      return (
+        <div className="capcut-anim-thebubble" aria-hidden="true">
+          THE
+        </div>
+      );
+    case "the-quick-fox":
+      return (
+        <div className="capcut-anim-quickfox" aria-hidden="true">
+          <div><span className="qf-red">THE</span> QUICK</div>
+          <div>BROWN FOX</div>
+        </div>
+      );
+    case "turn-text-fire":
+      return (
+        <div className="capcut-anim-turntext" aria-hidden="true">
+          <span className="flame-emoji">🔥</span>
+          <div>TURN <span className="tt-green">YOUR</span></div>
+          <div>TEXT INTO</div>
+        </div>
+      );
+    case "musang-perang":
+      return (
+        <div className="capcut-anim-musang" aria-hidden="true">
+          <span>MUSANG</span> <span>PERANG</span> <span className="musang-yellow">YANG</span>
+        </div>
+      );
+    case "multi-karaoke":
+      return (
+        <div className="capcut-anim-multikaraoke" aria-hidden="true">
+          <div>RUBAH <span className="mk-pink">PERANG</span> <span className="mk-yellow">YANG</span></div>
+          <div>PANTAS <span className="mk-purple">MELOMPAT</span> <span className="mk-cyan">DI</span></div>
+        </div>
+      );
+    default:
+      return <div className="capcut-anim-thebubble">CAPTION</div>;
+  }
+}
+
 export function ToolPanel(props) {
   const [captionGrouping, setCaptionGrouping] = useState("phrases");
   const {
@@ -1069,6 +1151,7 @@ export function ToolPanel(props) {
     captionStylePresets,
     setCaptionStylePresets,
     setCaptionSegments,
+    commitCaptionSegments,
     captionsEnabled,
     setCaptionsEnabled,
     selectedFilterId,
@@ -1105,6 +1188,7 @@ export function ToolPanel(props) {
     openAvatarPanel,
     smartMode,
     setSmartMode,
+    silenceRemoval,
     openMobileInspector,
     musicBlob,
     musicName,
@@ -1138,10 +1222,26 @@ export function ToolPanel(props) {
     cinematicDepth,
     photoParallaxDepth,
     effectsPanelMode,
+    replaceAudio,
+    applyAssetToTrack,
+    currentTime,
+    selectedAudioSegment,
+    updateAudioSegment,
+    selectTool,
+    visualSegments,
+    selectedTransitionIndex,
+    setSelectedTransitionIndex,
+    updateTransitionAtIndex,
+    applyTransitionToAll,
   } = props;
   const [captionFontStatus, setCaptionFontStatus] = useState("");
   const [captionStyleMenuOpen, setCaptionStyleMenuOpen] = useState(false);
   const [captionEditTarget, setCaptionEditTarget] = useState("master");
+  const [captionStudioTab, setCaptionStudioTab] = useState("auto");
+  const [autoCaptionLang, setAutoCaptionLang] = useState("auto");
+  const [selectedCapCutTemplateId, setSelectedCapCutTemplateId] = useState("tiktok-viral");
+  const [selectedAudioSourceType, setSelectedAudioSourceType] = useState("timeline");
+
   const captionFontOptions = useMemo(
     () => getCaptionFontsForLanguage(uiLanguage),
     [uiLanguage],
@@ -1257,6 +1357,28 @@ export function ToolPanel(props) {
     || captionStylePresets.find((preset) => preset.id === captionStylePresetId)
     || null;
 
+  if (activeTool === "text") {
+    return (
+      <div className="tool-panel text-tool-panel mobile-panel-scroll-body">
+        <TextStudioPanel
+          captionSegments={captionSegments}
+          setCaptionSegments={setCaptionSegments}
+          commitCaptionSegments={commitCaptionSegments}
+          selectedSegmentId={selectedSegmentId}
+          setSelectedSegmentId={setSelectedSegmentId}
+          currentTime={currentTime}
+          captionStyle={captionStyle}
+          setCaptionStyle={setCaptionStyle}
+          captionSize={captionSize}
+          setCaptionSize={setCaptionSize}
+          notify={notify}
+          t={t}
+          uiLanguage={uiLanguage}
+        />
+      </div>
+    );
+  }
+
   if (activeTool === "caption") {
     const currentPosition = editingCurrentCaption && selectedCaptionSegment?.placement
       ? ["top", "middle", "bottom"].find((position) => (
@@ -1266,152 +1388,618 @@ export function ToolPanel(props) {
     const presetLabel = selectedCaptionStylePreset
       ? (selectedCaptionStylePreset.labelKey ? t(selectedCaptionStylePreset.labelKey) : selectedCaptionStylePreset.name)
       : t("captionStyleModified");
+
+    const handleApplyTemplate = (template) => {
+      setSelectedCapCutTemplateId(template.id);
+      setCaptionStyle((prev) => ({ ...prev, ...template.style }));
+      setCaptionStylePresetId(template.id);
+      if (template.captionSize) setCaptionSize(template.captionSize);
+      if (captionSegments.length > 0) {
+        setCaptionSegments((segments) =>
+          segments.map((seg) => ({
+            ...seg,
+            styleOverrides: { ...(seg.styleOverrides || {}), ...template.style },
+          }))
+        );
+        notify?.(`🎨 បានផ្លាស់ប្តូរ Style "${template.nameKm || template.name}" ទៅលើ Subtitles ទាំងអស់នៅលើ Timeline!`);
+      }
+    };
+
+    const handleTriggerAutoCaption = async () => {
+      let targetBlob = sourceAudioBlob;
+      let targetStart = 0;
+      let targetDuration = undefined;
+
+      if (selectedAudioSourceType === "voice" && audioBlob) {
+        targetBlob = audioBlob;
+        targetDuration = audioDuration;
+      } else if (selectedAudioSourceType === "selected" && selectedAudioToolTarget?.blob) {
+        targetBlob = selectedAudioToolTarget.blob;
+        targetStart = selectedAudioToolTarget.start;
+        targetDuration = selectedAudioToolTarget.duration;
+      } else if (sourceAudioBlob) {
+        targetBlob = sourceAudioBlob;
+        targetDuration = sourceAudioDuration;
+      } else if (audioBlob) {
+        targetBlob = audioBlob;
+        targetDuration = audioDuration;
+      }
+
+      if (!targetBlob) {
+        notify?.(t("autoCaptionsNeedsSource", "សូមបញ្ចូល ឬជ្រើសរើសសំឡេងដើម/AI Voice ជាមុនសិន"));
+        return;
+      }
+
+      const template = getCaptionTemplateById(selectedCapCutTemplateId);
+      await generateCaptionsFromSourceAudio({
+        blob: targetBlob,
+        language: autoCaptionLang,
+        template,
+        grouping: captionGrouping || "phrases",
+        start: targetStart,
+        duration: targetDuration,
+        append: false,
+      });
+    };
+
     return (
       <div className="tool-panel caption-tool-panel">
         <div className="caption-tool-heading">
-          <div><h2>{t("captionStyle")}</h2><p>{t("captionStyleSystemHint")}</p></div>
-          <label className="caption-visibility-toggle"><input type="checkbox" checked={captionsEnabled} onChange={(event) => setCaptionsEnabled(event.target.checked)} /><span>{t("showCaptions")}</span></label>
+          <div>
+            <h2>Auto Caption Studio</h2>
+            <p>បង្កើត Subtitles ដោយស្វ័យប្រវត្តិ</p>
+          </div>
+          <label className="caption-visibility-toggle">
+            <input
+              type="checkbox"
+              checked={captionsEnabled}
+              onChange={(event) => setCaptionsEnabled(event.target.checked)}
+            />
+            <span>{t("showCaptions", "បង្ហាញ")}</span>
+          </label>
         </div>
-        <div className="caption-style-library">
-          <button className="caption-style-library-trigger" type="button" aria-expanded={captionStyleMenuOpen} onClick={() => setCaptionStyleMenuOpen((open) => !open)}>
-            <span><small>{t("captionDefaultStyle")}</small><strong>{presetLabel}</strong></span><CaretDown size={16} weight="bold" />
-          </button>
-          <button className="caption-style-edit-button" type="button" onClick={() => setCaptionEditTarget("master")}>{t("captionEditStyle")}</button>
-          {captionStyleMenuOpen ? <div className="caption-style-library-menu">
-            <div className="caption-style-library-section">
-              <span>{t("captionProjectStyles")}</span>
-              <button type="button" onClick={() => { setCaptionEditTarget("master"); setCaptionStyleMenuOpen(false); }}><i className="caption-style-sample is-classic">Aa</i><strong>{t("captionDefaultStyle")}</strong>{captionEditTarget === "master" ? <Check size={15} weight="bold" /> : null}</button>
-              {captionStylePresets.map((preset) => <button type="button" key={preset.id} onClick={() => applyCaptionStylePreset(preset)}><i className="caption-style-sample is-custom">Aa</i><strong>{preset.name}</strong>{captionStylePresetId === preset.id && !editingCurrentCaption ? <Check size={15} weight="bold" /> : null}</button>)}
-            </div>
-            <div className="caption-style-library-section">
-              <span>{t("captionBuiltInPresets")}</span>
-              {BUILTIN_CAPTION_STYLE_PRESETS.map((preset) => <button type="button" key={preset.id} onClick={() => applyCaptionStylePreset(preset)}><i className={`caption-style-sample ${preset.sampleClass}`}>Aa</i><strong>{t(preset.labelKey)}</strong>{captionStylePresetId === preset.id && !editingCurrentCaption ? <Check size={15} weight="bold" /> : null}</button>)}
-            </div>
-            <button className="caption-style-save-row" type="button" onClick={saveCurrentCaptionStyle}><Plus size={15} weight="bold" />{t("captionSaveAsStyle")}</button>
-          </div> : null}
-        </div>
-        <div className="caption-edit-target" role="tablist" aria-label={t("captionEditTarget")}>
-          <button type="button" className={captionEditTarget === "master" ? "is-active" : ""} onClick={() => setCaptionEditTarget("master")}>{t("captionDefaultStyleTab")}</button>
-          <button type="button" disabled={!selectedCaptionSegment} className={editingCurrentCaption ? "is-active" : ""} onClick={() => setCaptionEditTarget("current")}>{t("captionCurrentCaption")}</button>
-        </div>
-        <div className={`caption-edit-scope-note ${editingCurrentCaption ? "is-current" : "is-master"}`}><Diamond size={14} weight={editingCurrentCaption ? "fill" : "duotone"} /><span>{editingCurrentCaption ? t("captionEditingCurrentHint") : t("captionEditingMasterHint").replace("{count}", captionSegments.length)}</span></div>
-        <div className="caption-position-heading">
-          <span className="caption-field-title">{t("captionPositionLabel")}</span>
+
+        {/* Tab Switcher: Auto Caption vs Custom Style */}
+        <div className="caption-studio-nav" role="tablist">
           <button
             type="button"
-            disabled={!selectedCaptionSegment}
-            onClick={() => {
-              syncCaptionPositions(selectedCaptionSegment?.id);
-              setCaptionEditTarget("master");
-            }}
+            className={`caption-studio-nav-btn ${captionStudioTab === "auto" ? "is-active" : ""}`}
+            onClick={() => setCaptionStudioTab("auto")}
           >
-            <ArrowsClockwise size={13} weight="bold" />
-            {t("captionSyncPosition")}
+            <Sparkle size={14} weight="fill" />
+            <span>Auto Caption</span>
+          </button>
+          <button
+            type="button"
+            className={`caption-studio-nav-btn ${captionStudioTab === "style" ? "is-active" : ""}`}
+            onClick={() => setCaptionStudioTab("style")}
+          >
+            <Palette size={14} weight="duotone" />
+            <span>Custom Styles</span>
           </button>
         </div>
-        <div className="segmented caption-position-segmented">
-          {["top", "middle", "bottom"].map((position) => (
-            <button
-              className={currentPosition === position ? "is-active" : ""}
-              type="button"
-              key={position}
-              onClick={() => setCaptionPosition(position, editingCurrentCaption ? selectedCaptionSegment?.id : "")}
-            >
-              {position === "top" ? t("top") : position === "middle" ? t("middle") : t("bottom")}
-            </button>
-          ))}
-        </div>
-        {currentPosition === "custom" ? <small className="caption-custom-position-note">{t("captionCustomPosition")}</small> : null}
-        <div className={`caption-font-field ${captionFontStatus === "loading" ? "is-loading" : ""}`} aria-busy={captionFontStatus === "loading"}>
-          <div className="caption-style-heading">
-            <strong>{t("captionFont")}</strong>
-            <span>{t("captionFontHint")}</span>
+
+        {captionStudioTab === "auto" ? (
+          <div className="auto-caption-content">
+            {/* Local AI Engine Status & Configuration */}
+            <div className="auto-caption-card">
+              <div className="auto-caption-header">
+                <span className="auto-caption-badge">
+                  <Sparkle size={11} weight="fill" /> Local AI Model
+                </span>
+                <span className="auto-caption-engine-tag">Whisper / Khmer STT</span>
+              </div>
+
+              {/* Audio Source Selector */}
+              <div className="auto-caption-field">
+                <div className="auto-caption-label">
+                  <span>ប្រភពសំឡេង</span>
+                  {selectedAudioSourceType === "timeline" && sourceAudioBlob ? (
+                    <span style={{ color: "#35ead9", fontSize: "10.5px" }}>{formatTime(sourceAudioDuration)}</span>
+                  ) : selectedAudioSourceType === "voice" && audioBlob ? (
+                    <span style={{ color: "#35ead9", fontSize: "10.5px" }}>{formatTime(audioDuration)}</span>
+                  ) : null}
+                </div>
+                <select
+                  className="auto-caption-select"
+                  value={selectedAudioSourceType}
+                  onChange={(e) => setSelectedAudioSourceType(e.target.value)}
+                >
+                  <option value="timeline">
+                    🎵 សំឡេង Timeline {sourceAudioBlob ? `(${formatTime(sourceAudioDuration)})` : "(គ្មាន)"}
+                  </option>
+                  <option value="voice">
+                    🎙️ សំឡេង AI Voice {audioBlob ? `(${formatTime(audioDuration)})` : "(គ្មាន)"}
+                  </option>
+                  {selectedAudioToolTarget?.blob ? (
+                    <option value="selected">
+                      ✂️ សំឡេង Clip ({formatTime(selectedAudioToolTarget.duration)})
+                    </option>
+                  ) : null}
+                </select>
+              </div>
+
+              {/* Multi-Language Selector */}
+              <div className="auto-caption-field">
+                <div className="auto-caption-label">
+                  <span>ភាសានិយាយ</span>
+                  <span style={{ color: "#2ed573", fontSize: "10px", fontWeight: "700" }}>Fast Local</span>
+                </div>
+                <select
+                  className="auto-caption-select"
+                  value={autoCaptionLang}
+                  onChange={(e) => setAutoCaptionLang(e.target.value)}
+                >
+                  {AUTO_CAPTION_LANGUAGES.map((lang) => (
+                    <option key={lang.code} value={lang.code}>
+                      {lang.flag} {lang.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Grouping Style */}
+              <div className="auto-caption-field">
+                <div className="auto-caption-label">
+                  <span>ទម្រង់ឃ្លា (Format)</span>
+                </div>
+                <select
+                  className="auto-caption-select"
+                  value={captionGrouping}
+                  onChange={(e) => setCaptionGrouping(e.target.value)}
+                  disabled={isGeneratingCaptions}
+                >
+                  <option value="phrases">ឃ្លាខ្លី (Short Phrases)</option>
+                  <option value="words">ពាក្យម្តងមួយ (Single Words)</option>
+                </select>
+              </div>
+
+              {/* Big Generate Action Button */}
+              <button
+                type="button"
+                className="auto-caption-cta-btn"
+                disabled={isGeneratingCaptions || (!sourceAudioBlob && !audioBlob && !selectedAudioToolTarget?.blob)}
+                onClick={handleTriggerAutoCaption}
+              >
+                {isGeneratingCaptions ? (
+                  <>
+                    <CircleNotch size={17} className="spin-animation" />
+                    <span>កំពុងបង្កើត... {automaticCaptionProgress}%</span>
+                  </>
+                ) : (
+                  <>
+                    <ClosedCaptioning size={18} weight="fill" />
+                    <span>បង្កើត Auto Caption</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* CapCut Style Templates Grid - Authentic Image 2 Style with Live Card Animation */}
+            <div style={{ margin: "14px 0 8px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                <strong style={{ fontSize: "12px", color: "#e3f1f5" }}>
+                  ✨ CapCut Styles ({CAPCUT_CAPTION_TEMPLATES.length})
+                </strong>
+                <span style={{ fontSize: "10px", color: "#6e828e" }}>ចុច Apply លើវីដេអូ</span>
+              </div>
+              <div className="capcut-cards-grid">
+                {CAPCUT_CAPTION_TEMPLATES.map((tmpl) => {
+                  const isSelected = selectedCapCutTemplateId === tmpl.id;
+                  return (
+                    <button
+                      type="button"
+                      key={tmpl.id}
+                      className={`capcut-card-item ${isSelected ? "is-selected" : ""}`}
+                      onClick={() => handleApplyTemplate(tmpl)}
+                      title={`${tmpl.nameKm} (${tmpl.name})`}
+                    >
+                      <div className="capcut-card-corner">
+                        <Diamond size={11} weight="fill" className="capcut-diamond-icon" />
+                      </div>
+                      <div className="capcut-card-center-stage">
+                        {renderCapCutCardAnimation(tmpl.id)}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Timeline Caption Segments Overview */}
+            {captionSegments.length > 0 ? (
+              <div className="auto-caption-segments-box">
+                <div className="auto-caption-segments-header">
+                  <span>🎬 Subtitles នៅលើ Timeline ({captionSegments.length})</span>
+                  <button
+                    type="button"
+                    style={{ background: "none", border: "none", color: "#ef5350", fontSize: "10.5px", cursor: "pointer", fontWeight: "700" }}
+                    onClick={() => {
+                      if (window.confirm("តើអ្នកពិតជាចង់លុប Subtitles ទាំងអស់ពី Timeline មែនទេ?")) {
+                        setCaptionSegments([]);
+                        notify?.("🗑️ បានលុប Subtitles ពី Timeline រួចរាល់");
+                      }
+                    }}
+                  >
+                    លុបទាំងអស់
+                  </button>
+                </div>
+                <div style={{ maxHeight: "200px", overflowY: "auto", display: "grid", gap: "5px" }}>
+                  {captionSegments.slice(0, 15).map((seg, idx) => (
+                    <div
+                      key={seg.id || idx}
+                      className="auto-caption-segment-item"
+                      onClick={() => {
+                        setSelectedSegmentId?.(seg.id);
+                        setSelectedTrack?.("caption");
+                        seekTo?.(seg.start);
+                      }}
+                    >
+                      <span className="auto-caption-segment-time">{formatTime(seg.start)}</span>
+                      <span className="auto-caption-segment-text" title={seg.text}>{seg.text}</span>
+                      <CheckCircle size={13} color="#35ead9" />
+                    </div>
+                  ))}
+                  {captionSegments.length > 15 ? (
+                    <small style={{ color: "#7a8b96", textAlign: "center", padding: "4px" }}>
+                      + និង {captionSegments.length - 15} segments ទៀតនៅលើ Timeline
+                    </small>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </div>
-          <div className="caption-font-select-wrap">
-            <select
-              aria-label={t("captionFont")}
-              aria-describedby="caption-font-load-status"
-              value={activeCaptionFontId}
-              onChange={(event) => selectCaptionFont(event.target.value)}
-            >
-              {visibleCaptionFontOptions.map((item) => (
-                <option value={item.id} key={item.id}>
-                  {item.id === "default" ? t("captionFontDefault") : item.label}
-                </option>
+        ) : (
+          /* Style & Customization Tab (Original styling options) */
+          <>
+            <div className="caption-style-library">
+              <button
+                className="caption-style-library-trigger"
+                type="button"
+                aria-expanded={captionStyleMenuOpen}
+                onClick={() => setCaptionStyleMenuOpen((open) => !open)}
+              >
+                <span>
+                  <small>{t("captionDefaultStyle")}</small>
+                  <strong>{presetLabel}</strong>
+                </span>
+                <CaretDown size={16} weight="bold" />
+              </button>
+              <button
+                className="caption-style-edit-button"
+                type="button"
+                onClick={() => setCaptionEditTarget("master")}
+              >
+                {t("captionEditStyle")}
+              </button>
+              {captionStyleMenuOpen ? (
+                <div className="caption-style-library-menu">
+                  <div className="caption-style-library-section">
+                    <span>{t("captionProjectStyles")}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCaptionEditTarget("master");
+                        setCaptionStyleMenuOpen(false);
+                      }}
+                    >
+                      <i className="caption-style-sample is-classic">Aa</i>
+                      <strong>{t("captionDefaultStyle")}</strong>
+                      {captionEditTarget === "master" ? <Check size={15} weight="bold" /> : null}
+                    </button>
+                    {captionStylePresets.map((preset) => (
+                      <button
+                        type="button"
+                        key={preset.id}
+                        onClick={() => applyCaptionStylePreset(preset)}
+                      >
+                        <i className="caption-style-sample is-custom">Aa</i>
+                        <strong>{preset.name}</strong>
+                        {captionStylePresetId === preset.id && !editingCurrentCaption ? (
+                          <Check size={15} weight="bold" />
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="caption-style-library-section">
+                    <span>CapCut Templates</span>
+                    {CAPCUT_CAPTION_TEMPLATES.map((tmpl) => (
+                      <button
+                        type="button"
+                        key={tmpl.id}
+                        onClick={() => handleApplyTemplate(tmpl)}
+                      >
+                        <i className={`caption-style-sample ${tmpl.sampleClass}`}>Aa</i>
+                        <strong>{tmpl.nameKm}</strong>
+                        {captionStylePresetId === tmpl.id && !editingCurrentCaption ? (
+                          <Check size={15} weight="bold" />
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="caption-style-library-section">
+                    <span>{t("captionBuiltInPresets")}</span>
+                    {BUILTIN_CAPTION_STYLE_PRESETS.map((preset) => (
+                      <button
+                        type="button"
+                        key={preset.id}
+                        onClick={() => applyCaptionStylePreset(preset)}
+                      >
+                        <i className={`caption-style-sample ${preset.sampleClass}`}>Aa</i>
+                        <strong>{t(preset.labelKey)}</strong>
+                        {captionStylePresetId === preset.id && !editingCurrentCaption ? (
+                          <Check size={15} weight="bold" />
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                  <button className="caption-style-save-row" type="button" onClick={saveCurrentCaptionStyle}>
+                    <Plus size={15} weight="bold" />
+                    {t("captionSaveAsStyle")}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="caption-edit-target" role="tablist" aria-label={t("captionEditTarget")}>
+              <button
+                type="button"
+                className={captionEditTarget === "master" ? "is-active" : ""}
+                onClick={() => setCaptionEditTarget("master")}
+              >
+                {t("captionDefaultStyleTab")}
+              </button>
+              <button
+                type="button"
+                disabled={!selectedCaptionSegment}
+                className={editingCurrentCaption ? "is-active" : ""}
+                onClick={() => setCaptionEditTarget("current")}
+              >
+                {t("captionCurrentCaption")}
+              </button>
+            </div>
+            <div className={`caption-edit-scope-note ${editingCurrentCaption ? "is-current" : "is-master"}`}>
+              <Diamond size={14} weight={editingCurrentCaption ? "fill" : "duotone"} />
+              <span>
+                {editingCurrentCaption
+                  ? t("captionEditingCurrentHint")
+                  : t("captionEditingMasterHint").replace("{count}", captionSegments.length)}
+              </span>
+            </div>
+            <div className="caption-position-heading">
+              <span className="caption-field-title">{t("captionPositionLabel")}</span>
+              <button
+                type="button"
+                disabled={!selectedCaptionSegment}
+                onClick={() => {
+                  syncCaptionPositions(selectedCaptionSegment?.id);
+                  setCaptionEditTarget("master");
+                }}
+              >
+                <ArrowsClockwise size={13} weight="bold" />
+                {t("captionSyncPosition")}
+              </button>
+            </div>
+            <div className="segmented caption-position-segmented">
+              {["top", "middle", "bottom"].map((position) => (
+                <button
+                  className={currentPosition === position ? "is-active" : ""}
+                  type="button"
+                  key={position}
+                  onClick={() => setCaptionPosition(position, editingCurrentCaption ? selectedCaptionSegment?.id : "")}
+                >
+                  {position === "top" ? t("top") : position === "middle" ? t("middle") : t("bottom")}
+                </button>
               ))}
-            </select>
-            <span className="caption-font-select-indicator" aria-hidden="true">
-              {captionFontStatus === "loading"
-                ? <i className="caption-font-select-loading" />
-                : <CaretDown size={15} weight="bold" />}
-            </span>
-          </div>
-          <div
-            className="caption-font-preview"
-            style={{
-              fontFamily: selectedCaptionFont.family
-                ? `"${selectedCaptionFont.family}", ${selectedCaptionFont.fallback}`
-                : selectedCaptionFont.fallback,
-              fontWeight: selectedCaptionFont.weight,
-            }}
-          >
-            {selectedCaptionFont.sample}
-          </div>
-          {captionFontStatus ? (
-            <small id="caption-font-load-status" className={`caption-font-status is-${captionFontStatus}`} aria-live="polite">
-              {t(`captionFont${captionFontStatus[0].toUpperCase()}${captionFontStatus.slice(1)}`)}
-            </small>
-          ) : null}
-        </div>
-        <div className="slider-field compact-slider">
-          <div>
-            <label htmlFor="caption-size">{t("fontSize")}</label>
-            <span>{effectiveCaptionSize}px</span>
-          </div>
-          <input
-            id="caption-size"
-            type="range"
-            min="12"
-            max="42"
-            step="1"
-            value={effectiveCaptionSize}
-            onChange={(event) => {
-              const value = Number(event.target.value);
-              if (editingCurrentCaption) updateCaptionStyleField("captionSize", value);
-              else {
-                setCaptionStylePresetId("modified");
-                setCaptionSize(value);
-                setCaptionSegments((items) => items.map((segment) => {
-                  const styleOverrides = { ...(segment.styleOverrides || {}) };
-                  delete styleOverrides.captionSize;
-                  const next = { ...segment, styleOverrides };
-                  if (!Object.keys(styleOverrides).length) delete next.styleOverrides;
-                  return next;
-                }));
-              }
-            }}
-          />
-        </div>
-        <div className="caption-style-panel">
-          <label className="caption-alignment-field">
-            <span>{getCaptionEditingCopy(uiLanguage)[0]}</span>
-            <span className="caption-alignment-select">
-              <select aria-label={getCaptionEditingCopy(uiLanguage)[0]} value={effectiveCaptionStyle.textAlign || "center"} onChange={(event) => updateCaptionStyleField("textAlign", event.target.value)}>
-                {["left", "center", "right"].map((value, index) => <option key={value} value={value}>{getCaptionEditingCopy(uiLanguage)[index + 1]}</option>)}
-              </select>
-              <CaretDown size={16} aria-hidden="true" />
-            </span>
-          </label>
-          <div className="caption-color-row">
-            <label>{t("captionTextColor")}<input type="color" value={effectiveCaptionStyle.textColor} onChange={(event) => updateCaptionStyleField("textColor", event.target.value)} /></label>
-            <label>{t("captionBackground")}<input type="color" value={effectiveCaptionStyle.backgroundColor} onChange={(event) => updateCaptionStyleField("backgroundColor", event.target.value)} /></label>
-            <label>{t("captionBorderColor")}<input type="color" value={effectiveCaptionStyle.borderColor} onChange={(event) => updateCaptionStyleField("borderColor", event.target.value)} /></label>
-          </div>
-          {[["letterSpacing", getCaptionSpacingCopy(uiLanguage)[0], 0, 12, 0.5, "px"], ["lineGap", getCaptionSpacingCopy(uiLanguage)[1], 0, 32, 1, "px"], ["backgroundOpacity", t("captionOpacity"), 0, 1, 0.05, "%"], ["textStrokeWidth", t("captionOutlineWidth"), 0, 6, 1, "px"], ["borderWidth", t("captionBorderWidth"), 0, 8, 1, "px"], ["radius", t("captionRadius"), 0, 28, 1, "px"], ["paddingX", getCaptionEditingCopy(uiLanguage)[4], 0, 52, 1, "px"], ["paddingY", getCaptionEditingCopy(uiLanguage)[5], 0, 32, 1, "px"], ["shadowOpacity", t("captionShadow"), 0, 1, 0.05, "%"]].map(([key, label, min, max, step, unit]) => (
-            <div className="slider-field compact-slider" key={key}><div><label>{label}</label><span>{unit === "%" ? `${Math.round(effectiveCaptionStyle[key] * 100)}%` : `${effectiveCaptionStyle[key] ?? 0}${unit}`}</span></div><input type="range" min={min} max={max} step={step} value={effectiveCaptionStyle[key] ?? 0} onChange={(event) => updateCaptionStyleField(key, Number(event.target.value))} /></div>
-          ))}
-          <button className="caption-save-style-button" type="button" onClick={saveCurrentCaptionStyle}><Plus size={15} weight="bold" />{t("captionSaveAsStyle")}</button>
-        </div>
+            </div>
+            {currentPosition === "custom" ? (
+              <small className="caption-custom-position-note">{t("captionCustomPosition")}</small>
+            ) : null}
+            <div
+              className={`caption-font-field ${captionFontStatus === "loading" ? "is-loading" : ""}`}
+              aria-busy={captionFontStatus === "loading"}
+            >
+              <div className="caption-style-heading">
+                <strong>{t("captionFont")}</strong>
+                <span>{t("captionFontHint")}</span>
+              </div>
+              <div className="caption-font-select-wrap">
+                <select
+                  aria-label={t("captionFont")}
+                  aria-describedby="caption-font-load-status"
+                  value={activeCaptionFontId}
+                  onChange={(event) => selectCaptionFont(event.target.value)}
+                >
+                  {visibleCaptionFontOptions.map((item) => (
+                    <option value={item.id} key={item.id}>
+                      {item.id === "default" ? t("captionFontDefault") : item.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="caption-font-select-indicator" aria-hidden="true">
+                  {captionFontStatus === "loading" ? (
+                    <i className="caption-font-select-loading" />
+                  ) : (
+                    <CaretDown size={15} weight="bold" />
+                  )}
+                </span>
+              </div>
+              <div
+                className="caption-font-preview"
+                style={{
+                  fontFamily: selectedCaptionFont.family
+                    ? `"${selectedCaptionFont.family}", ${selectedCaptionFont.fallback}`
+                    : selectedCaptionFont.fallback,
+                  fontWeight: selectedCaptionFont.weight,
+                }}
+              >
+                {selectedCaptionFont.sample}
+              </div>
+              {captionFontStatus ? (
+                <small id="caption-font-load-status" className={`caption-font-status is-${captionFontStatus}`} aria-live="polite">
+                  {t(`captionFont${captionFontStatus[0].toUpperCase()}${captionFontStatus.slice(1)}`)}
+                </small>
+              ) : null}
+            </div>
+            <div className="slider-field compact-slider">
+              <div>
+                <label htmlFor="caption-size">{t("fontSize")}</label>
+                <span>{effectiveCaptionSize}px</span>
+              </div>
+              <input
+                id="caption-size"
+                type="range"
+                min="12"
+                max="42"
+                step="1"
+                value={effectiveCaptionSize}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  if (editingCurrentCaption) updateCaptionStyleField("captionSize", value);
+                  else {
+                    setCaptionStylePresetId("modified");
+                    setCaptionSize(value);
+                    setCaptionSegments((items) =>
+                      items.map((segment) => {
+                        const styleOverrides = { ...(segment.styleOverrides || {}) };
+                        delete styleOverrides.captionSize;
+                        const next = { ...segment, styleOverrides };
+                        if (!Object.keys(styleOverrides).length) delete next.styleOverrides;
+                        return next;
+                      })
+                    );
+                  }
+                }}
+              />
+            </div>
+            <div className="caption-style-panel">
+              <label className="caption-alignment-field">
+                <span>{getCaptionEditingCopy(uiLanguage)[0]}</span>
+                <span className="caption-alignment-select">
+                  <select
+                    aria-label={getCaptionEditingCopy(uiLanguage)[0]}
+                    value={effectiveCaptionStyle.textAlign || "center"}
+                    onChange={(event) => updateCaptionStyleField("textAlign", event.target.value)}
+                  >
+                    {["left", "center", "right"].map((value, index) => (
+                      <option key={value} value={value}>
+                        {getCaptionEditingCopy(uiLanguage)[index + 1]}
+                      </option>
+                    ))}
+                  </select>
+                  <CaretDown size={16} aria-hidden="true" />
+                </span>
+              </label>
+              <div className="caption-color-row">
+                <label>
+                  {t("captionTextColor")}
+                  <input
+                    type="color"
+                    value={effectiveCaptionStyle.textColor}
+                    onChange={(event) => updateCaptionStyleField("textColor", event.target.value)}
+                  />
+                </label>
+                <label>
+                  {t("captionBackground")}
+                  <input
+                    type="color"
+                    value={effectiveCaptionStyle.backgroundColor}
+                    onChange={(event) => updateCaptionStyleField("backgroundColor", event.target.value)}
+                  />
+                </label>
+                <label>
+                  {t("captionBorderColor")}
+                  <input
+                    type="color"
+                    value={effectiveCaptionStyle.borderColor}
+                    onChange={(event) => updateCaptionStyleField("borderColor", event.target.value)}
+                  />
+                </label>
+              </div>
+              {[
+                ["letterSpacing", getCaptionSpacingCopy(uiLanguage)[0], 0, 12, 0.5, "px"],
+                ["lineGap", getCaptionSpacingCopy(uiLanguage)[1], 0, 32, 1, "px"],
+                ["backgroundOpacity", t("captionOpacity"), 0, 1, 0.05, "%"],
+                ["textStrokeWidth", t("captionOutlineWidth"), 0, 6, 1, "px"],
+                ["borderWidth", t("captionBorderWidth"), 0, 8, 1, "px"],
+                ["radius", t("captionRadius"), 0, 28, 1, "px"],
+                ["paddingX", getCaptionEditingCopy(uiLanguage)[4], 0, 52, 1, "px"],
+                ["paddingY", getCaptionEditingCopy(uiLanguage)[5], 0, 32, 1, "px"],
+                ["shadowOpacity", t("captionShadow"), 0, 1, 0.05, "%"],
+              ].map(([key, label, min, max, step, unit]) => (
+                <div className="slider-field compact-slider" key={key}>
+                  <div>
+                    <label>{label}</label>
+                    <span>
+                      {unit === "%"
+                        ? `${Math.round(effectiveCaptionStyle[key] * 100)}%`
+                        : `${effectiveCaptionStyle[key] ?? 0}${unit}`}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={min}
+                    max={max}
+                    step={step}
+                    value={effectiveCaptionStyle[key] ?? 0}
+                    onChange={(event) => updateCaptionStyleField(key, Number(event.target.value))}
+                  />
+                </div>
+              ))}
+              <button className="caption-save-style-button" type="button" onClick={saveCurrentCaptionStyle}>
+                <Plus size={15} weight="bold" />
+                {t("captionSaveAsStyle")}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+
+  if (activeTool === "voice-effects") {
+    return (
+      <div className="tool-panel voice-effects-tool-panel mobile-panel-scroll-body">
+        <VoiceEffectPanel
+          replaceAudio={replaceAudio}
+          applyAssetToTrack={applyAssetToTrack}
+          currentTime={currentTime}
+          notify={notify}
+          selectedAudioSegment={selectedAudioSegment}
+          updateAudioSegment={updateAudioSegment}
+        />
+      </div>
+    );
+  }
+
+  if (activeTool === "auto-zoom") {
+    return (
+      <div className="tool-panel auto-zoom-tool-panel mobile-panel-scroll-body">
+        <AutoZoomPanel
+          selectedVisualSegment={selectedVisualSegment}
+          updateSelectedVisualEffects={updateSelectedVisualEffects}
+          visualSegments={visualSegments}
+          setSelectedSegmentId={setSelectedSegmentId}
+          currentTime={currentTime}
+          notify={notify}
+        />
+      </div>
+    );
+  }
+
+  if (activeTool === "transitions") {
+    return (
+      <div className="tool-panel transitions-tool-panel mobile-panel-scroll-body">
+        <TransitionsPanel
+          visualSegments={visualSegments}
+          selectedTransitionIndex={selectedTransitionIndex}
+          setSelectedTransitionIndex={setSelectedTransitionIndex}
+          updateTransitionAtIndex={updateTransitionAtIndex}
+          applyTransitionToAll={applyTransitionToAll}
+          notify={notify}
+          trOption={trOption}
+        />
       </div>
     );
   }
@@ -1422,22 +2010,36 @@ export function ToolPanel(props) {
       <div className="tool-panel smart-hub-panel">
         <div className="smart-hub-grid" role="tablist" aria-label={t("smartTools")}>
           {[
-            ["auto-edit", Scissors, t("smartAutoEdit"), t("smartAutoEditHint")],
+            ["auto-edit", Sparkle, t("smartAutoEdit"), t("smartAutoEditHint")],
+            ["remove-pauses", Scissors, "Auto Cut (កាត់ស្ងាត់)", "លុបចន្លោះស្ងាត់វៃឆ្លាតដោយ AI"],
             ["ai-music", MusicNote, aiCopy.title, aiCopy.hint],
             ["smart-frame", FrameCorners, t("smartFrame"), t("smartFrameHint")],
             ["avatar", PersonSimpleRun, t("smartAvatar"), t("smartAvatarHint")],
-            ["remove-pauses", Waveform, t("pauseTitle"), t("pauseHint")],
           ].map(([id, Icon, title, hint]) => (
-            <button className={smartMode === id ? "is-active" : ""} type="button" role="tab" aria-selected={smartMode === id} key={id} onClick={() => {
+            <button className={`${smartMode === id ? "is-active" : ""} ${id === "remove-pauses" ? "is-autocut-card" : ""}`} type="button" role="tab" aria-selected={smartMode === id} key={id} onClick={() => {
               setSmartMode(id);
               if (id === "avatar") openAvatarPanel();
               if (id === "ai-music" && window.matchMedia?.("(max-width: 760px)").matches) openMobileInspector?.();
               if (id === "remove-pauses" && window.matchMedia?.("(max-width: 1279px)").matches) openMobileInspector?.();
             }}>
-              <Icon size={24} weight="duotone" /><strong>{title}</strong><span>{hint}</span>
+              <Icon size={24} weight="duotone" />
+              <strong>{title}</strong>
+              <span>{hint}</span>
             </button>
           ))}
         </div>
+
+        {smartMode === "remove-pauses" ? (
+          <div className="smart-tool-active-box" style={{ marginTop: "14px", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "14px" }}>
+            {silenceRemoval ? (
+              <SilenceRemovalPanel tool={silenceRemoval} />
+            ) : (
+              <div className="autocut-status-msg is-warning">
+                សូមជ្រើសរើស Clip វីដេអូ ឬសំឡេងនៅលើ Timeline ជាមុនសិន។
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -1466,6 +2068,20 @@ export function ToolPanel(props) {
             <em>{t("aiVoiceEntryDesc")}</em>
           </span>
         </button>}
+        <button
+          className="audio-entry-card"
+          type="button"
+          onClick={() => {
+            selectTool?.("smart");
+            setSmartMode?.("voice-effects");
+          }}
+        >
+          <Waveform size={24} weight="duotone" />
+          <span>
+            <strong>Voice & Sound Effects (SFX)</strong>
+            <em>បណ្ណាល័យសំឡេង Effect និង Folder ក្នុងកុំព្យូទ័រ</em>
+          </span>
+        </button>
         <button
           className="audio-entry-card separation-entry-card"
           type="button"

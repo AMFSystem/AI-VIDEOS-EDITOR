@@ -1,0 +1,717 @@
+/* TransitionsPanel.css - CapCut Style Animated Transition Studio */
+
+.transitions-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #e2e8f0;
+  font-family: inherit;
+  padding: 4px 1px 20px 1px;
+}
+
+/* 1. Header */
+.transitions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.transitions-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.transitions-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.transitions-cut-badge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.transitions-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.transitions-reset-btn:hover {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+}
+
+/* 2. Cut Switcher Navigation */
+.transitions-cut-nav {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 7px;
+  padding: 4px 6px;
+}
+
+.transitions-cut-arrow {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.transitions-cut-arrow:hover:not(:disabled) {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.transitions-cut-arrow:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.transitions-cut-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: 1;
+}
+
+.transitions-cut-chip {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 3px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.transitions-cut-chip:hover {
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.transitions-cut-chip.is-active {
+  background: rgba(14, 165, 233, 0.2);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+/* Empty Tip */
+.transitions-empty-tip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 12px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+/* 3. CapCut Category Tabs */
+.transitions-cat-row {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.transitions-cat-tab {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 20px;
+  color: #94a3b8;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3.5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.transitions-cat-tab:hover {
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.transitions-cat-tab.is-active {
+  background: #38bdf8;
+  border-color: #38bdf8;
+  color: #0f172a;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.35);
+}
+
+/* 4. CapCut Animated Cards Grid */
+.transitions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+}
+
+.transitions-card-capcut {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 6px 5px 6px;
+  cursor: pointer;
+  position: relative;
+  text-align: center;
+  box-shadow: 
+    0 2px 5px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.transitions-card-capcut:hover {
+  transform: translateY(-2px);
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 
+    0 5px 12px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.transitions-card-capcut.is-selected {
+  border-color: #38bdf8;
+  background: linear-gradient(180deg, rgba(14, 165, 233, 0.18) 0%, #0f172a 100%);
+  box-shadow: 
+    0 4px 10px rgba(14, 165, 233, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* CapCut Animated Thumbnail Screen */
+.capcut-thumb-screen {
+  width: 100%;
+  height: 38px;
+  border-radius: 5px;
+  overflow: hidden;
+  position: relative;
+  background: #020617;
+  margin-bottom: 5px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.capcut-stage {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.capcut-clip-a,
+.capcut-clip-b {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+.capcut-clip-a {
+  background: linear-gradient(135deg, #1e40af 0%, #38bdf8 100%);
+  color: rgba(255, 255, 255, 0.85);
+  z-index: 1;
+}
+
+.capcut-clip-b {
+  background: linear-gradient(135deg, #be123c 0%, #fb923c 100%);
+  color: rgba(255, 255, 255, 0.95);
+  z-index: 2;
+}
+
+.clip-label {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.transitions-card-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1.2;
+}
+
+.transitions-card-capcut.is-selected .transitions-card-label {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.transitions-card-check {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #38bdf8;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  z-index: 5;
+}
+
+/* Overlays inside animated thumb */
+.capcut-fx-flash {
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  pointer-events: none;
+  animation: fxFlash 2.5s infinite ease-in-out;
+}
+
+.capcut-fx-flash-black {
+  position: absolute;
+  inset: 0;
+  background: #000000;
+  pointer-events: none;
+  animation: fxFlashBlack 2.5s infinite ease-in-out;
+}
+
+.capcut-fx-light-leak {
+  position: absolute;
+  inset: -50%;
+  background: linear-gradient(120deg, transparent 20%, rgba(253, 224, 71, 0.85) 50%, rgba(244, 63, 94, 0.85) 60%, transparent 80%);
+  pointer-events: none;
+  mix-blend-mode: screen;
+  animation: fxLightLeak 2.5s infinite ease-in-out;
+}
+
+.capcut-fx-glitch {
+  position: absolute;
+  inset: 0;
+  background: rgba(56, 189, 248, 0.25);
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+  animation: fxGlitchOverlay 2.5s infinite steps(2);
+}
+
+/* ========================================================
+   CAPCUT REAL ANIMATIONS (Continuous Live Preview Loops)
+   Cycle: 2.5s loop
+   0%-20%: Clip A visible
+   20%-65%: Transition takes place
+   65%-85%: Clip B visible
+   85%-100%: Smoothly reset back to Clip A
+   ======================================================== */
+
+/* 1. None */
+.anim-none {
+  animation: kfNone 2.5s infinite;
+}
+@keyframes kfNone {
+  0%, 35% { opacity: 0; }
+  35.1%, 85% { opacity: 1; }
+  85.1%, 100% { opacity: 0; }
+}
+
+/* 2. Fade (Cross Dissolve) */
+.anim-fade {
+  animation: kfFade 2.5s infinite ease-in-out;
+}
+@keyframes kfFade {
+  0%, 20% { opacity: 0; }
+  45%, 85% { opacity: 1; }
+  98%, 100% { opacity: 0; }
+}
+
+/* 3. Flash White */
+.anim-flash {
+  animation: kfFlash 2.5s infinite ease-in-out;
+}
+@keyframes kfFlash {
+  0%, 25% { opacity: 0; }
+  35%, 85% { opacity: 1; }
+  98%, 100% { opacity: 0; }
+}
+@keyframes fxFlash {
+  0%, 20% { opacity: 0; }
+  35% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* 4. Flash Black (Dip to Black) */
+.anim-flash-black {
+  animation: kfFlashBlack 2.5s infinite ease-in-out;
+}
+@keyframes kfFlashBlack {
+  0%, 25% { opacity: 0; }
+  38%, 85% { opacity: 1; }
+  98%, 100% { opacity: 0; }
+}
+@keyframes fxFlashBlack {
+  0%, 15% { opacity: 0; }
+  30% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* 5. Zoom In */
+.anim-zoom {
+  animation: kfZoomIn 2.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes kfZoomIn {
+  0%, 20% { opacity: 0; transform: scale(1.6); }
+  45%, 85% { opacity: 1; transform: scale(1); }
+  98%, 100% { opacity: 0; transform: scale(1.6); }
+}
+
+/* 6. Zoom Out */
+.anim-zoom-out {
+  animation: kfZoomOut 2.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes kfZoomOut {
+  0%, 20% { opacity: 0; transform: scale(0.4); }
+  45%, 85% { opacity: 1; transform: scale(1); }
+  98%, 100% { opacity: 0; transform: scale(0.4); }
+}
+
+/* 7. Push Left */
+.anim-push-left {
+  animation: kfPushLeft 2.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes kfPushLeft {
+  0%, 20% { transform: translateX(100%); }
+  45%, 85% { transform: translateX(0%); }
+  98%, 100% { transform: translateX(100%); }
+}
+
+/* 8. Push Right */
+.anim-push-right {
+  animation: kfPushRight 2.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes kfPushRight {
+  0%, 20% { transform: translateX(-100%); }
+  45%, 85% { transform: translateX(0%); }
+  98%, 100% { transform: translateX(-100%); }
+}
+
+/* 9. Spin 360 */
+.anim-spin {
+  animation: kfSpin 2.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes kfSpin {
+  0%, 20% { opacity: 0; transform: rotate(180deg) scale(0.2); }
+  45%, 85% { opacity: 1; transform: rotate(0deg) scale(1); }
+  98%, 100% { opacity: 0; transform: rotate(180deg) scale(0.2); }
+}
+
+/* 10. Camera Shake */
+.anim-shake {
+  animation: kfShake 2.5s infinite ease-in-out;
+}
+@keyframes kfShake {
+  0%, 20% { opacity: 0; transform: none; }
+  25% { opacity: 1; transform: translate(-3px, 2px); }
+  30% { transform: translate(3px, -2px); }
+  35% { transform: translate(-2px, 1px); }
+  42%, 85% { opacity: 1; transform: translate(0, 0); }
+  98%, 100% { opacity: 0; transform: none; }
+}
+
+/* 11. Wipe Left */
+.anim-wipe-left {
+  animation: kfWipeLeft 2.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes kfWipeLeft {
+  0%, 20% { clip-path: inset(0 0 0 100%); }
+  45%, 85% { clip-path: inset(0 0 0 0%); }
+  98%, 100% { clip-path: inset(0 0 0 100%); }
+}
+
+/* 12. Wipe Right */
+.anim-wipe-right {
+  animation: kfWipeRight 2.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes kfWipeRight {
+  0%, 20% { clip-path: inset(0 100% 0 0); }
+  45%, 85% { clip-path: inset(0 0 0 0); }
+  98%, 100% { clip-path: inset(0 100% 0 0); }
+}
+
+/* 13. Wipe Up */
+.anim-wipe-up {
+  animation: kfWipeUp 2.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes kfWipeUp {
+  0%, 20% { clip-path: inset(100% 0 0 0); }
+  45%, 85% { clip-path: inset(0 0 0 0); }
+  98%, 100% { clip-path: inset(100% 0 0 0); }
+}
+
+/* 14. Wipe Down */
+.anim-wipe-down {
+  animation: kfWipeDown 2.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes kfWipeDown {
+  0%, 20% { clip-path: inset(0 0 100% 0); }
+  45%, 85% { clip-path: inset(0 0 0 0); }
+  98%, 100% { clip-path: inset(0 0 100% 0); }
+}
+
+/* 15. Split Door */
+.anim-split {
+  animation: kfSplit 2.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes kfSplit {
+  0%, 20% { clip-path: inset(0 50%); }
+  45%, 85% { clip-path: inset(0 0%); }
+  98%, 100% { clip-path: inset(0 50%); }
+}
+
+/* 16. Circle Iris */
+.anim-circle-iris {
+  animation: kfCircleIris 2.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes kfCircleIris {
+  0%, 20% { clip-path: circle(0% at 50% 50%); }
+  48%, 85% { clip-path: circle(85% at 50% 50%); }
+  98%, 100% { clip-path: circle(0% at 50% 50%); }
+}
+
+/* 17. Blur Cut */
+.anim-blur {
+  animation: kfBlur 2.5s infinite ease-in-out;
+}
+@keyframes kfBlur {
+  0%, 20% { opacity: 0; filter: blur(8px); }
+  45%, 85% { opacity: 1; filter: blur(0px); }
+  98%, 100% { opacity: 0; filter: blur(8px); }
+}
+
+/* 18. Glitch RGB */
+.anim-glitch {
+  animation: kfGlitch 2.5s infinite steps(2);
+}
+@keyframes kfGlitch {
+  0%, 20% { opacity: 0; transform: none; filter: none; }
+  25% { opacity: 1; transform: translateX(-4px) skewX(-14deg); filter: hue-rotate(90deg); }
+  32% { transform: translateX(4px) skewX(10deg); filter: invert(0.3); }
+  40%, 85% { opacity: 1; transform: none; filter: none; }
+  98%, 100% { opacity: 0; transform: none; }
+}
+@keyframes fxGlitchOverlay {
+  0%, 22% { opacity: 0; }
+  25%, 38% { opacity: 0.8; }
+  40%, 100% { opacity: 0; }
+}
+
+/* 19. Light Leak */
+.anim-light-leak {
+  animation: kfLightLeak 2.5s infinite ease-in-out;
+}
+@keyframes kfLightLeak {
+  0%, 20% { opacity: 0; }
+  38%, 85% { opacity: 1; }
+  98%, 100% { opacity: 0; }
+}
+@keyframes fxLightLeak {
+  0%, 15% { transform: translateX(-100%) rotate(25deg); opacity: 0; }
+  35% { transform: translateX(0%) rotate(0deg); opacity: 1; }
+  55%, 100% { transform: translateX(100%) rotate(-25deg); opacity: 0; }
+}
+
+/* 5. Duration Box */
+.transitions-duration-box {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.transitions-duration-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.transitions-duration-label-row span {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.transitions-duration-label-row strong {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.transitions-slider {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+  cursor: pointer;
+}
+
+.transitions-slider:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.transitions-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.transitions-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.transitions-duration-presets {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.transitions-duration-presets::-webkit-scrollbar {
+  display: none;
+}
+
+.transitions-preset-pill {
+  padding: 3px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.transitions-preset-pill:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+}
+
+.transitions-preset-pill.is-active {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(14, 165, 233, 0.4);
+}
+
+.transitions-preset-pill:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* 6. Footer Button */
+.transitions-footer {
+  display: flex;
+  margin-top: 2px;
+}
+
+.transitions-apply-all-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 7px;
+  padding: 7px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #f1f5f9;
+  cursor: pointer;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.18s ease;
+}
+
+.transitions-apply-all-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  transform: translateY(-1px);
+}
+
+.transitions-apply-all-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

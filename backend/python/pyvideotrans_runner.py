@@ -29,11 +29,18 @@ PYVIDEOTRANS_DIR = CURRENT_DIR / "pyvideotrans"
 if str(PYVIDEOTRANS_DIR) not in sys.path:
     sys.path.insert(0, str(PYVIDEOTRANS_DIR))
 
+# Ensure winform is mocked for headless CLI execution before loading videotrans
+import videotrans
+videotrans.winform = None
+
 # Initialize pyvideotrans configuration
 from videotrans.configure import config
 config.init_run()
 
 from videotrans.configure.config import app_cfg, tr
+app_cfg.exec_mode = "cli"
+app_cfg.exit_soft = False
+
 from videotrans.task.trans_create import TransCreate
 from videotrans.task.taskcfg import TaskCfgVTT
 from videotrans.util import tools
@@ -108,6 +115,18 @@ def run_pipeline(cfg_dict: dict):
             getset_gpu()
         except Exception:
             pass
+
+        # Normalize Khmer Voice Roles for Edge-TTS
+        # Official Edge-TTS for Khmer (km) supports:
+        # - Female: "Sreymom(Female/KH)" (km-KH-SreymomNeural)
+        # - Male: "Piseth(Male/KH)" (km-KH-PisethNeural)
+        target_lang = str(cfg_dict.get("target_language_code") or "").lower()
+        requested_voice = str(cfg_dict.get("voice_role") or "").strip()
+        if target_lang in ("km", "khmer") or "KH" in requested_voice:
+            if any(f in requested_voice for f in ["Sophea", "Bopha", "Female"]):
+                cfg_dict["voice_role"] = "Sreymom(Female/KH)"
+            else:
+                cfg_dict["voice_role"] = "Piseth(Male/KH)"
 
         # Strictly filter cfg_dict to only keys defined in TaskCfgVTT dataclass
         valid_fields = {f.name for f in dataclasses.fields(TaskCfgVTT)}

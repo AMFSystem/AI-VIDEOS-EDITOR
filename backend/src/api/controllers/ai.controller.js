@@ -13,6 +13,7 @@ import {
   synthesizeGeminiSpeech,
   generateGeminiScript,
   analyzeGeminiVocalPersona,
+  directGeminiVoiceoverScript,
 } from "../../services/ai/geminiService.js";
 import { config } from "../../config/index.js";
 import { pyvideotransService } from "../../services/ai/pyvideotransService.js";
@@ -236,6 +237,32 @@ export const aiController = {
 
     try {
       const result = await generateGeminiScript({ apiKey, prompt, topic, tone });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async geminiDirectScript(req, res) {
+    const apiKey = req.body?.apiKey || config.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const { text, currentStyle, currentEmotion, currentSpeed, currentPitch, engine } = req.body;
+    if (!apiKey) {
+      return res.status(400).json({ error: "Google Gemini API Key គឺចាំបាច់" });
+    }
+    if (!text || !String(text).trim()) {
+      return res.status(400).json({ error: "អត្ថបទត្រូវវិភាគគឺចាំបាច់" });
+    }
+
+    try {
+      const result = await directGeminiVoiceoverScript({
+        apiKey,
+        text,
+        currentStyle,
+        currentEmotion,
+        currentSpeed,
+        currentPitch,
+        engine,
+      });
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: err.message });

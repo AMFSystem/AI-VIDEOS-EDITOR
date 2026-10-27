@@ -1286,15 +1286,38 @@ export function drawPreviewFrame(context, visual, canvas, options) {
     const amount = Math.max(0, Math.min(1, transitionProgress));
     context.save();
     if (transitionId === "wipe-left") context.rect(width * (1 - amount), 0, width * amount, height);
+    else if (transitionId === "wipe-right") context.rect(0, 0, width * amount, height);
     else if (transitionId === "wipe-up") context.rect(0, height * (1 - amount), width, height * amount);
+    else if (transitionId === "wipe-down") context.rect(0, 0, width, height * amount);
     else if (transitionId === "split") {
       context.rect(width * (0.5 - amount / 2), 0, width * amount, height);
+    } else if (transitionId === "circle-iris") {
+      context.beginPath();
+      context.arc(width / 2, height / 2, Math.hypot(width, height) * amount * 0.75, 0, Math.PI * 2);
     }
-    if (["wipe-left", "wipe-up", "split"].includes(transitionId)) context.clip();
-    context.globalAlpha = transitionId === "flash" ? Math.max(0, (amount - 0.35) / 0.65) : amount;
+    if (["wipe-left", "wipe-right", "wipe-up", "wipe-down", "split", "circle-iris"].includes(transitionId)) context.clip();
+    context.globalAlpha = (transitionId === "flash" || transitionId === "flash-black" || transitionId === "light-leak")
+      ? Math.max(0, (amount - 0.35) / 0.65)
+      : amount;
     if (transitionId === "zoom") {
-      const scale = 1.12 - amount * 0.12;
+      const scale = 1.15 - amount * 0.15;
       context.translate(width / 2, height / 2); context.scale(scale, scale); context.translate(-width / 2, -height / 2);
+    } else if (transitionId === "zoom-out") {
+      const scale = 0.85 + amount * 0.15;
+      context.translate(width / 2, height / 2); context.scale(scale, scale); context.translate(-width / 2, -height / 2);
+    } else if (transitionId === "push-left") {
+      context.translate(width * (1 - amount), 0);
+    } else if (transitionId === "push-right") {
+      context.translate(-width * (1 - amount), 0);
+    } else if (transitionId === "spin") {
+      context.translate(width / 2, height / 2);
+      context.rotate((1 - amount) * Math.PI * 2);
+      const scale = 0.5 + amount * 0.5;
+      context.scale(scale, scale);
+      context.translate(-width / 2, -height / 2);
+    } else if (transitionId === "shake") {
+      const shakeAmt = (1 - amount) * 16;
+      context.translate(Math.sin(amount * Math.PI * 12) * shakeAmt, Math.cos(amount * Math.PI * 12) * shakeAmt * 0.6);
     }
     const nextBaseFilter = composeColorGradeFilter(
       transitionNext.filter || filter,
@@ -1306,11 +1329,19 @@ export function drawPreviewFrame(context, visual, canvas, options) {
     drawFittedVisual(context, transitionNext.visual, canvas, fitMode, nextFilter, transitionNext.vision || null, null, nextSmartFrameCrop);
     context.restore();
     if (transitionId === "flash") {
-      context.fillStyle = `rgba(255,255,255,${Math.max(0, 1 - Math.abs(amount - 0.5) * 2) * 0.7})`;
+      context.fillStyle = `rgba(255,255,255,${Math.max(0, 1 - Math.abs(amount - 0.5) * 2) * 0.85})`;
       context.fillRect(0, 0, width, height);
-    }
-    if (transitionId === "glitch") {
-      context.fillStyle = `rgba(53,234,217,${Math.sin(amount * Math.PI * 8) * 0.12})`;
+    } else if (transitionId === "flash-black") {
+      context.fillStyle = `rgba(0,0,0,${Math.max(0, 1 - Math.abs(amount - 0.5) * 2) * 0.95})`;
+      context.fillRect(0, 0, width, height);
+    } else if (transitionId === "light-leak") {
+      const grad = context.createLinearGradient(0, 0, width, height);
+      grad.addColorStop(0, `rgba(251,191,36,${Math.max(0, 1 - Math.abs(amount - 0.5) * 2) * 0.7})`);
+      grad.addColorStop(1, `rgba(244,63,94,${Math.max(0, 1 - Math.abs(amount - 0.5) * 2) * 0.7})`);
+      context.fillStyle = grad;
+      context.fillRect(0, 0, width, height);
+    } else if (transitionId === "glitch") {
+      context.fillStyle = `rgba(53,234,217,${Math.sin(amount * Math.PI * 8) * 0.15})`;
       context.fillRect(0, 0, width, height);
     }
   }

@@ -17,7 +17,9 @@ export const CAPTION_VISUAL_STYLE_KEYS = [
   "effect",
   "textStrokeColor",
   "textStrokeWidth",
+  "animation",
 ];
+
 
 export const CAPTION_SEGMENT_STYLE_KEYS = [...CAPTION_VISUAL_STYLE_KEYS, "captionSize"];
 
@@ -124,9 +126,14 @@ export const BUILTIN_CAPTION_STYLE_PRESETS = [
   },
 ];
 
+import { CAPCUT_CAPTION_TEMPLATES } from "./captionTemplates.js";
+
 export function getCaptionStylePreset(id) {
-  return BUILTIN_CAPTION_STYLE_PRESETS.find((preset) => preset.id === id) ?? null;
+  const builtin = BUILTIN_CAPTION_STYLE_PRESETS.find((preset) => preset.id === id);
+  if (builtin) return builtin;
+  return CAPCUT_CAPTION_TEMPLATES.find((template) => template.id === id) ?? null;
 }
+
 
 export function getCaptionSegmentOverrides(segment) {
   const overrides = { ...(segment?.styleOverrides ?? {}) };

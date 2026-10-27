@@ -184,6 +184,7 @@ export function EditorSidebar({ model: d }) {
             captionStylePresets={d.captionStylePresets}
             setCaptionStylePresets={d.setCaptionStylePresets}
             setCaptionSegments={d.setCaptionSegments}
+            commitCaptionSegments={d.commitCaptionSegments}
             captionsEnabled={d.captionsEnabled}
             setCaptionsEnabled={d.setCaptionsEnabled}
             selectedFilterId={d.selectedFilterId}
@@ -221,6 +222,13 @@ export function EditorSidebar({ model: d }) {
             openAvatarPanel={d.openAvatarPanel}
             smartMode={d.smartMode}
             setSmartMode={d.setSmartMode}
+            silenceRemoval={d.silenceRemoval}
+            replaceAudio={d.replaceAudio}
+            applyAssetToTrack={d.applyAssetToTrack}
+            currentTime={d.currentTime}
+            selectedAudioSegment={d.selectedAudioSegment}
+            updateAudioSegment={d.updateAudioSegment}
+            selectTool={d.selectTool}
             openMobileInspector={() => d.setMobilePanel?.("inspector")}
             musicBlob={d.musicBlob}
             musicName={d.musicName}
@@ -235,6 +243,7 @@ export function EditorSidebar({ model: d }) {
             t={d.t}
             trOption={d.trOption}
             selectedVisualSegment={d.selectedVisualSegment}
+            visualSegments={d.visualSegments}
             selectedEffectSegment={d.selectedEffectSegment}
             effectAnalysis={d.effectAnalysis}
             effectRunning={d.effectRunning}
@@ -275,6 +284,10 @@ export function EditorSidebar({ model: d }) {
             miganRepair={d.miganRepair}
             hdRestoration={d.hdRestoration}
             smartDenoise={d.smartDenoise}
+            selectedTransitionIndex={d.selectedTransitionIndex}
+            setSelectedTransitionIndex={d.setSelectedTransitionIndex}
+            updateTransitionAtIndex={d.updateTransitionAtIndex}
+            applyTransitionToAll={d.applyTransitionToAll}
           />
         )}
       </aside>

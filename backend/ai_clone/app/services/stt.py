@@ -121,30 +121,31 @@ class SttService:
         return self._khmer
 
     def transcribe(self, audio_path: Path, language: str | None = None) -> Transcription:
-        """Transcribe an audio file. `language=None` auto-detects between Khmer and English."""
+        """Transcribe an audio file. `language=None` or `language='auto'` auto-detects language."""
         from faster_whisper.audio import decode_audio
 
         audio = decode_audio(str(audio_path), sampling_rate=SAMPLE_RATE)
         duration = round(len(audio) / SAMPLE_RATE, 2)
 
         with self._slots:
-            if language is None:
-                language, probability = self._detect(audio)
+            if not language or language == "auto":
+                target_lang, probability = self._detect(audio)
             else:
+                target_lang = language.lower().strip()
                 probability = 1.0
 
-            if language == "en":
-                segments = self._transcribe_english(audio)
-                text = " ".join(s.text for s in segments)
-                segmented = text
-            else:
+            if target_lang == "km":
                 chunks = self._load_khmer().transcribe(audio)
                 segments = [Segment(c.start, c.end, c.text) for c in chunks]
                 text = " ".join(c.text for c in chunks)
                 segmented = " ".join(c.segmented for c in chunks)
+            else:
+                segments = self._transcribe_whisper(audio, target_lang)
+                text = " ".join(s.text for s in segments)
+                segmented = text
 
         return Transcription(
-            language=language,
+            language=target_lang,
             language_probability=round(probability, 3),
             duration=duration,
             text=text,
@@ -159,12 +160,15 @@ class SttService:
             return "en", p_en
         return "km", 1.0 - p_en
 
-    def _transcribe_english(self, audio) -> list[Segment]:
+
+    def _transcribe_whisper(self, audio, language: str = "en") -> list[Segment]:
         segments_iter, _ = self._load_whisper().transcribe(
             audio,
-            language="en",
+            language=language if language != "auto" else None,
             beam_size=self._settings.stt_beam_size,
             vad_filter=True,  # skip silence: faster and fewer hallucinations
+            word_timestamps=True,
         )
         # `segments_iter` is lazy; decoding actually happens while iterating.
-        return [Segment(round(s.start, 2), round(s.end, 2), s.text.strip()) for s in segments_iter]
+        return [Segment(round(s.start, 2), round(s.end, 2), s.text.strip()) for s in segments_iter if s.text.strip()]
+

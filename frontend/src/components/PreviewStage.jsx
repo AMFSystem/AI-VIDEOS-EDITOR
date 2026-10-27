@@ -825,7 +825,7 @@ export function PreviewStage({
                 ) : (
                   <img src={previewTransition.next.src} alt="" crossOrigin="anonymous" style={{ objectFit: activeObjectFit, objectPosition: activeObjectPosition }} />
                 )}
-                {previewTransition.id === "flash" ? <i /> : null}
+                {["flash", "flash-black", "light-leak"].includes(previewTransition.id) ? <i /> : null}
               </div>
             ) : null}
             {[...visualOverlays].sort((left, right) => (left.layer || 1) - (right.layer || 1)).map((overlay) => {

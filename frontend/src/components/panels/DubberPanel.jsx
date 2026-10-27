@@ -1621,10 +1621,10 @@ export function DubberPanel({
               onChange={(e) => setVoiceRole(e.target.value)}
             >
               <optgroup label="🇰🇭 Khmer Dubbing Voices">
-                <option value="Piseth(Male/KH)">Piseth (Male/KH)</option>
-                <option value="Sophea(Female/KH)">Sophea (Female/KH)</option>
-                <option value="Dara(Male/KH)">Dara (Male/KH)</option>
-                <option value="Bopha(Female/KH)">Bopha (Female/KH)</option>
+                <option value="Piseth(Male/KH)">Piseth - ពិសិដ្ឋ (Male/KH)</option>
+                <option value="Sreymom(Female/KH)">Sreymom / Sophea - ស្រីមុំ (Female/KH)</option>
+                <option value="Dara(Male/KH)">Dara - តារា (Male/KH)</option>
+                <option value="Bopha(Female/KH)">Bopha - បុប្ផា (Female/KH)</option>
               </optgroup>
               <optgroup label="🇨🇳 Chinese Voices">
                 <option value="zh-CN-YunxiNeural">zh-CN-YunxiNeural</option>

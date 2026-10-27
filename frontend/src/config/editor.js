@@ -2,11 +2,15 @@ import {
   ClosedCaptioning,
   FilmSlate,
   ImageSquare,
+  Intersect,
+  MagnifyingGlassPlus,
   MusicNote,
   MagicWand,
   PlugsConnected,
   Scan,
   Sticker,
+  TextT,
+  Waveform,
 } from "@phosphor-icons/react";
 
 export { MODEL_ID, AUTOMATIC_CAPTION_MODEL_ID, AUTOMATIC_CAPTION_MODEL_LABEL } from "./models.js";
@@ -215,9 +219,13 @@ export const VOICES = [
 
 export const TOOL_RAIL = [
   { id: "media", label: "Media", icon: ImageSquare },
+  { id: "text", label: "Text", icon: TextT },
   { id: "caption", label: "Captions", icon: ClosedCaptioning },
   { id: "smart", label: "Smart", icon: Scan },
   { id: "audio", label: "Audio", icon: MusicNote },
+  { id: "voice-effects", label: "Voice Effect", icon: Waveform },
+  { id: "auto-zoom", label: "Auto Zoom", icon: MagnifyingGlassPlus },
+  { id: "transitions", label: "Transitions", icon: Intersect },
   { id: "dubber", label: "Dubber", icon: FilmSlate },
   { id: "effects", label: "Effects", icon: MagicWand },
   { id: "plugins", label: "Plugins", icon: PlugsConnected },
@@ -253,16 +261,34 @@ export const EFFECT_OPTIONS = [
 export const FILTER_OPTIONS = [...BASIC_FILTER_OPTIONS, ...EFFECT_OPTIONS];
 export const VISUAL_STYLE_OPTIONS = FILTER_OPTIONS;
 
+export const TRANSITION_CATEGORIES = [
+  { id: "all", name: "All", khmer: "ទាំងអស់" },
+  { id: "basic", name: "Basic", khmer: "ទូទៅ" },
+  { id: "movement", name: "Movement", khmer: "ចលនា" },
+  { id: "wipe", name: "Wipe & Split", khmer: "រុញកាត់" },
+  { id: "effect", name: "Effects", khmer: "បែបពិសេស" },
+];
+
 export const TRANSITIONS = [
-  { id: "none", name: "No Transition" },
-  { id: "fade", name: "Fade" },
-  { id: "zoom", name: "Zoom In/Out" },
-  { id: "flash", name: "Flash White" },
-  { id: "wipe-left", name: "Wipe Left" },
-  { id: "wipe-up", name: "Wipe Up" },
-  { id: "blur", name: "Blur Cut" },
-  { id: "split", name: "Split Door" },
-  { id: "glitch", name: "Glitch" },
+  { id: "none", name: "No Transition", category: "basic" },
+  { id: "fade", name: "Fade", category: "basic" },
+  { id: "flash", name: "Flash White", category: "basic" },
+  { id: "flash-black", name: "Flash Black", category: "basic" },
+  { id: "zoom", name: "Zoom In", category: "movement" },
+  { id: "zoom-out", name: "Zoom Out", category: "movement" },
+  { id: "push-left", name: "Push Left", category: "movement" },
+  { id: "push-right", name: "Push Right", category: "movement" },
+  { id: "spin", name: "Spin 360", category: "movement" },
+  { id: "shake", name: "Camera Shake", category: "movement" },
+  { id: "wipe-left", name: "Wipe Left", category: "wipe" },
+  { id: "wipe-right", name: "Wipe Right", category: "wipe" },
+  { id: "wipe-up", name: "Wipe Up", category: "wipe" },
+  { id: "wipe-down", name: "Wipe Down", category: "wipe" },
+  { id: "split", name: "Split Door", category: "wipe" },
+  { id: "circle-iris", name: "Circle Iris", category: "wipe" },
+  { id: "blur", name: "Blur Cut", category: "effect" },
+  { id: "glitch", name: "Glitch RGB", category: "effect" },
+  { id: "light-leak", name: "Light Leak", category: "effect" },
 ];
 
 export const STICKER_PAGE_SIZE = 9;

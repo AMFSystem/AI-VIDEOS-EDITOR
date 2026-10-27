@@ -232,6 +232,7 @@ export function Timeline({
   selectedTrack,
   setSelectedTrack,
   setActiveTool,
+  setSmartMode,
   openMobileInspector,
   openMobileTools,
   openMobileFilePicker,
@@ -282,6 +283,8 @@ export function Timeline({
   imageSrc,
   displayedVisualSegments,
   setVisualSegments,
+  selectedTransitionIndex = 0,
+  setSelectedTransitionIndex,
   renderedVisualTimeline,
   visualType,
   currentVisualSegment,
@@ -2918,6 +2921,18 @@ export function Timeline({
             <Scissors size={17} />
           </IconButton>
           <IconButton
+            label="Auto Cut (កាត់ស្ងាត់)"
+            tooltip
+            releaseFocusOnPointer
+            onClick={() => {
+              setActiveTool?.("smart");
+              setSmartMode?.("remove-pauses");
+              openMobileInspector?.();
+            }}
+          >
+            <Waveform size={17} weight="bold" />
+          </IconButton>
+          <IconButton
             label={t(rippleEditing ? "rippleEditingOn" : "rippleEditingOff")}
             tooltip
             releaseFocusOnPointer
@@ -3423,7 +3438,7 @@ export function Timeline({
                   : 0;
                 return (
                   <button
-                    className={`visual-junction ${transition.id !== "none" ? "has-transition" : ""}`}
+                    className={`visual-junction ${transition.id !== "none" ? "has-transition" : ""} ${selectedTransitionIndex === index ? "is-active-junction" : ""}`}
                     key={`junction-${segment.id}`}
                     type="button"
                     aria-label={`${t("transition")}: ${trOption(TRANSITIONS.find((item) => item.id === transition.id)?.name || "无转场")}`}
@@ -3432,8 +3447,10 @@ export function Timeline({
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => {
                       event.stopPropagation();
-                      const rect = event.currentTarget.getBoundingClientRect();
-                      setTransitionEditor({ index, x: rect.left + rect.width / 2, y: rect.top });
+                      setTransitionEditor(null);
+                      setSelectedTransitionIndex?.(index);
+                      setActiveTool?.("transitions");
+                      if (openMobileInspector) openMobileInspector("image", "transitions");
                     }}
                   ><span>◇</span></button>
                 );
@@ -3774,6 +3791,17 @@ export function Timeline({
                 <button type="button" role="menuitem" disabled={audioProcessingBusy} onClick={() => runContextAction(() => generateCaptionsFromAudioClip?.({ blob: musicBlob, start: contextMusicSegment.start, sourceStart: contextMusicSegment.sourceStart || 0, duration: contextMusicSegment.duration, append: true }))}><ClosedCaptioning size={16} />{t("generateCaptionsFromClip")}</button>
               </> : null}
               <button type="button" role="menuitem" onClick={() => runContextAction(handleCutTrack)}><Scissors size={16} />{t("splitAtPlayhead")}</button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => runContextAction(() => {
+                  setActiveTool?.("smart");
+                  setSmartMode?.("remove-pauses");
+                  openMobileInspector?.();
+                })}
+              >
+                <Waveform size={16} />Auto Cut (កាត់ស្ងាត់)
+              </button>
               <button type="button" role="menuitem" onClick={() => runContextAction(handleDuplicateTrack)}><CopySimple size={16} />{t("duplicateClip")}</button>
               <div className="timeline-context-divider" />
               <button className="is-danger" type="button" role="menuitem" onClick={() => runContextAction(handleDeleteTrack)}><Trash size={16} />{t("deleteClip")}</button>
@@ -3790,7 +3818,7 @@ export function Timeline({
       {transitionEditor ? (() => {
         const segment = displayedVisualSegments[transitionEditor.index];
         const transition = segment?.transition || { id: "none", duration: 0.5 };
-        const maxDuration = Math.max(0.1, Math.min(2, (segment?.duration || 0.5) / 2, (displayedVisualSegments[transitionEditor.index + 1]?.duration || 0.5) / 2));
+        const maxDuration = 10.0;
         return (
           <div className="transition-popover" role="dialog" aria-label={t("transitionSettings")} style={{ left: transitionEditor.x, top: transitionEditor.y }} onPointerDown={(event) => event.stopPropagation()}>
             <div className="transition-popover-head"><strong>{t("transition")}</strong><button type="button" onClick={() => setTransitionEditor(null)} aria-label={t("close")}><X size={17} /></button></div>

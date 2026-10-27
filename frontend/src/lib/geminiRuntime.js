@@ -677,3 +677,218 @@ Rules:
 
   throw lastScriptError || new Error("Gemini Script Generation បរាជ័យ");
 }
+
+/**
+ * AI Auto Director: Directs, analyzes and optimizes Khmer script for Local TTS & Voice Clone
+ * @param {object} params
+ * @param {string} [params.apiKey]
+ * @param {string} params.text
+ * @param {string} [params.currentStyle]
+ * @param {string} [params.currentEmotion]
+ * @param {number} [params.currentSpeed]
+ * @param {number} [params.currentPitch]
+ * @param {string} [params.engine]
+ * @returns {Promise<{
+ *   directedText: string,
+ *   textType: string,
+ *   suggestedStyle: string,
+ *   suggestedEmotion: string,
+ *   suggestedSpeed: number,
+ *   suggestedPitch: number,
+ *   directorNotes: string
+ * }>}
+ */
+export async function directVoiceoverWithGemini({
+  apiKey = "",
+  text = "",
+  currentStyle = "professional",
+  currentEmotion = "none",
+  currentSpeed = 1.0,
+  currentPitch = 1.0,
+  engine = "mms",
+}) {
+  const cleanKey = (apiKey || getStoredGeminiKey() || "").trim();
+
+  // Channel 1: Try backend proxy
+  try {
+    const res = await fetch("/api/ai/gemini/direct-script", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        apiKey: cleanKey,
+        text,
+        currentStyle,
+        currentEmotion,
+        currentSpeed,
+        currentPitch,
+        engine,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.directedText) {
+        return data;
+      }
+    }
+  } catch {
+    // Fall back to direct browser call
+  }
+
+  if (!cleanKey) {
+    throw new Error("សូមបញ្ចូល Google Gemini API Key ដើម្បីប្រើមុខងារ AI Director (ឥតគិតថ្លៃ)");
+  }
+
+  // Channel 2: Direct browser call
+  const candidateModels = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+
+  const systemInstruction = `You are an elite Cambodian AI Voice Director, Khmer Linguist, and Commercial Audio Engineer.
+Your task is to analyze, rewrite, and direct Khmer text for neural Text-to-Speech (TTS) and Voice Cloning engines (such as VoxCPM2 48kHz, OmniVoice F5-TTS, and Meta MMS) to make the synthesized speech sound 100% natural, human-like, and accurately tailored to the chosen Style and Emotion.
+
+CRITICAL INSTRUCTIONS FOR directedText:
+1. YOU MUST ACTIVELY ENHANCE THE SCRIPT FOR SPOKEN VOICE:
+   - Convert all numerals, prices, percentages, dates, and phone numbers into full spoken Khmer words:
+     * "ម៉ោង ២" -> "ម៉ោងពីរ"
+     * "១០" / "10" -> "ដប់"
+     * "$50" / "50$" -> "ហាសិបដុល្លារ"
+     * "100,000៛" -> "ដប់ម៉ឺនរៀល"
+     * "50%" -> "ហាសិបភាគរយ"
+     * "012 345 678" -> "សូន្យ ដប់ពីរ បីរយសែសិបប្រាំ ប្រាំមួយរយកៅសិបប្រាំបី"
+   - Insert expressive breathing pauses using natural commas, full stops, or "[pause 0.3s]", "[pause 0.4s]", or "[pause 0.5s]" before dramatic transitions or key reveals.
+   - Refine sentence flow so the local voice model sounds like an authentic human with no awkward tongue-twisters.
+   - DO NOT return the script verbatim unchanged. Every script MUST have audible vocal improvements.
+
+2. STYLE & EMOTION DELIVERY RULES:
+   - "sponsor" (📢 ស្ពតពាណិជ្ជកម្ម / Commercial Sponsor Ad):
+     * Vibe: Energetic, enthusiastic, persuasive, punchy!
+     * Delivery: Insert micro-pauses before brand names, product features, and call-to-actions. Use exclamation marks '!' for excitement on offers/benefits.
+     * Suggested Speed: 1.08 - 1.15. Suggested Pitch: 1.04 - 1.08. Emotion: "happy" or "none".
+   - "dramatic" (🎭 រឿងភាគ/បុរាណ / Mystery):
+     * Vibe: Emotionally intense, measured, solemn, suspenseful.
+     * Suggested Speed: 0.90 - 0.95. Suggested Pitch: 0.93 - 0.98.
+   - "news" (🎙️ ព័ត៌មាន / អត្ថាធិប្បាយ):
+     * Vibe: Articulate, authoritative, objective, crisp broadcast tone.
+     * Suggested Speed: 1.02 - 1.06. Suggested Pitch: 1.00.
+   - "cinematic" (🎬 ភាពយន្ត / Epic Movie Trailer):
+     * Vibe: Grand, deep resonance, dramatic gravitas.
+     * Suggested Speed: 0.88 - 0.94. Suggested Pitch: 0.92 - 0.96.
+   - "casual" (💬 សន្ទនាធម្មតា / Daily Vlog):
+     * Vibe: Friendly, approachable, natural everyday conversational flow.
+     * Suggested Speed: 1.00. Suggested Pitch: 1.00.
+   - "professional" (👔 ផ្លូវការ / Corporate / Narration):
+     * Vibe: Polished, clear, respectful.
+     * Suggested Speed: 1.00. Suggested Pitch: 1.00.
+
+3. AUTO-DETECTION & USER STYLE ALIGNMENT:
+   - If the user explicitly selected a Style (e.g. currentStyle is "sponsor", "dramatic", "news", etc.), HONOR that choice and direct the vocal cadence specifically to excel in that requested style!
+   - If currentStyle is "professional" or general, but the text contains promotional/commercial cues (e.g. "បញ្ចុះតម្លៃ", "ប្រូម៉ូសិន", "ទិញឥឡូវនេះ", "ទាក់ទង", "រង្វាន់", "$", "%", "ហាង"), auto-detect textType as "Commercial / Sponsor Ad" and set suggestedStyle to "sponsor".
+   - textType: e.g. "Commercial / Sponsor Ad", "Suspense / Horror Mystery", "Historical Drama", "News & Documentary", "Storytelling / Legend", "Conversational Dialogue"
+   - suggestedStyle: one of ["professional", "sponsor", "dramatic", "news", "cinematic", "casual"] (lowercase)
+   - suggestedEmotion: one of ["none", "happy", "angry", "sad", "surprised", "whisper"] (lowercase)
+   - suggestedSpeed: number between 0.85 and 1.25
+   - suggestedPitch: number between 0.90 and 1.15
+   - directorNotes: A concise 1-2 sentence advice in Khmer explaining exactly what was improved for the voice artist.
+
+Respond in STRICT JSON format:
+{
+  "directedText": "...",
+  "textType": "...",
+  "suggestedStyle": "...",
+  "suggestedEmotion": "...",
+  "suggestedSpeed": 1.10,
+  "suggestedPitch": 1.05,
+  "directorNotes": "..."
+}`;
+
+  const userContent = `អត្ថបទបច្ចុប្បន្ន (Current Script):
+${text}
+
+ការកំណត់បច្ចុប្បន្ន (Current Settings):
+- Style: ${currentStyle}
+- Emotion: ${currentEmotion}
+- Speed: ${currentSpeed}x
+- Pitch: ${currentPitch}x
+- Target Audio Engine: ${engine}
+
+សូមជួយ Direct និងកែលម្អអត្ថបទនេះឱ្យមានចង្វាក់និយាយដូចមនុស្សពិតៗ (បម្លែងលេខជាពាក្យ និងដាក់ pause សមស្រប) និងកំណត់ Settings ដ៏ល្អបំផុតជាទម្រង់ JSON។`;
+
+  const requestBody = {
+    systemInstruction: {
+      parts: [{ text: systemInstruction }],
+    },
+    contents: [
+      {
+        parts: [{ text: userContent }],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.3,
+      responseMimeType: "application/json",
+      maxOutputTokens: 1500,
+    },
+  };
+
+  let lastError = null;
+  for (const model of candidateModels) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        const msg = errJson?.error?.message || `HTTP ${response.status}`;
+        lastError = new Error(`Gemini Director (${model}) បរាជ័យ: ${msg}`);
+        continue;
+      }
+
+      const result = await response.json();
+      const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) {
+        lastError = new Error(`Gemini (${model}) មិនបានឆ្លើយតបអត្ថបទទេ`);
+        continue;
+      }
+
+      let parsed = null;
+      try {
+        const cleanJsonStr = rawText
+          .replace(/```json\\s*/gi, "")
+          .replace(/```\\s*$/gi, "")
+          .trim();
+        parsed = JSON.parse(cleanJsonStr);
+      } catch {
+        const match = rawText.match(/\\{[\\s\\S]*\\}/);
+        if (match) {
+          try {
+            parsed = JSON.parse(match[0]);
+          } catch {}
+        }
+      }
+
+      if (!parsed || typeof parsed !== "object") {
+        lastError = new Error(`Gemini (${model}) ឆ្លើយតបទិន្នន័យមិនអាចបំប្លែងជា JSON បាន`);
+        continue;
+      }
+
+      const styleStr = String(parsed.suggestedStyle || currentStyle).toLowerCase().trim();
+      const emotionStr = String(parsed.suggestedEmotion || currentEmotion).toLowerCase().trim();
+
+      return {
+        directedText: parsed.directedText || text,
+        textType: parsed.textType || "Narrative Script",
+        suggestedStyle: styleStr,
+        suggestedEmotion: emotionStr,
+        suggestedSpeed: Number(parsed.suggestedSpeed) || currentSpeed,
+        suggestedPitch: Number(parsed.suggestedPitch) || currentPitch,
+        directorNotes: parsed.directorNotes || "Gemini បានកែលម្អចង្វាក់ដកដង្ហើម និងការបញ្ចេញសំឡេងឱ្យដូចមនុស្សពិត។",
+      };
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("Gemini Director បរាជ័យ");
+}

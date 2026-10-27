@@ -183,12 +183,15 @@ export const pyvideotransService = {
     logger.info(`[PyVideoTrans] Starting native task for ${path.basename(name)} (${sourceLang} -> ${targetLang})`);
 
     return new Promise((resolve, reject) => {
+      const uvPath = fs.existsSync("/Users/hr/.local/bin/uv") ? "/Users/hr/.local/bin/uv" : "uv";
+      const extendedPath = ["/Users/hr/.local/bin", "/opt/homebrew/bin", "/usr/local/bin", process.env.PATH].filter(Boolean).join(":");
       const dyldFallback = ["/opt/homebrew/lib", "/usr/local/lib", process.env.DYLD_FALLBACK_LIBRARY_PATH].filter(Boolean).join(":");
 
-      const child = spawn("uv", ["run", "--no-sync", "python", RUNNER_SCRIPT, "--config", configPath], {
+      const child = spawn(uvPath, ["run", "python", RUNNER_SCRIPT, "--config", configPath], {
         cwd: PYVIDEOTRANS_DIR,
         env: {
           ...process.env,
+          PATH: extendedPath,
           PYTHONUNBUFFERED: "1",
           DYLD_FALLBACK_LIBRARY_PATH: dyldFallback,
         },

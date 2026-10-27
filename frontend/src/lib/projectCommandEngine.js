@@ -11,7 +11,7 @@ const MIN_TIMED_CAPTION_SECONDS = 0.2;
 
 export const CAPTION_STYLE_PROPERTY_SCHEMA = Object.freeze({
   fontId: { type: "string", enum: CAPTION_FONT_CATALOG.map((font) => font.id) },
-  captionSize: { type: "number", minimum: 12, maximum: 42 },
+  captionSize: { type: "number", minimum: 12, maximum: 64 },
   ...Object.fromEntries(["textColor", "backgroundColor", "borderColor", "textStrokeColor"].map((key) => [key, { type: "string", pattern: "^#[0-9a-fA-F]{6}$" }])),
   ...Object.fromEntries(Object.entries({ backgroundOpacity: 1, shadowOpacity: 1, textStrokeWidth: 6, borderWidth: 8, radius: 28, paddingX: 52, paddingY: 32 })
     .map(([key, maximum]) => [key, { type: "number", minimum: 0, maximum }])),
@@ -471,7 +471,11 @@ function addOverlay(project, operation) {
 }
 
 function setTransition(project, operation) {
-  const transitions = new Set(["none", "fade", "zoom", "flash", "wipe-left", "wipe-up", "blur", "split", "glitch"]);
+  const transitions = new Set([
+    "none", "fade", "zoom", "zoom-out", "flash", "flash-black",
+    "wipe-left", "wipe-right", "wipe-up", "wipe-down", "push-left", "push-right",
+    "blur", "split", "glitch", "spin", "circle-iris", "shake", "light-leak",
+  ]);
   if (!transitions.has(operation.transitionId)) throw Object.assign(new Error(`Unknown transition: ${operation.transitionId}`), { code: "INVALID_TRANSITION" });
   const visuals = Array.isArray(project.visualSegments) ? project.visualSegments : [];
   const index = visuals.findIndex((clip) => clip.id === operation.clipId);
@@ -479,9 +483,7 @@ function setTransition(project, operation) {
   if (operation.transitionId !== "none" && index >= visuals.length - 1) {
     throw Object.assign(new Error("A transition requires a following visual clip"), { code: "INVALID_TRANSITION_TARGET" });
   }
-  const maximum = index < visuals.length - 1
-    ? Math.max(0.1, Math.min(2, Number(visuals[index].duration) / 2, Number(visuals[index + 1].duration) / 2))
-    : 0.5;
+  const maximum = index < visuals.length - 1 ? 10.0 : 0.5;
   const duration = Object.hasOwn(operation, "duration") ? finitePositive(operation.duration, "duration") : 0.5;
   if (duration > maximum) throw Object.assign(new Error(`Transition duration cannot exceed ${maximum}`), { code: "INVALID_RANGE" });
   visuals[index].transition = { id: operation.transitionId, duration: Math.min(duration, maximum) };

@@ -88,7 +88,7 @@ import { useNanoVsrRestoration } from "./hooks/useNanoVsrRestoration.js";
 import { useSmartDenoise } from "./hooks/useSmartDenoise.js";
 import { useGenerationPlugins } from "./hooks/useGenerationPlugins.js";
 import { getVisualAssetPayload, getVisualSegmentTimeline, getImageThumbnailCount, getVisualSegmentsTotal, normalizeTimedSegmentIds } from "./lib/timeline.js";
-import { getVisualSourceTime, normalizeVisualTransform, removeVisualPropertyKeyframe, updateVisualSegmentPlaybackRate, upsertVisualKeyframe, upsertVisualPropertyKeyframe } from "./lib/visualEffects.js";
+import { getVisualSourceTime, normalizeVisualKeyframes, normalizeVisualTransform, removeVisualPropertyKeyframe, updateVisualSegmentPlaybackRate, upsertVisualKeyframe, upsertVisualPropertyKeyframe } from "./lib/visualEffects.js";
 import { getVisualSpeedCurveTimelineProgress, updateVisualSegmentSpeedCurve } from "./lib/visualSpeedCurve.js";
 import { getLinkedSourceAudioEnd, getLinkedSourceAudioSegments, shouldMuteEmbeddedVideoAudio, sliceSourceAudioPeaks } from "./lib/sourceAudioSync.js";
 import { getTimelineInitialContentZoom } from "./lib/timelineScale.js";
@@ -224,8 +224,24 @@ export function App() {
     phase: "",
   });
   const [avatarPanelOpen, setAvatarPanelOpen] = useState(false);
-  const [smartMode, setSmartMode] = useState("auto-edit");
+  const [smartMode, setSmartMode] = useState("remove-pauses");
   const [avatarJob, setAvatarJob] = useState({ running: false, progress: 0, phase: "" });
+  const [selectedTransitionIndex, setSelectedTransitionIndex] = useState(0);
+
+  const updateTransitionAtIndex = (index, patch) => {
+    if (trackLocks.image) return void notify("Image track is locked");
+    setVisualSegments((items) => items.map((item, itemIndex) => itemIndex === index
+      ? { ...item, transition: { id: item.transition?.id || "none", duration: item.transition?.duration || 0.5, ...patch } }
+      : item));
+  };
+
+  const applyTransitionToAll = (patch) => {
+    if (trackLocks.image) return void notify("Image track is locked");
+    setVisualSegments((items) => items.map((item, itemIndex) => itemIndex < items.length - 1
+      ? { ...item, transition: { id: item.transition?.id || "none", duration: item.transition?.duration || 0.5, ...patch } }
+      : item));
+    notify("⚡ បានអនុវត្ត Transition លើគ្រប់ Cuts ទាំងអស់!");
+  };
   const lastSaved = useAutosaveTimestamp([
     script, imageSrc, visualType, imageDuration, captionPlacement, selectedVoiceId, speed,
     volume, musicName, musicDuration, musicStart, musicVolume, sourceAudioName, sourceAudioDuration,
@@ -427,10 +443,32 @@ export function App() {
     currentTime - (selectedVisualRange?.start ?? 0),
   ));
   const updateSelectedVisualEffects = (change) => {
-    if (!selectedVisualSegment?.id || trackLocks.image) return notify("请先选择未锁定的 Visuals 片段");
+    if (change?.applyToAll) {
+      if (trackLocks.image) return notify("Visuals track ត្រូវបានចាក់សោ (Locked)");
+      setVisualSegments((items) =>
+        items.map((item) => {
+          if (!item || !["image", "video"].includes(item.type)) return item;
+          const dur = Math.max(0.1, Number(item.duration) || 2);
+          if (change.keyframesGenerator) {
+            return { ...item, keyframes: normalizeVisualKeyframes(change.keyframesGenerator(dur)) };
+          }
+          if (Array.isArray(change.keyframes)) {
+            return { ...item, keyframes: normalizeVisualKeyframes(change.keyframes) };
+          }
+          if (change.resetTransform) {
+            return { ...item, keyframes: [], baseTransform: normalizeVisualTransform({ x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 }) };
+          }
+          return item;
+        })
+      );
+      return;
+    }
+    if (!selectedVisualSegment?.id || trackLocks.image) return notify("សូមជ្រើសរើស Clip វីដេអូ ឬរូបភាពនៅលើ Timeline ជាមុនសិន");
     setVisualSegments((items) => {
       const nextItems = items.map((item) => {
       if (item.id !== selectedVisualSegment.id) return item;
+      if (Array.isArray(change.keyframes)) return { ...item, keyframes: normalizeVisualKeyframes(change.keyframes) };
+      if (change.resetTransform) return { ...item, keyframes: [], baseTransform: normalizeVisualTransform({ x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 }) };
       if (Number.isFinite(change.playbackRate) && item.type === "video") return updateVisualSegmentPlaybackRate(item, change.playbackRate);
       if (change.speedCurve && item.type === "video") return updateVisualSegmentSpeedCurve(item, change.speedCurve);
       if (change.baseTransform) return {
@@ -1230,10 +1268,12 @@ export function App() {
 
   const generateCaptionsFromSourceAudio = useAutoCaptions({
     notify, script, seekTo, setActiveTool, setCaptionSegments, captionStyle,
+    setCaptionStyle, setCaptionStylePresetId, setCaptionSize,
     setCaptionsEnabled, setProgress, setScript, setSelectedSegmentId,
     setSelectedTrack, setStatus, setStatusText, setTrackVisibility, sourceAudioBlob,
     sourceAudioStart, status, t, trackLocks, uiLanguage,
   });
+
 
   const handleFiles = useFileUpload({
     appendVisualAssetToTimeline, imageUrlRefs, notify, setSelectedLibraryAssetId, setSelectedTrack, setUserAssets,
@@ -1691,7 +1731,7 @@ export function App() {
           builtInAssets, captionPosition, captionSegments, captionSize, captionStyle,
           captionStylePresetId, captionStylePresets,
           captionTargetDuration, captionsEnabled, clearMusicTrack, clearSourceAudioTrack,
-          compactRail, currentSegmentIndex, deleteCaptionSegment,
+          compactRail, currentSegmentIndex, deleteCaptionSegment, commitCaptionSegments,
           deleteUserAsset, downloadBlob, draggedAssetId,
           estimatedDuration, fileInputRef, generateCaptionsFromSourceAudio: generateCaptionsWhenIdle, handleAssetClick,
           handleAssetPointerDown, handleCaptionPositionChange, handleFiles, handleStickerClick, confirmStickerSelection,
@@ -1716,6 +1756,10 @@ export function App() {
           effectsPanelMode, setEffectsPanelMode, cinematicDepth, photoParallaxDepth,
           visualLocalTime, updateSelectedVisualEffects, updateSelectedSubjectEffect, updateSelectedClickRipple, removeSelectedSubjectEffect, miganRepair, hdRestoration, smartDenoise,
           mobilePanel, setMobilePanel: changeMobilePanel, applyAssetToTrack, handleGeneratedVector, generationPlugins,
+          silenceRemoval,
+          currentTime, replaceAudio, updateAudioSegment, selectedAudioSegment,
+          visualSegments, selectedTransitionIndex, setSelectedTransitionIndex,
+          updateTransitionAtIndex, applyTransitionToAll,
         }} />
 
         <PreviewStage
@@ -1910,10 +1954,15 @@ export function App() {
           aiMusic={aiMusic}
           autoEdit={autoEdit}
           silenceRemoval={silenceRemoval}
+          replaceAudio={replaceAudio}
+          applyAssetToTrack={applyAssetToTrack}
           uiLanguage={activeLanguage}
           captionStyle={captionStyle}
           setCaptionStyle={setCaptionStyle}
           setCaptionSegments={setCaptionSegments}
+          commitCaptionSegments={commitCaptionSegments}
+          captionSize={captionSize}
+          setCaptionSize={setCaptionSize}
           smartFrame={smartFrame}
           analyzeCurrentVisual={analyzeCurrentVisual}
           analyzeEffectVisual={analyzeEffectVisual}
@@ -2005,6 +2054,7 @@ export function App() {
         selectedTrack={selectedTrack}
         setSelectedTrack={setSelectedTrack}
         setActiveTool={setActiveTool}
+        setSmartMode={setSmartMode}
         openMobileInspector={(track, section = "") => {
           setMobilePanelOrigin(getMobileClipPanelOrigin(track));
           setMobileInspectorSection(section);
@@ -2060,6 +2110,9 @@ export function App() {
         imageSrc={imageSrc}
         displayedVisualSegments={displayedVisualSegments}
         setVisualSegments={setVisualSegments}
+        selectedTransitionIndex={selectedTransitionIndex}
+        setSelectedTransitionIndex={setSelectedTransitionIndex}
+        updateTransitionAtIndex={updateTransitionAtIndex}
         renderedVisualTimeline={renderedVisualTimeline}
         visualType={visualType}
         currentVisualSegment={currentVisualSegment}

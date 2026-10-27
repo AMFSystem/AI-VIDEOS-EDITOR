@@ -22,6 +22,7 @@ aiRouter.post("/gemini/verify", aiController.geminiVerifyKey);
 aiRouter.post("/gemini/tts", aiController.geminiTts);
 aiRouter.post("/gemini/analyze-voice", aiController.geminiAnalyzeVoice);
 aiRouter.post("/gemini/generate-script", aiController.geminiGenerateScript);
+aiRouter.post("/gemini/direct-script", aiController.geminiDirectScript);
 
 // PyVideoTrans Video Translation, Alignment & Dubber Pipeline
 aiRouter.get("/pyvideotrans/status", aiController.pyvideotransStatus);

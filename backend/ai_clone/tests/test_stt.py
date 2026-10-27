@@ -95,8 +95,9 @@ def test_stt_forced_language(fake_stt):
 
 
 def test_stt_rejects_unknown_language(fake_stt):
-    res = client.post("/api/v1/stt", files={"file": ("a.wav", b"x")}, data={"language": "fr"})
+    res = client.post("/api/v1/stt", files={"file": ("a.wav", b"x")}, data={"language": "unknown_dialect"})
     assert res.status_code == 422
+
 
 
 def test_stt_rejects_bad_extension(fake_stt):

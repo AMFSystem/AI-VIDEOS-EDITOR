@@ -108,10 +108,13 @@ export function CaptionOverlay({
     ? `${snapToPhysicalPixel((renderFrame.height * placementY) / 100, devicePixelRatio)}px`
     : `${placementY || 78}%`;
 
+  const animationClass = captionStyle?.animation ? `anim-${captionStyle.animation}` : "";
+
   return (
     <button
-      className={`caption-overlay ${fontStatus === "loading" ? "is-font-loading" : ""}`}
+      className={`caption-overlay ${fontStatus === "loading" ? "is-font-loading" : ""} ${animationClass}`}
       type="button"
+
       aria-label={text}
       aria-busy={fontStatus === "loading"}
       style={{
