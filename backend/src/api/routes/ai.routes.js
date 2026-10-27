@@ -47,5 +47,9 @@ aiRouter.post("/training/start", aiController.startVoiceTraining);
 aiRouter.get("/training/status/:id", aiController.getVoiceTrainingStatus);
 aiRouter.get("/training/models", aiController.listTrainedVoiceModels);
 
+// Voice FL Studio - Professional Vocal Processing & Mastering
+aiRouter.post("/voice-fl/process", aiController.processVoiceFL);
+aiRouter.get("/voice-fl/presets", aiController.getVoiceFLPresets);
+
 
 

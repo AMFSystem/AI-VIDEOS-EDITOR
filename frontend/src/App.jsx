@@ -1282,6 +1282,12 @@ export function App() {
   });
 
   const [activePageView, setActivePageView] = useState("editor");
+  const [voiceStudioInitialTab, setVoiceStudioInitialTab] = useState("tts");
+
+  const handleOpenVoiceStudio = useCallback((tab = "tts") => {
+    setVoiceStudioInitialTab(typeof tab === "string" ? tab : "tts");
+    setActivePageView("voice-clone-studio");
+  }, []);
   const handleDownloadedMedia = useCallback(async (fileOrData) => {
     try {
       let file = fileOrData;
@@ -1718,7 +1724,7 @@ export function App() {
         handleImportProject={handleImportProject}
         projectFileInputRef={projectFileInputRef}
         onOpenUrlDownloader={() => setActivePageView("url-downloader")}
-        onOpenVoiceStudio={() => setActivePageView("voice-clone-studio")}
+        onOpenVoiceStudio={handleOpenVoiceStudio}
         onOpenModelsManager={() => setShowModelsManager(true)}
       />
 
@@ -1739,7 +1745,7 @@ export function App() {
           libraryType, libraryQuery, setLibraryQuery, selectLibraryType, libraryStatus, libraryError, libraryProvider,
           assetDownloadStates, prefetchLibraryAsset,
           onOpenUrlDownloader: () => setActivePageView("url-downloader"),
-          onOpenVoiceStudio: () => setActivePageView("voice-clone-studio"),
+          onOpenVoiceStudio: handleOpenVoiceStudio,
           notify, openAvatarPanel, previewVisionAnalysis, previewVisionKey, smartMode, setSmartMode,
           previewVisionOptions, previewVisualSrc, previewVisualType, progress, script,
           seekTo, segments, selectTool, selectedCaptionSegment, selectedFilterId,
@@ -1874,7 +1880,7 @@ export function App() {
         <VoicePanel
           captionHighlightDisabled={trackLocks.caption}
           t={t}
-          onOpenVoiceStudio={() => setActivePageView("voice-clone-studio")}
+          onOpenVoiceStudio={handleOpenVoiceStudio}
           activeTool={activeTool}
           captionVoiceFocusRequest={captionVoiceFocusRequest}
           status={status}
@@ -2255,6 +2261,7 @@ export function App() {
       )}
       {activePageView === "voice-clone-studio" && (
         <VoiceCloneStudioPage
+          initialTab={voiceStudioInitialTab}
           onBack={() => setActivePageView("editor")}
           onInsertToTimeline={async ({ blob, name, script, duration, peaks, options = {} }) => {
             await handleInsertClonedVoiceToTimeline({ blob, name, script, duration, peaks, options });

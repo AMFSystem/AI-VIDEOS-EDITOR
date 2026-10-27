@@ -43,6 +43,7 @@ import {
   directVoiceoverWithGemini,
 } from "../../lib/geminiRuntime.js";
 import "./VoiceCloneStudioPage.css";
+import { VoiceFLRack } from "../../components/VoiceFLStudio/VoiceFLRack.jsx";
 
 // --- Preset Characters (Empty: Default voices removed per user request) ---
 const PRESET_CHARACTERS = [];
@@ -82,6 +83,7 @@ const BONDETH_AUTH_TOKEN =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YzdkYTNlZi0xMDBhLTQ3ZjItODc3YS01M2QzYTQ1MGJkZmIiLCJ0eXBlIjoiYWNjZXNzIiwiaWF0IjoxNzkyODEyMjQzLCJleHAiOjE5NTA0OTIyNDN9.Ca3Zxsn26DM6Myiw35v_4MoZ6h_3nRy7kahd3tfI_yc";
 
 export function VoiceCloneStudioPage({
+  initialTab = "tts",
   onBack,
   onInsertToTimeline,
   voiceProfiles = [],
@@ -93,8 +95,8 @@ export function VoiceCloneStudioPage({
   notify = console.log,
   onOpenModelsManager,
 }) {
-  // Navigation View: "tts" (Main Studio & Library) | "clone" | "stt" | "history"
-  const [activeTab, setActiveTab] = useState("tts");
+  // Navigation View: "tts" (Main Studio & Library) | "clone" | "voice_fl" | "train" | "stt"
+  const [activeTab, setActiveTab] = useState(initialTab || "tts");
 
   // Selected Voice in Library
   const [selectedVoiceId, setSelectedVoiceId] = useState(null);
@@ -1684,6 +1686,13 @@ export function VoiceCloneStudioPage({
               <span>Voice Clone</span>
             </button>
             <button
+              className={`vs-mode-tab ${activeTab === "voice_fl" ? "active" : ""}`}
+              onClick={() => setActiveTab("voice_fl")}
+            >
+              <Sliders size={15} weight={activeTab === "voice_fl" ? "fill" : "regular"} />
+              <span>Voice FL Studio</span>
+            </button>
+            <button
               className={`vs-mode-tab ${activeTab === "train" ? "active" : ""}`}
               onClick={() => setActiveTab("train")}
             >
@@ -1953,6 +1962,7 @@ export function VoiceCloneStudioPage({
                   onChange={(e) => setTtsModelEngine(e.target.value)}
                 >
                   <option value="auto">⚡ Auto-Detect (Voice Clone & TTS Smart)</option>
+                  <option value="voice_fl">🎛️ Voice FL Studio (Mastering & Vocal Polish)</option>
                   <option value="voxcpm2">✨ VoxCPM2 (OpenBMB 48kHz)</option>
                   <option value="omnivoice">⚡ OmniVoice (F5-TTS Neural)</option>
                   <option value="mms">🎙️ Meta MMS-TTS (Khmer Offline)</option>
@@ -2828,6 +2838,7 @@ export function VoiceCloneStudioPage({
                           onChange={(e) => setCloneModelEngine(e.target.value)}
                         >
                           <option value="voxcpm2">✨ VoxCPM2 (48kHz)</option>
+                          <option value="voice_fl">🎛️ Voice FL Studio (Edison + NewTone)</option>
                           <option value="omnivoice">⚡ OmniVoice (F5-TTS)</option>
                         </select>
                       </div>
@@ -3714,6 +3725,24 @@ export function VoiceCloneStudioPage({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 5. VOICE FL STUDIO: PROFESSIONAL VOCAL MASTERING & EDITION */}
+      {activeTab === "voice_fl" && (
+        <div className="vs-content-body" style={{ padding: "16px 20px", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
+          <VoiceFLRack
+            initialAudioUrl={activeVoice?.sampleUrl || activeVoice?.audioUrl || activeVoice?.referenceAudio || null}
+            initialAudioName={activeVoice?.name || "Voice Sample"}
+            voiceProfiles={allVoices}
+            onInsertToTimeline={onInsertToTimeline}
+            onSaveToLibrary={(newProfile) => {
+              if (typeof addVoiceProfile === "function") {
+                addVoiceProfile(newProfile);
+              }
+            }}
+            notify={notify}
+          />
         </div>
       )}
 

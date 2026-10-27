@@ -1,0 +1,1012 @@
+/* ==========================================================================
+   Voice FL Studio - Professional 3D Vocal Processing Rack
+   Aesthetic: Sleek FL Studio Hardware Rack, Subtle 3D Depth, Clean & Uncluttered
+   ========================================================================== */
+
+.voice-fl-rack-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  color: #f1f5f9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+  user-select: none;
+}
+
+/* ==========================================================================
+   3D Segmented Navigation Bar (Switch between All, Card 1, or Card 2)
+   ========================================================================== */
+.vfl-card-segmented-nav {
+  display: flex;
+  background: #0b0d13;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: 9px;
+  padding: 3px;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vfl-nav-tab {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #8e9bb0;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vfl-nav-tab:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.vfl-nav-tab.active {
+  background: linear-gradient(180deg, #ff7043 0%, #d84315 100%);
+  border: 1px solid #ff8a65;
+  color: #ffffff;
+  box-shadow: 0 3px 8px rgba(216, 67, 21, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* ==========================================================================
+   Subtle 3D Hardware Cards (Card 1 & Card 2)
+   ========================================================================== */
+.vfl-card {
+  background: linear-gradient(180deg, #151922 0%, #0d0f16 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 11px;
+  padding: 10px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  box-shadow: 
+    0 10px 24px -4px rgba(0, 0, 0, 0.65),
+    0 3px 6px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: border-color 0.18s ease;
+}
+
+.vfl-card:hover {
+  border-color: rgba(255, 112, 67, 0.28);
+}
+
+/* Card Header */
+.vfl-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.vfl-brand-badge,
+.vfl-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.vfl-logo-glow,
+.vfl-rack-icon-badge {
+  font-size: 16px;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, rgba(255, 112, 67, 0.35) 0%, rgba(0, 229, 255, 0.18) 100%);
+  border: 1px solid rgba(255, 112, 67, 0.55);
+  border-top: 1px solid rgba(255, 180, 150, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(255, 112, 67, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+}
+
+.vfl-brand-text h3,
+.vfl-card-title-group h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  background: linear-gradient(90deg, #ffffff 0%, #ff8a65 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  white-space: nowrap;
+}
+
+.vfl-brand-text span,
+.vfl-card-title-group span {
+  font-size: 9px;
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 3D Bypass / A-B Testing Toggle */
+.vfl-bypass-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(0, 229, 255, 0.18) 0%, rgba(0, 229, 255, 0.08) 100%);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-top: 1px solid rgba(0, 229, 255, 0.7);
+  color: #00e5ff;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.16s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.vfl-bypass-toggle.is-bypassed {
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.22) 0%, rgba(239, 68, 68, 0.1) 100%);
+  border-color: rgba(239, 68, 68, 0.5);
+  border-top-color: rgba(254, 160, 160, 0.7);
+  color: #f87171;
+}
+
+.vfl-rack-led {
+  font-size: 9px;
+  font-weight: 800;
+  color: #00e5ff;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   3D Audio Input & Player Section
+   ========================================================================== */
+.vfl-audio-transport-section {
+  background: #090b11;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.75), 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.vfl-source-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.vfl-source-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+}
+
+.vfl-wave-icon {
+  color: #ff7043;
+  flex-shrink: 0;
+}
+
+.vfl-source-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vfl-source-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vfl-source-text small {
+  font-size: 9px;
+  color: #64748b;
+  font-family: monospace;
+}
+
+/* Inline 3D Play Button & Controls */
+.vfl-transport-inline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.vfl-transport-play-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff7043 0%, #d84315 100%);
+  border: 1px solid #ff8a65;
+  border-top: 1px solid #ffbca8;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(216, 67, 21, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.vfl-transport-play-btn:hover:not(:disabled) {
+  transform: scale(1.08);
+}
+
+.vfl-transport-play-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.vfl-transport-sub-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #1e222e 0%, #12151e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.vfl-transport-sub-btn:hover:not(:disabled) {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.vfl-transport-sub-btn.is-looping {
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(56, 189, 248, 0.14);
+}
+
+/* 3D Action Chips */
+.vfl-input-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vfl-action-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #1c212c 0%, #11141c 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  white-space: nowrap;
+}
+
+.vfl-action-chip:hover {
+  background: linear-gradient(180deg, #242a38 0%, #171b24 100%);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.vfl-action-chip.is-recording {
+  background: linear-gradient(180deg, #dc2626 0%, #991b1b 100%);
+  border-color: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+}
+
+/* ==========================================================================
+   3D Presets Grid: Balanced 2x3 Grid with Tactile Feel
+   ========================================================================== */
+.vfl-presets-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vfl-section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #cbd5e1;
+  padding: 0 2px;
+}
+
+.vfl-section-label small {
+  color: #64748b;
+  font-size: 9px;
+}
+
+.vfl-presets-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vfl-preset-card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #1a1e28 0%, #10131a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.vfl-preset-card-item:hover {
+  background: linear-gradient(180deg, #222735 0%, #141720 100%);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.vfl-preset-card-item.is-active {
+  background: linear-gradient(180deg, rgba(255, 112, 67, 0.28) 0%, rgba(216, 67, 21, 0.16) 100%);
+  border: 1px solid #ff7043;
+  border-top: 1px solid #ff9e80;
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(255, 112, 67, 0.35), inset 0 1px 0 rgba(255, 180, 150, 0.3);
+}
+
+.vfl-preset-top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.vfl-preset-emoji {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.vfl-preset-title-en {
+  font-size: 10px;
+  font-weight: 700;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.vfl-preset-title-km {
+  font-size: 9px;
+  color: #8fa0b5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vfl-preset-card-item.is-active .vfl-preset-title-km {
+  color: #ffab91;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   3D Real-Time Spectrum Visualizer Screen
+   ========================================================================== */
+.vfl-screen-chassis {
+  background: #05070a;
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-top: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 8px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  width: 100%;
+  box-shadow: 
+    inset 0 2px 8px rgba(0, 0, 0, 0.95),
+    0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+.vfl-screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  padding: 0 1px;
+}
+
+.vfl-screen-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: #00e5ff;
+}
+
+.vfl-led-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #00e5ff;
+  box-shadow: 0 0 6px #00e5ff;
+}
+
+.vfl-screen-stats {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  color: #64748b;
+  font-family: monospace;
+}
+
+.vfl-badge-hi {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 112, 67, 0.2);
+  border: 1px solid rgba(255, 112, 67, 0.4);
+  color: #ff7043;
+  font-weight: 700;
+}
+
+.vfl-canvas-wrap {
+  position: relative;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-sizing: border-box;
+}
+
+.vfl-spectrum-canvas {
+  width: 100%;
+  height: 72px;
+  display: block;
+}
+
+.vfl-freq-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 4px;
+  font-size: 8px;
+  color: #475569;
+  font-family: monospace;
+  background: #040507;
+}
+
+/* ==========================================================================
+   CARD 2: 3D Vocal FX Hardware Rack
+   ========================================================================== */
+.vfl-rack-strips-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vfl-strip-card {
+  background: linear-gradient(180deg, #171b24 0%, #0f1219 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  box-sizing: border-box;
+  width: 100%;
+  box-shadow: 
+    0 3px 8px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: border-color 0.16s ease;
+}
+
+.vfl-strip-card:hover {
+  border-color: rgba(255, 112, 67, 0.3);
+}
+
+.vfl-strip-card.highlight-sg {
+  border-color: rgba(255, 112, 67, 0.35);
+  border-top-color: rgba(255, 150, 120, 0.4);
+  box-shadow: 
+    0 3px 10px rgba(255, 112, 67, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.vfl-strip-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.vfl-strip-num {
+  font-size: 8px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.vfl-strip-header h4 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: 0.15px;
+}
+
+.vfl-knobs-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 3D Inset Recessed Knob Box */
+.vfl-knob-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #090b10;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75), 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  padding: 5px 8px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.vfl-knob-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+.vfl-rotary-dial {
+  flex: 1;
+  min-width: 60px;
+  max-width: 120px;
+}
+
+/* 3D Realistic Sliders */
+.vfl-range-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: #050609;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9);
+  outline: none;
+  cursor: pointer;
+}
+
+.vfl-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #cbd5e1 55%, #64748b 100%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.8), inset 0 1px 1px #ffffff;
+  cursor: pointer;
+  transition: transform 0.14s ease;
+}
+
+.vfl-range-input::-webkit-slider-thumb:hover {
+  transform: scale(1.18);
+}
+
+.vfl-range-input.accent-orange::-webkit-slider-thumb {
+  background: radial-gradient(circle at 35% 35%, #ffab91 0%, #ff7043 55%, #d84315 100%);
+  box-shadow: 0 0 6px rgba(255, 112, 67, 0.7), 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.vfl-range-input.accent-cyan::-webkit-slider-thumb {
+  background: radial-gradient(circle at 35% 35%, #e0f7fa 0%, #00e5ff 55%, #0097a7 100%);
+  box-shadow: 0 0 6px rgba(0, 229, 255, 0.7), 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.vfl-range-input.accent-fruit::-webkit-slider-thumb {
+  background: radial-gradient(circle at 35% 35%, #ff8a65 0%, #ff3d00 55%, #bf360c 100%);
+  box-shadow: 0 0 7px #ff3d00, 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.vfl-range-input.accent-green::-webkit-slider-thumb {
+  background: radial-gradient(circle at 35% 35%, #ccff90 0%, #76ff03 55%, #558b2f 100%);
+  box-shadow: 0 0 6px rgba(118, 255, 3, 0.7), 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.vfl-val-badge {
+  font-size: 9px;
+  font-family: monospace;
+  font-weight: 700;
+  color: #38bdf8;
+  min-width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.vfl-val-badge.fruit {
+  color: #ff7043;
+}
+
+/* 3D Hardware Toggle Switch */
+.vfl-3d-toggle-switch {
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, #1c202a 0%, #10131a 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #64748b;
+  font-size: 9.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  flex-shrink: 0;
+}
+
+.vfl-3d-toggle-switch.is-on {
+  background: linear-gradient(180deg, #ff7043 0%, #d84315 100%);
+  border-color: #ff8a65;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 112, 67, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.vfl-select-inline {
+  background: #090b10;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  color: #f1f5f9;
+  font-size: 9.5px;
+  padding: 3px 5px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* 4-Band 3D Mini Faders */
+.vfl-eq-mini-group {
+  display: flex;
+  justify-content: space-around;
+  background: #090b10;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
+  border-radius: 6px;
+  padding: 5px 2px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vfl-eq-mini-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.vfl-eq-val {
+  font-size: 7.5px;
+  color: #38bdf8;
+  font-family: monospace;
+}
+
+.vfl-v-slider {
+  writing-mode: bt-lr;
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  width: 12px;
+  height: 44px;
+  cursor: pointer;
+}
+
+.vfl-eq-label {
+  font-size: 8px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+/* 3D Soundgoodizer Box */
+.vfl-sg-main-box {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: rgba(255, 112, 67, 0.04);
+  border: 1px solid rgba(255, 112, 67, 0.25);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  border-radius: 6px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.vfl-sg-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vfl-sg-modes-row {
+  display: flex;
+  gap: 4px;
+}
+
+.vfl-sg-mode-btn {
+  flex: 1;
+  padding: 3px 0;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #1f232f 0%, #11141b 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  font-size: 9.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.vfl-sg-mode-btn.is-active {
+  background: linear-gradient(180deg, #ff7043 0%, #d84315 100%);
+  border-color: #ff8a65;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 112, 67, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/* Limiter Box */
+.vfl-limiter-box {
+  justify-content: space-between;
+}
+
+.vfl-limiter-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(118, 255, 3, 0.1);
+  border: 1px solid rgba(118, 255, 3, 0.3);
+  color: #76ff03;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.vfl-limiter-led {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #76ff03;
+  box-shadow: 0 0 5px #76ff03;
+}
+
+/* ==========================================================================
+   3D Master Export Actions
+   ========================================================================== */
+.vfl-master-actions-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 2px;
+}
+
+.vfl-export-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.vfl-export-btn.is-download {
+  background: linear-gradient(180deg, #242937 0%, #141720 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f1f5f9;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.vfl-export-btn.is-download:hover:not(:disabled) {
+  background: linear-gradient(180deg, #2c3243 0%, #191c28 100%);
+  transform: translateY(-1px);
+}
+
+.vfl-export-btn.is-timeline {
+  background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+  border: 1px solid #38bdf8;
+  border-top: 1px solid #7dd3fc;
+  color: #ffffff;
+  box-shadow: 0 3px 8px rgba(2, 132, 199, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.vfl-export-btn.is-timeline:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.7);
+}
+
+.vfl-export-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   Modal for Voice Library Picker
+   ========================================================================== */
+.vfl-voice-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.vfl-voice-modal {
+  width: 90%;
+  max-width: 400px;
+  background: #141721;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 11px;
+  padding: 13px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+  box-sizing: border-box;
+}
+
+.vfl-voice-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+
+.vfl-voice-modal-head h4 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.vfl-voice-modal-head button {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.vfl-voice-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.vfl-voice-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.14s ease;
+}
+
+.vfl-voice-item:hover {
+  background: rgba(255, 112, 67, 0.16);
+  border-color: rgba(255, 112, 67, 0.4);
+}
+
+.vfl-voice-avatar {
+  font-size: 15px;
+}
+
+.vfl-voice-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vfl-voice-details strong {
+  font-size: 11px;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vfl-voice-details small {
+  font-size: 9px;
+  color: #64748b;
+}
+
+.vfl-voice-choose {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #ff7043;
+}

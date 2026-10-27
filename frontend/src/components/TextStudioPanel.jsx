@@ -6,10 +6,12 @@ import {
   TextT,
   Check,
   Flame,
+  Lightning,
 } from "@phosphor-icons/react";
 import {
   TEXT_TEMPLATES,
   TEXT_EFFECT_STYLES,
+  TEXT_ANIMATIONS,
   KHMER_FONTS,
   LATIN_TRENDING_FONTS,
 } from "../config/textTemplates.js";
@@ -31,7 +33,7 @@ export function TextStudioPanel({
   t = (k) => k,
   uiLanguage = "km",
 }) {
-  const [activeTab, setActiveTab] = useState("templates"); // 'templates' | 'styles' | 'fonts'
+  const [activeTab, setActiveTab] = useState("styles"); // 'styles' | 'animations' | 'templates' | 'fonts'
   const [searchQuery, setSearchQuery] = useState("");
 
   // Find currently selected caption/text segment
@@ -41,6 +43,16 @@ export function TextStudioPanel({
 
   const activeOverrides = selectedTextSegment?.styleOverrides || {};
   const currentFontId = activeOverrides.fontId || captionStyle?.fontId || "kantumruy-pro";
+  const currentAnimation = activeOverrides.animation || captionStyle?.animation || "none";
+
+  // Filter animations
+  const filteredAnimations = useMemo(() => {
+    if (!searchQuery.trim()) return TEXT_ANIMATIONS;
+    const q = searchQuery.toLowerCase().trim();
+    return TEXT_ANIMATIONS.filter(
+      (a) => a.name.toLowerCase().includes(q) || (a.nameKm && a.nameKm.toLowerCase().includes(q))
+    );
+  }, [searchQuery]);
 
   // Filter templates
   const filteredTemplates = useMemo(() => {
@@ -230,6 +242,29 @@ export function TextStudioPanel({
     }
   };
 
+  // Apply or Add a Text Animation
+  const handleSelectAnimation = (animObj) => {
+    if (selectedTextSegment) {
+      const nextSegments = captionSegments.map((seg) => {
+        if (seg.id === selectedSegmentId) {
+          return {
+            ...seg,
+            styleOverrides: {
+              ...(seg.styleOverrides || {}),
+              animation: animObj.id,
+            },
+          };
+        }
+        return seg;
+      });
+      applySegmentsChange(nextSegments, `⚡ បានអនុវត្តចលនា «${animObj.name}»!`, selectedSegmentId);
+      notify(`⚡ បានអនុវត្តចលនា «${animObj.name}» លើ Text!`);
+    } else {
+      setCaptionStyle((prev) => ({ ...prev, animation: animObj.id }));
+      notify(`⚡ បានកំណត់ចលនាអក្សរ: ${animObj.name}`);
+    }
+  };
+
   return (
     <section className="text-studio-panel" aria-label="Text Studio">
       {/* 1. Header */}
@@ -254,29 +289,9 @@ export function TextStudioPanel({
         </button>
       </div>
 
-      {/* 2. Selected Text Hint Banner */}
-      {selectedTextSegment && (
-        <div className="text-studio-selected-banner">
-          <div className="text-studio-selected-info">
-            <span className="text-pulse-dot" />
-            <span className="text-studio-selected-label">
-              អត្ថបទកំពុងជ្រើសរើស: <strong>"{selectedTextSegment.text?.slice(0, 18) || "Text"}{selectedTextSegment.text?.length > 18 ? "…" : ""}"</strong>
-            </span>
-          </div>
-          <span className="text-studio-selected-tip">👉 កែសម្រួល Font, Size, Color & Position នៅផ្ទាំងខាងស្តាំ</span>
-        </div>
-      )}
 
       {/* 3. Main Navigation Tabs */}
       <div className="text-studio-tabs">
-        <button
-          type="button"
-          className={`text-tab-btn ${activeTab === "templates" ? "is-active" : ""}`}
-          onClick={() => setActiveTab("templates")}
-        >
-          <Sparkle size={13} weight="bold" />
-          <span>Templates</span>
-        </button>
         <button
           type="button"
           className={`text-tab-btn ${activeTab === "styles" ? "is-active" : ""}`}
@@ -284,6 +299,22 @@ export function TextStudioPanel({
         >
           <Flame size={13} weight="bold" />
           <span>Styles</span>
+        </button>
+        <button
+          type="button"
+          className={`text-tab-btn ${activeTab === "animations" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("animations")}
+        >
+          <Lightning size={13} weight="bold" />
+          <span>Animation</span>
+        </button>
+        <button
+          type="button"
+          className={`text-tab-btn ${activeTab === "templates" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("templates")}
+        >
+          <Sparkle size={13} weight="bold" />
+          <span>Templates</span>
         </button>
         <button
           type="button"
@@ -369,7 +400,7 @@ export function TextStudioPanel({
         </div>
       )}
 
-      {/* 6. TAB CONTENT: STYLES */}
+      {/* 6. TAB CONTENT: STYLES (TEXT EFFECTS) */}
       {activeTab === "styles" && (
         <div className="text-tab-pane">
           <div className="text-styles-grid">
@@ -377,35 +408,46 @@ export function TextStudioPanel({
               <button
                 key={eff.id}
                 type="button"
-                className="text-style-card"
+                className={`text-style-card ${eff.previewClass || ""}`}
                 onClick={() => handleSelectStyle(eff)}
+                title={eff.nameKm || eff.name}
               >
-                <div
-                  className="text-style-preview"
-                  style={{
-                    backgroundColor: eff.style.backgroundOpacity > 0 ? eff.style.backgroundColor : "#0f172a",
-                    border: eff.style.borderWidth
-                      ? `${eff.style.borderWidth}px solid ${eff.style.borderColor}`
-                      : "1px solid rgba(255,255,255,0.08)",
-                  }}
-                >
-                  <span
-                    className="text-style-sample"
-                    style={{
-                      color: eff.style.textColor,
-                      WebkitTextStroke: `${eff.style.textStrokeWidth * 0.8}px ${eff.style.textStrokeColor}`,
-                      textShadow:
-                        eff.style.effect === "neon"
-                          ? `0 0 12px ${eff.style.borderColor || eff.style.textColor}`
-                          : "0 2px 6px rgba(0,0,0,0.9)",
-                    }}
-                  >
-                    {eff.sample}
-                  </span>
-                </div>
-                <span className="text-style-name">{eff.nameKm || eff.name}</span>
+                <span className="text-style-art">{eff.sample || "ART"}</span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 6b. TAB CONTENT: ANIMATIONS */}
+      {activeTab === "animations" && (
+        <div className="text-tab-pane">
+          <div className="text-animations-grid">
+            {filteredAnimations.map((anim) => {
+              const isSelected = currentAnimation === anim.id;
+              return (
+                <button
+                  key={anim.id}
+                  type="button"
+                  className={`text-anim-card ${isSelected ? "is-selected" : ""}`}
+                  onClick={() => handleSelectAnimation(anim)}
+                  title={anim.nameKm || anim.name}
+                >
+                  <div className={`text-anim-preview-box ${anim.previewClass || ""}`}>
+                    <span className="text-anim-icon">{anim.icon}</span>
+                    <span className="text-anim-sample-text">TEXT</span>
+                  </div>
+                  <div className="text-anim-meta">
+                    <span className="text-anim-name">{uiLanguage === "km" ? anim.nameKm : anim.name}</span>
+                    {isSelected && (
+                      <span className="text-anim-check">
+                        <Check size={12} weight="bold" />
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

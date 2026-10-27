@@ -13,8 +13,13 @@ import {
   SlidersHorizontal,
   Palette,
   Check,
+  Lightning,
 } from "@phosphor-icons/react";
-import { KHMER_FONTS, LATIN_TRENDING_FONTS } from "../config/textTemplates.js";
+import {
+  KHMER_FONTS,
+  LATIN_TRENDING_FONTS,
+  TEXT_ANIMATIONS,
+} from "../config/textTemplates.js";
 import { ensureCaptionFontLoaded } from "../lib/captionFonts.js";
 import "./TextInspectorPanel.css";
 
@@ -118,6 +123,24 @@ export function TextInspectorPanel({
     applySegmentsChange(nextSegments, `កែប្រែ ${key}`, segment.id);
   };
 
+  // Update multiple style overrides in one batch
+  const handleStyleChanges = (updates) => {
+    if (!segment) return;
+    const nextSegments = captionSegments.map((seg) => {
+      if (seg.id === segment.id) {
+        return {
+          ...seg,
+          styleOverrides: {
+            ...(seg.styleOverrides || {}),
+            ...updates,
+          },
+        };
+      }
+      return seg;
+    });
+    applySegmentsChange(nextSegments, "កែប្រែម៉ូតអក្សរ", segment.id);
+  };
+
   // Change font family
   const handleFontChange = (fontId) => {
     if (!segment) return;
@@ -192,7 +215,7 @@ export function TextInspectorPanel({
         textStrokeColor: "#05080d",
         textStrokeWidth: 2,
         backgroundColor: "#000000",
-        backgroundOpacity: 0.5,
+        backgroundOpacity: 0,
         borderColor: "#ffffff",
         borderWidth: 0,
         radius: 8,
@@ -339,7 +362,7 @@ export function TextInspectorPanel({
         </div>
       </div>
 
-      {/* 3. Sub Tabs (Text, Style, Position) */}
+      {/* 3. Sub Tabs (Text, Style, Animation, Position) */}
       <div className="text-subtabs">
         <button
           type="button"
@@ -355,7 +378,15 @@ export function TextInspectorPanel({
           onClick={() => setActiveTab("style")}
         >
           <Palette size={13} weight="bold" />
-          <span>Color & Effects</span>
+          <span>Color & BG</span>
+        </button>
+        <button
+          type="button"
+          className={`text-subtab-btn ${activeTab === "animation" ? "is-active" : ""}`}
+          onClick={() => setActiveTab("animation")}
+        >
+          <Lightning size={13} weight="bold" />
+          <span>Animation</span>
         </button>
         <button
           type="button"
@@ -443,6 +474,26 @@ export function TextInspectorPanel({
               </button>
             </div>
           </div>
+
+          {/* Quick Background Remove Banner if background box is present */}
+          {currentBgOpacity > 0 && (
+            <div className="text-bg-quick-alert">
+              <div className="text-bg-quick-info">
+                <span className="text-bg-indicator-dot" style={{ backgroundColor: currentBgColor }} />
+                <span>មាន Background ({currentBgOpacity}%)</span>
+              </div>
+              <button
+                type="button"
+                className="text-bg-quick-btn"
+                onClick={() => {
+                  handleStyleChanges({ backgroundOpacity: 0, borderWidth: 0 });
+                  notify("🗑️ បានដក Background ចេញ!");
+                }}
+              >
+                ✕ ដក Background ចេញ
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -505,25 +556,51 @@ export function TextInspectorPanel({
           <div className="text-form-row">
             <div className="text-form-label-row">
               <span className="text-form-label">Background (ប្រអប់ផ្ទៃក្រោយ)</span>
-              <div className="text-color-preview-wrap">
-                <input
-                  type="color"
-                  className="text-color-input"
-                  value={currentBgColor}
-                  onChange={(e) => handleStyleChange("backgroundColor", e.target.value)}
-                />
-                <small>{currentBgOpacity}%</small>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button
+                  type="button"
+                  className={`text-bg-toggle-action-btn ${currentBgOpacity > 0 ? "is-remove" : "is-add"}`}
+                  onClick={() => {
+                    if (currentBgOpacity > 0) {
+                      handleStyleChanges({ backgroundOpacity: 0, borderWidth: 0 });
+                      notify("🗑️ បានដក Background ចេញ!");
+                    } else {
+                      handleStyleChanges({ backgroundOpacity: 0.65, backgroundColor: currentBgColor || "#05080d" });
+                      notify("✨ បានដាក់ Background!");
+                    }
+                  }}
+                  title={currentBgOpacity > 0 ? "ដក Background ចេញ (Remove)" : "ដាក់ Background (Add)"}
+                >
+                  {currentBgOpacity > 0 ? "✕ ដកចេញ (Remove)" : "+ ដាក់ Background"}
+                </button>
+                {currentBgOpacity > 0 && (
+                  <div className="text-color-preview-wrap">
+                    <input
+                      type="color"
+                      className="text-color-input"
+                      value={currentBgColor}
+                      onChange={(e) => handleStyleChange("backgroundColor", e.target.value)}
+                    />
+                    <small>{currentBgOpacity}%</small>
+                  </div>
+                )}
               </div>
             </div>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              className="text-slider"
-              value={currentBgOpacity}
-              onChange={(e) => handleStyleChange("backgroundOpacity", Number(e.target.value) / 100)}
-            />
+            {currentBgOpacity > 0 ? (
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                className="text-slider"
+                value={currentBgOpacity}
+                onChange={(e) => handleStyleChange("backgroundOpacity", Number(e.target.value) / 100)}
+              />
+            ) : (
+              <div className="text-bg-hint-trans">
+                <span>✓ គ្មានផ្ទៃក្រោយ (Transparent / No Background)</span>
+              </div>
+            )}
           </div>
 
           {/* Neon Glow Toggle */}
@@ -538,6 +615,34 @@ export function TextInspectorPanel({
                 <Sparkle size={13} weight="bold" />
                 <span>{currentEffect === "neon" ? "NEON ON" : "NORMAL"}</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5b. Tab 2b: Text Animation */}
+      {activeTab === "animation" && (
+        <div className="text-section-body">
+          <div className="text-form-row">
+            <span className="text-form-label">Motion Animation (ចលនាអក្សរ)</span>
+            <div className="text-anim-inspector-grid">
+              {TEXT_ANIMATIONS.map((anim) => {
+                const isSelected = (overrides.animation || captionStyle.animation || "none") === anim.id;
+                return (
+                  <button
+                    key={anim.id}
+                    type="button"
+                    className={`text-anim-insp-card ${isSelected ? "is-active" : ""}`}
+                    onClick={() => {
+                      handleStyleChange("animation", anim.id);
+                      notify(`⚡ ចលនា: ${anim.name}`);
+                    }}
+                  >
+                    <span className="text-anim-insp-icon">{anim.icon}</span>
+                    <span className="text-anim-insp-name">{anim.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

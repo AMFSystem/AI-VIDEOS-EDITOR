@@ -509,3 +509,147 @@
   color: #64748b;
   font-size: 10px;
 }
+
+/* Text Animation Inspector Grid */
+.text-anim-inspector-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  width: 100%;
+}
+
+.text-anim-insp-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 4px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.text-anim-insp-card:hover {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.text-anim-insp-card.is-active {
+  background: linear-gradient(180deg, rgba(2, 132, 199, 0.35) 0%, rgba(15, 23, 42, 0.8) 100%);
+  border-color: #38bdf8;
+  color: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
+}
+
+.text-anim-insp-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.text-anim-insp-name {
+  font-size: 9.5px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* 7. Background Quick Removal Banner & Buttons */
+.text-bg-quick-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px dashed rgba(239, 68, 68, 0.35);
+  margin-top: 2px;
+}
+
+.text-bg-quick-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fca5a5;
+}
+
+.text-bg-indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.text-bg-quick-btn {
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: #dc2626;
+  border: none;
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 4px rgba(220, 38, 38, 0.4);
+}
+
+.text-bg-quick-btn:hover {
+  background: #ef4444;
+  transform: translateY(-1px);
+}
+
+.text-bg-toggle-action-btn {
+  padding: 3px 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.text-bg-toggle-action-btn.is-remove {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.text-bg-toggle-action-btn.is-remove:hover {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.text-bg-toggle-action-btn.is-add {
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+}
+
+.text-bg-toggle-action-btn.is-add:hover {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.text-bg-hint-trans {
+  font-size: 10.5px;
+  color: #94a3b8;
+  font-style: italic;
+  padding: 4px 2px;
+}
+

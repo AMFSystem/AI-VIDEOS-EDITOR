@@ -252,7 +252,7 @@ export function Topbar({
           type="button"
           title={t("voiceCloneStudioHint", "ស្ទូឌីយោក្លូនសំឡេង និងបម្លែងអត្ថបទទៅជាសំឡេង")}
           onClick={(event) => {
-            onOpenVoiceStudio?.();
+            onOpenVoiceStudio?.("tts");
             releasePointerActivatedFocus(event);
           }}
         >

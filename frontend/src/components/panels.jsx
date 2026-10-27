@@ -4,6 +4,7 @@ import { VoiceEffectPanel } from "./VoiceEffectPanel.jsx";
 import { AutoZoomPanel } from "./AutoZoomPanel.jsx";
 import { TransitionsPanel } from "./TransitionsPanel.jsx";
 import { TextStudioPanel } from "./TextStudioPanel.jsx";
+import { VoiceFLRack } from "./VoiceFLStudio/VoiceFLRack.jsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 
@@ -1374,6 +1375,20 @@ export function ToolPanel(props) {
           notify={notify}
           t={t}
           uiLanguage={uiLanguage}
+        />
+      </div>
+    );
+  }
+
+  if (activeTool === "voice-fl") {
+    return (
+      <div className="tool-panel voice-fl-tool-panel mobile-panel-scroll-body" style={{ padding: "6px 8px", width: "100%", boxSizing: "border-box", overflowY: "auto", overflowX: "hidden", maxHeight: "100%" }}>
+        <VoiceFLRack
+          initialAudioUrl={audioBlob ? URL.createObjectURL(audioBlob) : null}
+          initialAudioName={sourceAudioName || "Audio Clip"}
+          voiceProfiles={props.voiceProfiles || []}
+          onInsertToTimeline={applyAssetToTrack || replaceAudio}
+          notify={notify}
         />
       </div>
     );

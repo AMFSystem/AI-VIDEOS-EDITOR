@@ -3901,6 +3901,30 @@ button:disabled {
   100% { transform: scale(1.05); filter: drop-shadow(0 0 14px rgba(46, 213, 115, 0.8)); }
 }
 
+.caption-overlay.anim-fade-zoom canvas {
+  animation: capcutCanvasFadeZoom 1.5s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate;
+}
+@keyframes capcutCanvasFadeZoom {
+  0% { opacity: 0.7; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1.08); filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.7)); }
+}
+
+.caption-overlay.anim-slide-up-soft canvas {
+  animation: capcutCanvasSlideUpSoft 1.6s ease-in-out infinite alternate;
+}
+@keyframes capcutCanvasSlideUpSoft {
+  0% { transform: translateY(6px); opacity: 0.85; }
+  100% { transform: translateY(-4px); opacity: 1; filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.8)); }
+}
+
+.caption-overlay.anim-slide-down-soft canvas {
+  animation: capcutCanvasSlideDownSoft 1.6s ease-in-out infinite alternate;
+}
+@keyframes capcutCanvasSlideDownSoft {
+  0% { transform: translateY(-6px); opacity: 0.85; }
+  100% { transform: translateY(4px); opacity: 1; filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.8)); }
+}
+
 .auto-caption-cta-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:44px; border:none; border-radius:9px; background:linear-gradient(135deg,#35ead9 0%,#17b3a4 100%); color:#031418; font-size:13px; font-weight:800; cursor:pointer; box-shadow:0 4px 15px rgba(53,234,217,.25); transition:all .15s ease; }
 .auto-caption-cta-btn:hover:not(:disabled) { filter:brightness(1.08); box-shadow:0 6px 20px rgba(53,234,217,.4); transform:translateY(-1px); }
 .auto-caption-cta-btn:disabled { opacity:.5; cursor:not-allowed; box-shadow:none; }

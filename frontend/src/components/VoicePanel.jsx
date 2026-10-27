@@ -1610,6 +1610,16 @@ export function VoicePanel({
   const isVisualContext = panelContext === "visual" && !isEffectsContext && !isTextContext;
   const isStickerContext = panelContext === "sticker" && Boolean(selectedStickerSegment);
   const isOverlayContext = panelContext === "overlay" && Boolean(selectedVisualOverlay);
+  const isVoiceContext = !isTextContext
+    && !isSmartContext
+    && !isPluginsContext
+    && !isEffectsContext
+    && !isCaptionContext
+    && !isAvatarContext
+    && !isAudioClipContext
+    && !isVisualContext
+    && !isStickerContext
+    && !isOverlayContext;
   const isVectorOverlay = isOverlayContext && (
     selectedVisualOverlay.kind === "vector"
     || Boolean(selectedVisualOverlay.vectorBody)
@@ -1722,14 +1732,14 @@ export function VoicePanel({
         )}
       </div>
 
-      {!isTextContext && !isSmartContext && !isPluginsContext && !isEffectsContext && !isCaptionContext && !isAvatarContext && !isAudioClipContext && !isVisualContext && !isStickerContext && !isOverlayContext ? (
+      {isVoiceContext ? (
         <>
           {onOpenVoiceStudio && (
             <div style={{ marginBottom: 10 }}>
               <button
                 type="button"
                 className="ghost-action"
-                onClick={onOpenVoiceStudio}
+                onClick={() => onOpenVoiceStudio?.("tts")}
                 style={{
                   width: "100%",
                   padding: "8px 12px",
@@ -1749,6 +1759,32 @@ export function VoicePanel({
               >
                 <span>🎙️</span>
                 <span>{t("openFullVoiceStudio", "បើកស្ទូឌីយោ Clone សំឡេង (Open AI Voice Studio)")}</span>
+              </button>
+              <button
+                type="button"
+                className="ghost-action"
+                onClick={() => onOpenVoiceStudio?.("voice_fl")}
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255, 112, 67, 0.45)",
+                  background: "linear-gradient(135deg, rgba(255, 112, 67, 0.16) 0%, rgba(0, 229, 255, 0.12) 100%)",
+                  color: "#ffedd5",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  fontSize: "12.5px",
+                  fontWeight: "700",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  marginTop: "6px",
+                  boxShadow: "0 2px 8px rgba(255, 112, 67, 0.18)",
+                }}
+              >
+                <span>🎛️</span>
+                <span>Voice FL Studio (កាត់ Noise & Mastering)</span>
               </button>
             </div>
           )}
@@ -2018,7 +2054,7 @@ export function VoicePanel({
 
         {isAudioClipContext ? <AudioClipContextPanel t={t} language={uiLanguage} visualAssociation={audioVisualAssociation} processingDisabled={audioProcessingDisabled} registerProcessingUrl={registerAudioProcessingUrl} segment={{ ...audioPropertySegment, id: audioPropertySegment.id || audioPropertySegment.segmentId, track: audioPropertySegment.track || selectedTrack }} updateAudioSegment={selectedTrack === "audio" ? updateAudioSegment : updateSelectedTrackAudioSegment} toggleAudioSegmentReverse={toggleAudioSegmentReverse} deleteAudioSegment={selectedTrack === "audio" ? deleteAudioSegment : deleteSelectedTrackAudioSegment} downloadBlob={downloadBlob} requestedSection={mobileInspectorSection} voiceProfiles={voiceProfiles} onVoiceColorAssetReady={onVoiceColorAssetReady} onApplyVoiceColor={onApplyVoiceColor} onRestoreVoiceColor={onRestoreVoiceColor} /> : null}
 
-        {!isSmartContext && !isPluginsContext && !isEffectsContext && !isCaptionContext && !isAvatarContext && !isAudioClipContext && !isVisualContext && !isStickerContext && !isOverlayContext && voiceTab === "synthesis" ? (
+        {isVoiceContext && voiceTab === "synthesis" ? (
           <VoiceSynthesisPanel
             script={script}
             updateScript={updateScript}
@@ -2053,7 +2089,7 @@ export function VoicePanel({
           />
         ) : null}
 
-        {!isSmartContext && !isPluginsContext && !isEffectsContext && !isCaptionContext && !isAvatarContext && !isAudioClipContext && !isVisualContext && !isStickerContext && !isOverlayContext && voiceTab === "mine" ? (
+        {isVoiceContext && voiceTab === "mine" ? (
           <MyVoicesPanel
             notify={notify}
             t={t}
@@ -2073,7 +2109,7 @@ export function VoicePanel({
           />
         ) : null}
 
-        {!isSmartContext && !isPluginsContext && !isEffectsContext && !isCaptionContext && !isAvatarContext && !isAudioClipContext && !isVisualContext && !isStickerContext && !isOverlayContext && voiceTab === "favorites" ? (
+        {isVoiceContext && voiceTab === "favorites" ? (
           <FavoriteVoicesPanel
             favoriteVoiceIds={favoriteVoiceIds}
             setFavoriteVoiceIds={setFavoriteVoiceIds}
@@ -2088,7 +2124,7 @@ export function VoicePanel({
           />
         ) : null}
 
-        {!isSmartContext && !isPluginsContext && !isEffectsContext && !isCaptionContext && !isAvatarContext && !isAudioClipContext && !isVisualContext && !isStickerContext && !isOverlayContext && voiceTab === "history" ? (
+        {isVoiceContext && voiceTab === "history" ? (
           <HistoryPanel
             historyItems={historyItems}
             useHistoryItem={useHistoryItem}

@@ -19,6 +19,7 @@ import { config } from "../../config/index.js";
 import { pyvideotransService } from "../../services/ai/pyvideotransService.js";
 import { modelManager, modelEvents } from "../../services/ai/modelManager.js";
 import { voiceTrainingManager } from "../../services/ai/voiceTrainingManager.js";
+import { voiceFLService } from "../../services/ai/voiceFLService.js";
 
 export const aiController = {
   async transcribe(req, res) {
@@ -674,6 +675,40 @@ export const aiController = {
     try {
       const models = voiceTrainingManager.listTrainedModels();
       res.json(models);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // Voice FL Studio - Audio Mastering & Vocal Processor
+  async processVoiceFL(req, res) {
+    try {
+      const { audioPath, audioBase64, settings = {} } = req.body;
+      let targetPath = audioPath;
+
+      if (!targetPath && audioBase64) {
+        const cleanBase64 = audioBase64.replace(/^data:audio\/\w+;base64,/, "");
+        const buffer = Buffer.from(cleanBase64, "base64");
+        const tempName = `fl_input_${Date.now()}.wav`;
+        targetPath = fileManager.getFilePath("temp", tempName);
+        fs.writeFileSync(targetPath, buffer);
+      }
+
+      if (!targetPath || !fs.existsSync(targetPath)) {
+        return res.status(400).json({ error: "audioPath or valid audioBase64 is required" });
+      }
+
+      const result = await voiceFLService.processAudio(targetPath, settings);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  async getVoiceFLPresets(_req, res) {
+    try {
+      const presets = voiceFLService.getPresets();
+      res.json({ presets });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
