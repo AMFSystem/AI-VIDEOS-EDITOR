@@ -647,6 +647,44 @@ button:disabled {
   grid-template-columns: 50px minmax(250px, 0.76fr) minmax(520px, 1.38fr) minmax(300px, 0.86fr);
 }
 
+.editor-grid:has(.is-voice-fl-tool),
+.editor-grid.is-voice-fl-active {
+  grid-template-columns: 90px minmax(540px, 680px) minmax(460px, 1fr);
+}
+
+.editor-grid.is-compact-rail:has(.is-voice-fl-tool),
+.editor-grid.is-compact-rail.is-voice-fl-active {
+  grid-template-columns: 50px minmax(540px, 680px) minmax(460px, 1fr);
+}
+
+.editor-grid:has(.is-voice-fl-tool) .voice-panel,
+.editor-grid.is-voice-fl-active .voice-panel,
+.voice-panel.is-hidden-by-voice-fl {
+  display: none !important;
+}
+
+.media-panel.is-voice-fl-tool {
+  padding: 8px 12px !important;
+}
+
+@media (max-width: 1380px) {
+  .editor-grid:has(.is-voice-fl-tool),
+  .editor-grid.is-compact-rail:has(.is-voice-fl-tool),
+  .editor-grid.is-voice-fl-active,
+  .editor-grid.is-compact-rail.is-voice-fl-active {
+    grid-template-columns: 50px minmax(480px, 600px) minmax(380px, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .editor-grid:has(.is-voice-fl-tool),
+  .editor-grid.is-compact-rail:has(.is-voice-fl-tool),
+  .editor-grid.is-voice-fl-active,
+  .editor-grid.is-compact-rail.is-voice-fl-active {
+    grid-template-columns: 50px minmax(400px, 500px) minmax(300px, 1fr);
+  }
+}
+
 .language-intro {
   position: fixed;
   inset: 0;
@@ -9618,6 +9656,28 @@ button:disabled {
   box-shadow:
     inset 0 0 0 1px rgba(230, 219, 255, 0.16),
     0 0 8px rgba(153, 109, 255, 0.22);
+}
+
+.audio-clip.has-fl-master .waveform-strip {
+  border-color: rgba(255, 112, 67, 0.7);
+  box-shadow: 0 0 10px rgba(255, 112, 67, 0.3), inset 0 0 8px rgba(255, 112, 67, 0.2);
+}
+
+.audio-clip-fl-live-tag {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  background: linear-gradient(135deg, rgba(255, 112, 67, 0.95) 0%, rgba(216, 67, 21, 0.98) 100%);
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 5;
+  animation: vfl-pulse-glow 2s infinite ease-in-out;
 }
 
 .audio-clip.is-source.is-selected .waveform-strip {

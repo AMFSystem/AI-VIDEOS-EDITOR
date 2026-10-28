@@ -1285,6 +1285,10 @@ export function App() {
   const [voiceStudioInitialTab, setVoiceStudioInitialTab] = useState("tts");
 
   const handleOpenVoiceStudio = useCallback((tab = "tts") => {
+    if (tab === "voice_fl" || tab === "voice-fl") {
+      setActiveTool("voice-fl");
+      return;
+    }
     setVoiceStudioInitialTab(typeof tab === "string" ? tab : "tts");
     setActivePageView("voice-clone-studio");
   }, []);
@@ -1731,7 +1735,7 @@ export function App() {
       <WebMcpReview agent={webMcp} language={activeLanguage} />
       <WebMcpAiStatus agent={webMcp} />
       <ProjectImportOverlay progress={projectImportProgress} language={activeLanguage} />
-      <section className={`editor-grid ${compactRail ? "is-compact-rail" : ""}`}>
+      <section className={`editor-grid ${compactRail ? "is-compact-rail" : ""} ${activeTool === "voice-fl" ? "is-voice-fl-active" : ""}`}>
         <EditorSidebar model={{
           activeLanguage, activeTool, analyzeCurrentVisual, analyzeEffectVisual, audioBlob, audioDuration,
           builtInAssets, captionPosition, captionSegments, captionSize, captionStyle,
@@ -1763,7 +1767,7 @@ export function App() {
           visualLocalTime, updateSelectedVisualEffects, updateSelectedSubjectEffect, updateSelectedClickRipple, removeSelectedSubjectEffect, miganRepair, hdRestoration, smartDenoise,
           mobilePanel, setMobilePanel: changeMobilePanel, applyAssetToTrack, handleGeneratedVector, generationPlugins,
           silenceRemoval,
-          currentTime, replaceAudio, updateAudioSegment, selectedAudioSegment,
+          currentTime, isPlaying, handlePlayToggle, togglePlay: handlePlayToggle, seekTimeline: seekTo, seekTo, replaceAudio, updateAudioSegment, selectedAudioSegment, audioSegments,
           visualSegments, selectedTransitionIndex, setSelectedTransitionIndex,
           updateTransitionAtIndex, applyTransitionToAll,
         }} />

@@ -6,6 +6,7 @@ const { spawn } = require("node:child_process");
 
 let mainWindow = null;
 let backendProcess = null;
+let pythonProcess = null;
 
 function checkPortOpen(port, host = "127.0.0.1") {
   return new Promise((resolve) => {
@@ -26,7 +27,153 @@ function checkPortOpen(port, host = "127.0.0.1") {
   });
 }
 
-async function ensureBackendServer() {
+function resolveBinaries(resourcesPath, isPackaged) {
+  const isWindows = process.platform === "win32";
+  const osFolder = isWindows ? "win" : "mac";
+  const ffmpegName = isWindows ? "ffmpeg.exe" : "ffmpeg";
+  const ffprobeName = isWindows ? "ffprobe.exe" : "ffprobe";
+
+  const ffmpegCandidates = isPackaged
+    ? [
+        path.join(resourcesPath, "bin", osFolder, ffmpegName),
+        path.join(resourcesPath, "bin", ffmpegName),
+      ]
+    : [
+        path.join(__dirname, "bin", osFolder, ffmpegName),
+        path.join(__dirname, "bin", ffmpegName),
+      ];
+
+  let resolvedFfmpeg = null;
+  for (const c of ffmpegCandidates) {
+    if (fs.existsSync(c)) {
+      resolvedFfmpeg = c;
+      break;
+    }
+  }
+
+  const probeCandidates = isPackaged
+    ? [
+        path.join(resourcesPath, "bin", osFolder, ffprobeName),
+        path.join(resourcesPath, "bin", ffprobeName),
+      ]
+    : [
+        path.join(__dirname, "bin", osFolder, ffprobeName),
+        path.join(__dirname, "bin", ffprobeName),
+      ];
+
+  let resolvedFfprobe = null;
+  for (const c of probeCandidates) {
+    if (fs.existsSync(c)) {
+      resolvedFfprobe = c;
+      break;
+    }
+  }
+
+  return {
+    ffmpegPath: resolvedFfmpeg || "ffmpeg",
+    ffprobePath: resolvedFfprobe || "ffprobe",
+  };
+}
+
+async function ensureFastApiServer(modelsDir, storageDir) {
+  const isRunning = await checkPortOpen(8000);
+  if (isRunning) {
+    console.log("[Desktop] FastAPI AI Studio already active on port 8000");
+    return;
+  }
+
+  const isPackaged = app.isPackaged;
+  const isWindows = process.platform === "win32";
+  const resourcesPath = isPackaged ? process.resourcesPath : path.resolve(__dirname, "..");
+
+  let pythonExec = null;
+  let pythonArgs = [];
+  let pythonCwd = null;
+
+  // 1. Check for standalone PyInstaller engine binary if packaged
+  const engineBinary = isWindows ? "ai_engine.exe" : "ai_engine";
+  const bundledEngine = path.join(resourcesPath, "ai_engine", engineBinary);
+
+  if (isPackaged && fs.existsSync(bundledEngine)) {
+    pythonExec = bundledEngine;
+    pythonArgs = [];
+    pythonCwd = path.join(resourcesPath, "ai_engine");
+    console.log("[Desktop] Using bundled AI engine binary:", bundledEngine);
+  } else {
+    // 2. Check for virtual environments or system python
+    const venvBin = isWindows ? "Scripts" : "bin";
+    const pyExe = isWindows ? "python.exe" : "python";
+    const venvCandidates = [
+      path.join(resourcesPath, "backend", "ai_clone", ".venv", venvBin, pyExe),
+      path.join(resourcesPath, "backend", "python", ".venv", venvBin, pyExe),
+      path.join(resourcesPath, ".venv", venvBin, pyExe),
+      path.join(__dirname, "../backend/ai_clone/.venv", venvBin, pyExe),
+      path.join(__dirname, "../backend/python/.venv", venvBin, pyExe),
+      path.join(__dirname, "../.venv", venvBin, pyExe),
+    ];
+
+    for (const v of venvCandidates) {
+      if (fs.existsSync(v)) {
+        pythonExec = v;
+        break;
+      }
+    }
+
+    if (!pythonExec) {
+      pythonExec = isWindows ? "python" : "python3";
+    }
+
+    pythonCwd = isPackaged
+      ? path.join(resourcesPath, "backend", "ai_clone")
+      : path.resolve(__dirname, "../backend/ai_clone");
+
+    if (!fs.existsSync(pythonCwd)) {
+      console.warn("[Desktop] Python ai_clone directory not found, skipping FastAPI auto-start.");
+      return;
+    }
+
+    pythonArgs = ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"];
+  }
+
+  const pyEnv = {
+    ...process.env,
+    DESKTOP_MODE: "1",
+    BONDETH_DATABASE_URL: `sqlite+aiosqlite:///${path.join(modelsDir, "bondeth.db")}`,
+    BONDETH_MODEL_DIR: modelsDir,
+    BONDETH_TMP_DIR: path.join(storageDir, "tmp"),
+    BONDETH_DATA_DIR: path.join(storageDir, "data"),
+  };
+
+  try {
+    console.log("[Desktop] Spawning FastAPI server:", pythonExec, pythonArgs.join(" "));
+    pythonProcess = spawn(pythonExec, pythonArgs, {
+      cwd: pythonCwd,
+      env: pyEnv,
+      stdio: "inherit",
+      shell: !isPackaged && isWindows,
+    });
+
+    pythonProcess.on("exit", (code) => {
+      if (code !== 0 && code !== null) {
+        console.warn(`[Desktop] FastAPI process exited with code ${code}`);
+      }
+      pythonProcess = null;
+    });
+
+    // Wait for port 8000 to be active (up to 6s)
+    for (let i = 0; i < 24; i++) {
+      await new Promise((r) => setTimeout(r, 250));
+      if (await checkPortOpen(8000)) {
+        console.log("[Desktop] FastAPI AI Studio successfully online on port 8000");
+        break;
+      }
+    }
+  } catch (err) {
+    console.warn("[Desktop] Could not launch FastAPI server:", err.message);
+  }
+}
+
+async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegConfig) {
   const isRunning = await checkPortOpen(3001);
   if (isRunning) {
     console.log("[Desktop] Local Backend Server already active on port 3001");
@@ -35,41 +182,24 @@ async function ensureBackendServer() {
 
   const isPackaged = app.isPackaged;
   const isWindows = process.platform === "win32";
+  const resourcesPath = isPackaged ? process.resourcesPath : path.resolve(__dirname, "..");
 
   let backendScript;
   let backendCwd;
-  let frontendDist;
-  let storageDir;
-  let modelsDir;
 
   if (isPackaged) {
-    const resourcesPath = process.resourcesPath;
     backendScript = path.join(resourcesPath, "backend", "src", "server.js");
     backendCwd = path.join(resourcesPath, "backend");
-    frontendDist = path.join(__dirname, "dist");
-    // Models stored in user data directory so app installer remains lightweight
-    modelsDir = path.join(app.getPath("userData"), "models");
-    storageDir = path.join(app.getPath("userData"), "storage");
   } else {
     backendScript = path.resolve(__dirname, "../backend/src/server.js");
     backendCwd = path.resolve(__dirname, "../backend");
-    frontendDist = path.resolve(__dirname, "../frontend/dist");
-    modelsDir = path.resolve(__dirname, "../backend/ai_clone/models");
-    storageDir = path.resolve(__dirname, "../backend/storage");
   }
 
-  // Ensure directories exist
-  try {
-    if (!fs.existsSync(modelsDir)) fs.mkdirSync(modelsDir, { recursive: true });
-    if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
-  } catch (err) {
-    console.warn("[Desktop] Directory init error:", err);
-  }
-
-  console.log("[Desktop] Starting backend server:", backendScript);
+  console.log("[Desktop] Starting Node backend server:", backendScript);
   console.log("[Desktop] Packaged mode:", isPackaged);
   console.log("[Desktop] Storage directory:", storageDir);
   console.log("[Desktop] Models directory:", modelsDir);
+  console.log("[Desktop] FFmpeg binary:", ffmpegConfig.ffmpegPath);
 
   const env = {
     ...process.env,
@@ -80,6 +210,9 @@ async function ensureBackendServer() {
     AI_MODELS_DIR: modelsDir,
     BONDETH_MODEL_DIR: modelsDir,
     HF_HOME: path.join(modelsDir, "hf"),
+    FFMPEG_PATH: ffmpegConfig.ffmpegPath,
+    FFPROBE_PATH: ffmpegConfig.ffprobePath,
+    AI_CLONE_API_URL: "http://127.0.0.1:8000/api/v1/stt",
   };
 
   let execCmd;
@@ -116,7 +249,36 @@ async function ensureBackendServer() {
 }
 
 async function createWindow() {
-  await ensureBackendServer();
+  const isPackaged = app.isPackaged;
+  const resourcesPath = isPackaged ? process.resourcesPath : path.resolve(__dirname, "..");
+
+  let frontendDist;
+  let storageDir;
+  let modelsDir;
+
+  if (isPackaged) {
+    frontendDist = path.join(__dirname, "dist");
+    modelsDir = path.join(app.getPath("userData"), "models");
+    storageDir = path.join(app.getPath("userData"), "storage");
+  } else {
+    frontendDist = path.resolve(__dirname, "../frontend/dist");
+    modelsDir = path.resolve(__dirname, "../backend/ai_clone/models");
+    storageDir = path.resolve(__dirname, "../backend/storage");
+  }
+
+  // Ensure directories exist
+  try {
+    if (!fs.existsSync(modelsDir)) fs.mkdirSync(modelsDir, { recursive: true });
+    if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
+  } catch (err) {
+    console.warn("[Desktop] Directory init error:", err);
+  }
+
+  const ffmpegConfig = resolveBinaries(resourcesPath, isPackaged);
+
+  // Start both FastApi (port 8000) and Node backend (port 3001)
+  await ensureFastApiServer(modelsDir, storageDir);
+  await ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegConfig);
 
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -139,7 +301,6 @@ async function createWindow() {
     mainWindow.show();
   });
 
-  const isPackaged = app.isPackaged;
   if (!isPackaged) {
     const isDevRunning = await checkPortOpen(5173);
     if (isDevRunning) {
@@ -162,6 +323,17 @@ async function createWindow() {
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
+}
+
+function terminateChildren() {
+  if (backendProcess) {
+    try { backendProcess.kill(); } catch {}
+    backendProcess = null;
+  }
+  if (pythonProcess) {
+    try { pythonProcess.kill(); } catch {}
+    pythonProcess = null;
+  }
 }
 
 // IPC Handlers
@@ -198,18 +370,16 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  if (backendProcess) {
-    backendProcess.kill();
-    backendProcess = null;
-  }
+  terminateChildren();
   if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
+app.on("before-quit", () => {
+  terminateChildren();
+});
+
 app.on("quit", () => {
-  if (backendProcess) {
-    backendProcess.kill();
-    backendProcess = null;
-  }
+  terminateChildren();
 });

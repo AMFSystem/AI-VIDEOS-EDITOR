@@ -62,10 +62,14 @@ class SttService:
         if self._whisper is None:
             with self._load_lock:
                 if self._whisper is None:
+                    import os
                     from faster_whisper import WhisperModel
 
+                    num_cores = os.cpu_count() or 4
+                    cpu_threads = min(8, max(2, num_cores - 2 if num_cores > 4 else num_cores))
+
                     s = self._settings
-                    logger.info("Loading STT model %s on %s (%s)", s.stt_model, s.stt_device, s.stt_compute_type)
+                    logger.info("Loading STT model %s on %s (%s) with %d threads", s.stt_model, s.stt_device, s.stt_compute_type, cpu_threads)
                     download_root = str(s.model_dir / "whisper")
                     try:
                         self._whisper = WhisperModel(
@@ -74,6 +78,8 @@ class SttService:
                             compute_type=s.stt_compute_type,
                             download_root=download_root,
                             local_files_only=True,
+                            cpu_threads=cpu_threads,
+                            num_workers=2,
                         )
                         logger.info("Whisper STT: Loaded strictly from local offline cache")
                     except Exception:
@@ -83,6 +89,8 @@ class SttService:
                             device=s.stt_device,
                             compute_type=s.stt_compute_type,
                             download_root=download_root,
+                            cpu_threads=cpu_threads,
+                            num_workers=2,
                         )
         return self._whisper
 
@@ -162,10 +170,11 @@ class SttService:
 
 
     def _transcribe_whisper(self, audio, language: str = "en") -> list[Segment]:
+        beam_size = max(1, min(self._settings.stt_beam_size, 3))
         segments_iter, _ = self._load_whisper().transcribe(
             audio,
             language=language if language != "auto" else None,
-            beam_size=self._settings.stt_beam_size,
+            beam_size=beam_size,
             vad_filter=True,  # skip silence: faster and fewer hallucinations
             word_timestamps=True,
         )

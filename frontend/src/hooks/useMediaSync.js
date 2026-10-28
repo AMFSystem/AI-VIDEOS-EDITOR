@@ -54,7 +54,12 @@ export function useMediaSync(d) {
     const video = d.previewVideoRef.current;
     return () => cancelLatestVideoFrameRequest(video);
   }, [d.previewVideoRef, d.previewVisualSrc, d.previewVisualType]);
-  useEffect(() => { d.audioSegments.forEach((s) => { const a = d.audioSegmentRefs.current.get(s.id); if (a) setTimelineAudioGain(a, getAudioSegmentPreviewVolume(s, d.currentTime), s.spatialEffect, s.spatialAmount); }); }, [d.audioSegments, d.currentTime]);
+  useEffect(() => {
+    d.audioSegments.forEach((s) => {
+      const a = d.audioSegmentRefs.current.get(s.id);
+      if (a) setTimelineAudioGain(a, getAudioSegmentPreviewVolume(s, d.currentTime), s.spatialEffect, s.spatialAmount, s.flSettings, s.isFlBypassed);
+    });
+  }, [d.audioSegments, d.currentTime]);
   useEffect(() => {
     syncVoiceAudioSegments({
       segments: d.audioSegments,
@@ -65,7 +70,19 @@ export function useMediaSync(d) {
       visibleSegmentIds: visibleAudioSegmentIds,
     });
   }, [d.audioSegments, d.currentTime, d.isPlaying, d.trackVisibility, visibleAudioSegmentIds]);
-  useEffect(() => { if (d.sourceAudioRef.current) setTimelineAudioGain(d.sourceAudioRef.current, d.sourceAudioLinked ? getLinkedSourceAudioState(d.linkedSourceAudioSegments, d.currentTime).segment?.volume ?? d.sourceAudioVolume : d.sourceAudioVolume, d.sourceAudioSpatialEffect, d.sourceAudioSpatialAmount); }, [d.currentTime, d.linkedSourceAudioSegments, d.sourceAudioLinked, d.sourceAudioSpatialAmount, d.sourceAudioSpatialEffect, d.sourceAudioVolume, d.sourceAudioUrl]);
+  useEffect(() => {
+    if (d.sourceAudioRef.current) {
+      const linked = d.sourceAudioLinked ? getLinkedSourceAudioState(d.linkedSourceAudioSegments, d.currentTime).segment : null;
+      setTimelineAudioGain(
+        d.sourceAudioRef.current,
+        d.sourceAudioLinked ? (linked?.volume ?? d.sourceAudioVolume) : d.sourceAudioVolume,
+        d.sourceAudioSpatialEffect,
+        d.sourceAudioSpatialAmount,
+        linked?.flSettings ?? d.sourceAudioFlSettings,
+        linked?.isFlBypassed ?? d.sourceAudioIsFlBypassed,
+      );
+    }
+  }, [d.currentTime, d.linkedSourceAudioSegments, d.sourceAudioLinked, d.sourceAudioSpatialAmount, d.sourceAudioSpatialEffect, d.sourceAudioVolume, d.sourceAudioUrl, d.sourceAudioFlSettings, d.sourceAudioIsFlBypassed]);
   useEffect(() => {
     const a = d.sourceAudioRef.current; if (!a || !d.sourceAudioUrl) return;
     const state = d.sourceAudioLinked

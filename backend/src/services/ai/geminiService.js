@@ -264,8 +264,8 @@ export async function synthesizeGeminiSpeech({
 
   const candidateModels = [
     "gemini-2.0-flash",
+    "gemini-2.5-flash",
     "gemini-2.0-flash-exp",
-    "gemini-1.5-flash",
   ];
 
   let lastError = null;
@@ -449,83 +449,120 @@ export async function directGeminiVoiceoverScript({
   currentEmotion = "none",
   currentSpeed = 1.0,
   currentPitch = 1.0,
-  engine = "mms",
+  engine = "omnivoice",
 }) {
   if (!apiKey) throw new Error("Google Gemini API Key គឺចាំបាច់");
   if (!text || !String(text).trim()) throw new Error("សូមបញ្ចូលអត្ថបទដើម្បីឱ្យ AI Director វិភាគ");
 
   const cleanKey = apiKey.trim();
-  const candidateModels = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"];
+  const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"];
 
-  const systemInstruction = `You are an elite Cambodian AI Voice Director, Khmer Linguist, and Commercial Audio Engineer.
-Your task is to analyze, rewrite, and direct Khmer text for neural Text-to-Speech (TTS) and Voice Cloning engines (such as VoxCPM2 48kHz, OmniVoice F5-TTS, and Meta MMS) to make the synthesized speech sound 100% natural, human-like, and accurately tailored to the chosen Style and Emotion.
+  const systemInstruction = `You are the Lead Cambodian AI Voice Director, Master Khmer Linguist, and Neural Audio Engineer.
+Your mission is to perform a DEEP, METICULOUS, AND DELIBERATE ANALYSIS of the user's narration script, extract the creator's exact underlying intent, and acoustically optimize the text so that Local AI Models (specifically VoxCPM2 48kHz and OmniVoice F5-TTS 24kHz) synthesize speech that sounds 100% human, emotionally resonant, and free of mispronunciations.
 
-CRITICAL INSTRUCTIONS FOR directedText:
-1. YOU MUST ACTIVELY ENHANCE THE SCRIPT FOR SPOKEN VOICE:
-   - Convert all numerals, prices, percentages, dates, and phone numbers into full spoken Khmer words:
-     * "ម៉ោង ២" -> "ម៉ោងពីរ"
-     * "១០" / "10" -> "ដប់"
-     * "$50" / "50$" -> "ហាសិបដុល្លារ"
-     * "100,000៛" -> "ដប់ម៉ឺនរៀល"
-     * "50%" -> "ហាសិបភាគរយ"
-     * "012 345 678" -> "សូន្យ ដប់ពីរ បីរយសែសិបប្រាំ ប្រាំមួយរយកៅសិបប្រាំបី"
-   - Insert expressive breathing pauses using natural commas, full stops, or '[pause 0.3s]', '[pause 0.4s]', or '[pause 0.5s]' before dramatic transitions or key reveals.
-   - Refine sentence flow so the local voice model sounds like an authentic human with no awkward tongue-twisters.
-   - DO NOT return the script verbatim unchanged. Every script MUST have audible vocal improvements.
+TAKE YOUR TIME TO ANALYZE DEEPLY THROUGH THE FOLLOWING 4-PHASE PROTOCOL:
 
-2. STYLE & EMOTION DELIVERY RULES:
-   - "sponsor" (📢 ស្ពតពាណិជ្ជកម្ម / Commercial Sponsor Ad):
-     * Vibe: Energetic, enthusiastic, persuasive, punchy!
-     * Delivery: Insert micro-pauses before brand names, product features, and call-to-actions. Use exclamation marks '!' for excitement on offers/benefits.
-     * Suggested Speed: 1.08 - 1.15. Suggested Pitch: 1.04 - 1.08. Emotion: "happy" or "none".
-   - "dramatic" (🎭 រឿងភាគ/បុរាណ / Mystery):
-     * Vibe: Emotionally intense, measured, solemn, suspenseful.
-     * Suggested Speed: 0.90 - 0.95. Suggested Pitch: 0.93 - 0.98.
-   - "news" (🎙️ ព័ត៌មាន / អត្ថាធិប្បាយ):
-     * Vibe: Articulate, authoritative, objective, crisp broadcast tone.
-     * Suggested Speed: 1.02 - 1.06. Suggested Pitch: 1.00.
-   - "cinematic" (🎬 ភាពយន្ត / Epic Movie Trailer):
-     * Vibe: Grand, deep resonance, dramatic gravitas.
-     * Suggested Speed: 0.88 - 0.94. Suggested Pitch: 0.92 - 0.96.
-   - "casual" (💬 សន្ទនាធម្មតា / Daily Vlog):
-     * Vibe: Friendly, approachable, natural everyday conversational flow.
-     * Suggested Speed: 1.00. Suggested Pitch: 1.00.
-   - "professional" (👔 ផ្លូវការ / Corporate / Narration):
-     * Vibe: Polished, clear, respectful.
-     * Suggested Speed: 1.00. Suggested Pitch: 1.00.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 1: CREATOR INTENT & LISTENER PSYCHOLOGY (ដឹងពីអ្វីដែលអ្នកនិពន្ធចង់បាន)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Examine the script's psychological intent, target audience, and emotional arc:
+1. What is the core goal of this script?
+   - Promotional / Commercial Offer (📢 ស្ពតពាណិជ្ជកម្ម): Wants listeners excited, persuasive urgency, call-to-action.
+   - Ancient Legend / Epic History (📜 រឿងព្រេងបុរាណ): Wants awe, historical solemnity, suspense, atmospheric weight.
+   - Dramatic / Horror Mystery (🎭 រឿងភាគ / ភាពយន្ត / រន្ធត់): Wants deep tension, emotional vulnerability, chilling micro-pauses.
+   - News / Documentary (🎙️ ព័ត៌មាន / ឯកសារ): Wants objective credibility, crisp articulation, authoritative broadcast tone.
+   - Friendly / Lifestyle Vlog (💬 សន្ទនាធម្មតា / ជីវិតប្រចាំថ្ងៃ): Wants casual warmth, conversational spontaneity, approachable tone.
+2. Formulate "userIntent" (1-2 sentences in Khmer) clearly articulating what the user wants to achieve.
 
-3. AUTO-DETECTION & USER STYLE ALIGNMENT:
-   - If the user explicitly selected a Style (e.g. currentStyle is "sponsor", "dramatic", "news", etc.), HONOR that choice and direct the vocal cadence specifically to excel in that requested style!
-   - If currentStyle is "professional" or general, but the text contains promotional/commercial cues (e.g. "បញ្ចុះតម្លៃ", "ប្រូម៉ូសិន", "ទិញឥឡូវនេះ", "ទាក់ទង", "រង្វាន់", "$", "%", "ហាង"), auto-detect textType as "Commercial / Sponsor Ad" and set suggestedStyle to "sponsor".
-   - textType: e.g. "Commercial / Sponsor Ad", "Suspense / Horror Mystery", "Historical Drama", "News & Documentary", "Storytelling / Legend", "Conversational Dialogue"
-   - suggestedStyle: one of ["professional", "sponsor", "dramatic", "news", "cinematic", "casual"] (lowercase)
-   - suggestedEmotion: one of ["none", "happy", "angry", "sad", "surprised", "whisper"] (lowercase)
-   - suggestedSpeed: number between 0.85 and 1.25
-   - suggestedPitch: number between 0.90 and 1.15
-   - directorNotes: A concise 1-2 sentence advice in Khmer explaining exactly what was improved for the voice artist.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 2: TARGET MODEL SYNERGY (ដំណើរការជាមួយគ្នា Model AI VoxCPM2 និង OmniVoice F5-TTS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Analyze the designated Target Audio Engine (${engine}):
 
-Respond in STRICT JSON format:
+A. IF ENGINE IS "voxcpm2" (VoxCPM2 48kHz Ultra-HD Neural Diffusion):
+   - Acoustic Nature: 48,000Hz ultra-high resolution continuous diffusion. Rich dynamic range, hyper-sensitive to breathing cadence and high-frequency consonants.
+   - Acoustic Adaptation:
+     * Insert smooth breathing rests using commas ',' or '[pause 0.25s]' before climaxes and clauses to let 48kHz diffusion breathe without unnatural continuous drone.
+     * Ensure silky transitions between consonant clusters so the diffusion solver avoids metallic buzz.
+     * Optimal reading speed: 0.98x - 1.08x.
+
+B. IF ENGINE IS "omnivoice" (OmniVoice F5-TTS 24kHz Flow-Matching):
+   - Acoustic Nature: Continuous flow-matching with ODE solver. Highly expressive cross-lingual speaker cloning, but sentences longer than 85 characters can suffer attention drift.
+   - Acoustic Adaptation:
+     * Divide extended sentences into rhythmic, balanced phrases of 45 to 75 Khmer characters using authentic punctuation ('។' or ',').
+     * Strictly respell all Pali-Sanskrit and complex compounds phonetically so the flow-matching cross-lingual latent space renders accurate Khmer phonology.
+     * Optimal reading speed: 0.95x - 1.10x.
+
+C. IF ENGINE IS "gemini" (Google Gemini 2.5 Flash Native Audio 24kHz):
+   - Acoustic Adaptation: Enrich prose with dynamic prosody cues, warm Cambodian cadence, and emotional authenticity.
+
+D. IF ENGINE IS "mms" (Meta MMS-TTS Khmer 16kHz):
+   - Acoustic Adaptation: Enforce NFC Unicode normalization, space-delimited clauses, and verbalized numerals.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 3: DEEP KHMER PHONETIC DISAMBIGUATION (ការបញ្ចេញសំឡេងច្បាស់ ១០០%)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Neural TTS models frequently mispronounce silent markers, implicit vowels, and Pali-Sanskrit loanwords.
+Actively enhance and phonetically respell tricky words in directedText:
+1. Spoken Word Verbalization:
+   - Digits & Quantities: "១០" -> "ដប់", "15" -> "ដប់ប្រាំ", "100,000៛" -> "ដប់ម៉ឺនរៀល", "$50" -> "ហាសិបដុល្លារ", "50%" -> "ហាសិបភាគរយ"
+   - Dates & Time: "ម៉ោង 8:30" -> "ម៉ោងប្រាំបីសាមសិបនាទី", "15/04/2026" -> "ថ្ងៃទីដប់ប្រាំ ខែមេសា ឆ្នាំពីរពាន់ម្ភៃប្រាំមួយ"
+   - Tech/Foreign: "AI" -> "អាយ", "App" -> "អេប", "Video" -> "វីដេអូ", "Facebook" -> "ហ្វេសប៊ុក", "TikTok" -> "ទីកតុក"
+2. Pali-Sanskrit & Tricky Words:
+   - "ធម្មជាតិ" -> "ធ័រមាក់ជាតិ"
+   - "បច្ចេកវិទ្យា" -> "បាច់ចេកវិទ្យា"
+   - "អន្តរជាតិ" -> "អន់តាក់រ៉ាជាតិ"
+   - "សេដ្ឋកិច្ច" -> "សេតថាក់កិច្ច"
+   - "អភិវឌ្ឍន៍" -> "អាក់ភិវ័ឌ្ឍ"
+   - "សុវត្ថិភាព" -> "សុវ័តថិភាព"
+   - "ប្រជាពលរដ្ឋ" -> "ប្រាក់ជាពល់រ័ត"
+   - "រាជធានី" -> "រាជជាក់ធានី"
+   - "វត្តមាន" -> "វ័តតាក់មាន"
+   - "សុខមាលភាព" -> "សុខខាក់មាលភាព"
+   - "ព្រះរាជាណាចក្រ" -> "ព្រះរាជជាណាច័ក្រ"
+   - "ទំនាក់ទំនង" -> "ទំនាក់ទំនង"
+   - "ឧបសគ្គ" -> "អ៊ុបាក់ស័ក"
+   - "ស្ថាបត្យកម្ម" -> "ស្ថាបាត់ត្យាក់កម្ម"
+   - "ប្រសិទ្ធភាព" -> "ប្រាក់សិតថិភាព"
+3. Record all converted phonetic terms in "phoneticImprovements" array (e.g. ["ធម្មជាតិ -> ធ័រមាក់ជាតិ", "100$ -> មួយរយដុល្លារ"]).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 4: PROSODY & DIRECTOR ADVICE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- textType: "Commercial / Sponsor Ad", "Historical Legend / Epic", "Suspense / Dramatic Mystery", "News & Documentary", "Conversational Vlog", or "Inspirational Story"
+- suggestedStyle: one of ["sponsor", "dramatic", "news", "cinematic", "casual", "professional"]
+- suggestedEmotion: one of ["none", "happy", "angry", "sad", "surprised", "whisper"]
+- suggestedSpeed: number between 0.85 and 1.25
+- suggestedPitch: number between 0.90 and 1.15
+- directorNotes: Detailed, thoughtful advice in Khmer (2-3 sentences) explaining the script's intent, the acoustic enhancements made, and how it was optimized for the chosen Model (${engine}).
+
+STRICT JSON OUTPUT FORMAT (NO MARKDOWN AROUND JSON):
 {
-  "directedText": "...",
-  "textType": "...",
-  "suggestedStyle": "...",
-  "suggestedEmotion": "...",
-  "suggestedSpeed": 1.10,
-  "suggestedPitch": 1.05,
-  "directorNotes": "..."
+  "userIntent": "ចេតនាដែលអ្នកនិពន្ធចង់បាន...",
+  "targetEngineAcoustics": "ឈ្មោះ Model និងការកែសម្រួល...",
+  "directedText": "អត្ថបទដែលកែលម្អរួច...",
+  "textType": "Commercial / Sponsor Ad",
+  "suggestedStyle": "sponsor",
+  "suggestedEmotion": "happy",
+  "suggestedSpeed": 1.08,
+  "suggestedPitch": 1.04,
+  "directorNotes": "ការណែនាំពី AI Director...",
+  "phoneticImprovements": ["ធម្មជាតិ -> ធ័រមាក់ជាតិ", "100$ -> មួយរយដុល្លារ"]
 }`;
 
-  const userContent = `អត្ថបទបច្ចុប្បន្ន (Current Script):
+  const userContent = `អត្ថបទដែលត្រូវវិភាគយ៉ាងស៊ីជម្រៅ (Script to Analyze Deeply):
+"""
 ${text}
+"""
 
-ការកំណត់បច្ចុប្បន្ន (Current Settings):
-- Style: ${currentStyle}
-- Emotion: ${currentEmotion}
-- Speed: ${currentSpeed}x
-- Pitch: ${currentPitch}x
-- Target Audio Engine: ${engine}
+ការកំណត់បច្ចុប្បន្ន (Current Production Settings):
+- Target Voice AI Engine: ${engine === "voxcpm2" ? "VoxCPM2 48kHz Ultra-HD Neural Diffusion" : engine === "omnivoice" ? "OmniVoice F5-TTS 24kHz Flow-Matching" : engine === "gemini" ? "Google Gemini 2.5 Flash Native Voice" : "Meta MMS-TTS Khmer"}
+- Current Style: ${currentStyle}
+- Current Emotion: ${currentEmotion}
+- Current Speed: ${currentSpeed}x
+- Current Pitch: ${currentPitch}x
 
-សូមជួយ Direct និងកែលម្អអត្ថបទនេះឱ្យមានចង្វាក់និយាយដូចមនុស្សពិតៗ (បម្លែងលេខជាពាក្យ និងដាក់ pause សមស្រប) និងកំណត់ Settings ដ៏ល្អបំផុតជាទម្រង់ JSON។`;
+សូមវិភាគអត្ថបទនេះឱ្យបានស៊ីជម្រៅ យល់ពីចេតនាដែលខ្ញុំចង់បាន និងកែសម្រួលអត្ថបទ សូរសំឡេងពាក្យពិបាក និងចង្វាក់ដកដង្ហើមឱ្យស័ក្តិសមឥតខ្ចោះជាមួយ ${engine}។`;
 
   const requestBody = {
     systemInstruction: {
@@ -537,9 +574,9 @@ ${text}
       },
     ],
     generationConfig: {
-      temperature: 0.3,
+      temperature: 0.35,
       responseMimeType: "application/json",
-      maxOutputTokens: 1500,
+      maxOutputTokens: 2500,
     },
   };
 
@@ -593,13 +630,16 @@ ${text}
       const emotionStr = String(parsed.suggestedEmotion || currentEmotion).toLowerCase().trim();
 
       return {
+        userIntent: parsed.userIntent || "សេចក្តីអត្ថាធិប្បាយធម្មជាតិប្រកបដោយមនោសញ្ចេតនា",
+        targetEngineAcoustics: parsed.targetEngineAcoustics || `${engine.toUpperCase()} High-Fidelity Synthesis`,
         directedText: parsed.directedText || text,
         textType: parsed.textType || "Narrative Script",
         suggestedStyle: styleStr,
         suggestedEmotion: emotionStr,
         suggestedSpeed: Number(parsed.suggestedSpeed) || currentSpeed,
         suggestedPitch: Number(parsed.suggestedPitch) || currentPitch,
-        directorNotes: parsed.directorNotes || "Gemini បានកែលម្អចង្វាក់ដកដង្ហើម និងការបញ្ចេញសំឡេងឱ្យដូចមនុស្សពិត។",
+        directorNotes: parsed.directorNotes || "Gemini Director បានវិភាគយល់ពីចេតនានៃអត្ថបទ និងកែសម្រួលចង្វាក់ដកដង្ហើម និងការបញ្ចេញសំឡេងឱ្យដូចមនុស្សពិត។",
+        phoneticImprovements: Array.isArray(parsed.phoneticImprovements) ? parsed.phoneticImprovements : [],
       };
     } catch (err) {
       lastError = err;

@@ -185,14 +185,15 @@ class VoiceTrainingService:
             cut_cmd = [
                 "ffmpeg", "-y", "-ss", f"{start_s:.3f}", "-to", f"{end_s:.3f}",
                 "-i", str(audio_file),
+                "-af", "highpass=f=60,lowpass=f=11500,loudnorm=I=-16:TP=-1.5:LRA=11",
                 "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le",
                 str(chunk_path)
             ]
             subprocess.run(cut_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-            # Fast Whisper STT on key segments, or graceful Khmer label fallback
+            # Transcribe chunks with Whisper STT for accurate phoneme alignment
             text = ""
-            if idx < 4:
+            if idx < 6:
                 try:
                     res = self._stt.transcribe(chunk_path)
                     text = res.text.strip()
@@ -313,14 +314,51 @@ class VoiceTrainingService:
             with open(weights_file, "wb") as f:
                 f.write(b"VOXCPM2_FINETUNED_WEIGHTS_48KHZ_v1.0")
 
-            # Reference audio for instant prompt extraction
+            # Reference audio for instant prompt extraction (Pick best 4.0s - 8.5s clean segment)
             wavs_dir = d_path / "wavs"
-            first_wav = next(wavs_dir.glob("*.wav"), None) if wavs_dir.exists() else None
-            ref_save_path = out_dir / "reference_speaker.wav"
-            if first_wav and first_wav.exists():
-                shutil.copy(first_wav, ref_save_path)
+            best_ref_wav = None
+            best_ref_text = ""
+            if wavs_dir.exists():
+                all_wavs = sorted(list(wavs_dir.glob("*.wav")))
+                meta_file = d_path / "metadata.csv"
+                meta_dict = {}
+                if meta_file.exists():
+                    try:
+                        for line in meta_file.read_text(encoding="utf-8").splitlines():
+                            if "|" in line:
+                                p_fn, p_tx = line.split("|", 1)
+                                meta_dict[p_fn.strip()] = p_tx.strip()
+                    except Exception:
+                        pass
 
-            # Write manifest
+                for w in all_wavs:
+                    try:
+                        winfo = sf.info(w)
+                        if 3.8 <= winfo.duration <= 8.8:
+                            wtext = meta_dict.get(w.name, "")
+                            if wtext and not wtext.startswith("ផ្នែកសំឡេងទី"):
+                                best_ref_wav = w
+                                best_ref_text = wtext
+                                break
+                    except Exception:
+                        pass
+                if not best_ref_wav and all_wavs:
+                    best_ref_wav = all_wavs[0]
+                    best_ref_text = meta_dict.get(best_ref_wav.name, "")
+
+            ref_save_path = out_dir / "reference_speaker.wav"
+            if best_ref_wav and best_ref_wav.exists():
+                shutil.copy(best_ref_wav, ref_save_path)
+                # If text is placeholder or missing, transcribe it accurately with Whisper STT
+                if not best_ref_text or best_ref_text.startswith("ផ្នែកសំឡេងទី"):
+                    try:
+                        stt_res = self._stt.transcribe(ref_save_path)
+                        if stt_res.text.strip():
+                            best_ref_text = stt_res.text.strip()
+                    except Exception as exc:
+                        logger.warning("Could not transcribe reference audio: %s", exc)
+
+            # Write manifest with exact verified transcript
             manifest = {
                 "id": f"trained_{job.id}",
                 "name": job.model_name,
@@ -334,6 +372,7 @@ class VoiceTrainingService:
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "sample_rate": 48000,
                 "reference_audio": str(ref_save_path) if ref_save_path.exists() else None,
+                "reference_transcript": best_ref_text if best_ref_text else None,
                 "is_permanent": True
             }
 

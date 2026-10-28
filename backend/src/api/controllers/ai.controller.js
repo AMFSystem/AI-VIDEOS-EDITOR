@@ -683,9 +683,10 @@ export const aiController = {
   // Voice FL Studio - Audio Mastering & Vocal Processor
   async processVoiceFL(req, res) {
     try {
-      const { audioPath, audioBase64, settings = {} } = req.body;
+      const { audioPath, audioUrl, audioBase64, settings = {} } = req.body;
       let targetPath = audioPath;
 
+      // Handle base64 audio payload
       if (!targetPath && audioBase64) {
         const cleanBase64 = audioBase64.replace(/^data:audio\/\w+;base64,/, "");
         const buffer = Buffer.from(cleanBase64, "base64");
@@ -694,8 +695,42 @@ export const aiController = {
         fs.writeFileSync(targetPath, buffer);
       }
 
+      // Handle audioUrl (either http(s) URL or local server relative path)
+      if (!targetPath && audioUrl) {
+        if (audioUrl.startsWith("http://") || audioUrl.startsWith("https://")) {
+          // If points to local server storage
+          const urlObj = new URL(audioUrl);
+          const pathname = urlObj.pathname;
+          const candidateLocal = path.join(fileManager.baseDir, pathname.replace(/^\/storage\/?/, ""));
+          if (fs.existsSync(candidateLocal)) {
+            targetPath = candidateLocal;
+          } else {
+            // Fetch via HTTP and cache locally in temp
+            const resp = await fetch(audioUrl);
+            if (!resp.ok) throw new Error(`Failed to fetch audio from URL: ${resp.statusText}`);
+            const arrayBuf = await resp.arrayBuffer();
+            const tempName = `fl_url_${Date.now()}.wav`;
+            targetPath = fileManager.getFilePath("temp", tempName);
+            fs.writeFileSync(targetPath, Buffer.from(arrayBuf));
+          }
+        } else if (audioUrl.startsWith("/")) {
+          const candidate = path.join(fileManager.baseDir, audioUrl.replace(/^\/storage\/?/, ""));
+          if (fs.existsSync(candidate)) {
+            targetPath = candidate;
+          }
+        }
+      }
+
+      // Check if targetPath exists, or try resolving relative to fileManager baseDir
+      if (targetPath && !fs.existsSync(targetPath)) {
+        const fallback = path.join(fileManager.baseDir, targetPath);
+        if (fs.existsSync(fallback)) {
+          targetPath = fallback;
+        }
+      }
+
       if (!targetPath || !fs.existsSync(targetPath)) {
-        return res.status(400).json({ error: "audioPath or valid audioBase64 is required" });
+        return res.status(400).json({ error: "audioPath, audioUrl, or valid audioBase64 is required" });
       }
 
       const result = await voiceFLService.processAudio(targetPath, settings);

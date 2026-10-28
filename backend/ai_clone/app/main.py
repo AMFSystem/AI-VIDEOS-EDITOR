@@ -38,8 +38,12 @@ async def lifespan(app: FastAPI):
 
     settings = get_settings()
 
-    engine = create_engine(settings.database_url)
-    app.state.sessionmaker = create_sessionmaker(engine)
+    try:
+        engine = create_engine(settings.database_url)
+        app.state.sessionmaker = create_sessionmaker(engine)
+    except Exception as exc:
+        logging.warning("Database initialization failed (%s); operating in stateless/local mode.", exc)
+        app.state.sessionmaker = None
 
     try:
         sync_redis = redis.Redis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=1)

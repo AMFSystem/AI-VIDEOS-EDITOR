@@ -835,7 +835,7 @@ function CaptionContextPanel({
             className="audio-entry-card caption-entry-card"
             type="button"
             disabled={!sourceAudioBlob || isGeneratingCaptions}
-            onClick={() => generateCaptionsFromSourceAudio({ grouping: captionGrouping })}
+            onClick={() => generateCaptionsFromSourceAudio({ grouping: captionGrouping, language: language === "km" ? "km" : undefined })}
           >
             <ClosedCaptioning size={24} weight="duotone" />
             <span>
@@ -1721,7 +1721,11 @@ export function VoicePanel({
   }, [activeTool, smartMode]);
 
   return (
-    <aside ref={panelRef} className={`voice-panel ${isTextContext ? "is-text-context" : ""} ${isCaptionContext ? "is-caption-context" : ""} ${isAvatarContext ? "is-avatar-context" : ""} ${isAudioClipContext ? "is-audio-clip-context" : ""} ${isStickerContext ? "is-sticker-context" : ""} ${isVisualContext ? "is-visual-context" : ""} ${isEffectsContext ? "is-effects-context" : ""} ${isCinematicDepthContext && effectsPanelMode === "relight" ? "is-relight-context" : ""} ${isPluginsContext ? "is-plugins-context" : ""} ${isVectorOverlay ? "is-vector-overlay-context" : ""} ${mobileInspectorSection ? "is-focused-mobile-section" : ""}`}>
+    <aside
+      ref={panelRef}
+      className={`voice-panel ${activeTool === "voice-fl" ? "is-hidden-by-voice-fl" : ""} ${isTextContext ? "is-text-context" : ""} ${isCaptionContext ? "is-caption-context" : ""} ${isAvatarContext ? "is-avatar-context" : ""} ${isAudioClipContext ? "is-audio-clip-context" : ""} ${isStickerContext ? "is-sticker-context" : ""} ${isVisualContext ? "is-visual-context" : ""} ${isEffectsContext ? "is-effects-context" : ""} ${isCinematicDepthContext && effectsPanelMode === "relight" ? "is-relight-context" : ""} ${isPluginsContext ? "is-plugins-context" : ""} ${isVectorOverlay ? "is-vector-overlay-context" : ""} ${mobileInspectorSection ? "is-focused-mobile-section" : ""}`}
+      style={activeTool === "voice-fl" ? { display: "none" } : undefined}
+    >
       {mobileInspectorSection ? <header className="focused-mobile-sheet-header"><strong>{title}</strong><button type="button" aria-label={t("close", "关闭")} onClick={onCloseMobileInspector}><X size={20} /></button></header> : null}
       <div className="panel-title-row">
         <h1>{title}</h1>

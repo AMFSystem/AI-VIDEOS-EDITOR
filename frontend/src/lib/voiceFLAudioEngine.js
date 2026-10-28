@@ -6,11 +6,103 @@
 
 export const VOICE_FL_PRESETS = [
   {
+    id: "original_raw_voice",
+    name: "Original Voice",
+    nameKm: "សំឡេងដើម (Raw)",
+    icon: "📻",
+    desc: "ស្តាប់សំឡេងដើមធម្មជាតិ 100% គ្មាន Effect",
+    settings: {
+      denoise: 0,
+      noiseGate: -60,
+      lowCut: false,
+      deEsser: 0,
+      pitchShift: 0,
+      eqLow: 0,
+      eqMid: 0,
+      eqHigh: 0,
+      eqAir: 0,
+      soundgoodizerMode: "A",
+      soundgoodizerAmount: 0,
+      reverbRoom: 0,
+      reverbWet: 0,
+      outputGain: 1.0,
+    },
+  },
+  {
+    id: "podcast_studio_master",
+    name: "Studio Podcast 100%",
+    nameKm: "ផតខាស ស្ទូឌីយោ 100%",
+    icon: "🎙️",
+    desc: "សំឡេងកម្រិត Studio Broadcast កាត់ Noise ស្អាត ក្រាស់កក់ក្តៅ និងភ្លឺច្បាស់ 100%",
+    settings: {
+      denoise: 75,
+      noiseGate: -42,
+      lowCut: true,
+      deEsser: 65,
+      pitchShift: 0,
+      eqLow: 3.5,
+      eqMid: 0.5,
+      eqHigh: 3.2,
+      eqAir: 3.8,
+      soundgoodizerMode: "A",
+      soundgoodizerAmount: 62,
+      reverbRoom: 8,
+      reverbWet: 6,
+      outputGain: 1.15,
+    },
+  },
+  {
+    id: "podcast_shure_sm7b",
+    name: "Shure SM7B Broadcast",
+    nameKm: "សំឡេង Shure SM7B វិទ្យុ",
+    icon: "📻",
+    desc: "សំឡេងម៉ៃក្រូហ្វូន Shure SM7B ក្តៅ ក្រាស់ បែប Radio Broadcast អាជីព",
+    settings: {
+      denoise: 80,
+      noiseGate: -40,
+      lowCut: true,
+      deEsser: 70,
+      pitchShift: 0,
+      eqLow: 4.5,
+      eqMid: -0.5,
+      eqHigh: 3.8,
+      eqAir: 4.2,
+      soundgoodizerMode: "B",
+      soundgoodizerAmount: 68,
+      reverbRoom: 6,
+      reverbWet: 5,
+      outputGain: 1.2,
+    },
+  },
+  {
+    id: "podcast_intimate_story",
+    name: "Storyteller Intimate",
+    nameKm: "និទានរឿង កក់ក្ដៅ",
+    icon: "📖",
+    desc: "សំឡេងនិទានរឿង កក់ក្ដៅ ទន់ភ្លន់ ជិតត្រចៀក បែប Intimate Studio",
+    settings: {
+      denoise: 68,
+      noiseGate: -44,
+      lowCut: true,
+      deEsser: 60,
+      pitchShift: 0,
+      eqLow: 3.8,
+      eqMid: 1.0,
+      eqHigh: 2.2,
+      eqAir: 3.0,
+      soundgoodizerMode: "C",
+      soundgoodizerAmount: 58,
+      reverbRoom: 14,
+      reverbWet: 10,
+      outputGain: 1.1,
+    },
+  },
+  {
     id: "podcast_crisp",
     name: "Studio Clear",
     nameKm: "ផតខាសច្បាស់",
-    icon: "🎙️",
-    desc: "សំឡេងច្បាស់ល្អ កាត់ Noise",
+    icon: "✨",
+    desc: "សំឡេងច្បាស់ល្អ កាត់ Noise ស្រាល",
     settings: {
       denoise: 65,
       noiseGate: -40,
@@ -23,8 +115,8 @@ export const VOICE_FL_PRESETS = [
       eqAir: 2.5,
       soundgoodizerMode: "A",
       soundgoodizerAmount: 50,
-      reverbRoom: 15,
-      reverbWet: 10,
+      reverbRoom: 12,
+      reverbWet: 8,
       outputGain: 1.0,
     },
   },
@@ -146,19 +238,36 @@ export const VOICE_FL_PRESETS = [
 ];
 
 export const DEFAULT_FL_SETTINGS = {
-  denoise: 60,
-  noiseGate: -40,
+  denoise: 75,
+  noiseGate: -42,
   lowCut: true,
-  deEsser: 50,
+  deEsser: 65,
   pitchShift: 0,
-  eqLow: 1.5,
-  eqMid: 0.0,
-  eqHigh: 3.0,
-  eqAir: 2.0,
+  eqLow: 3.5,
+  eqMid: 0.5,
+  eqHigh: 3.2,
+  eqAir: 3.8,
   soundgoodizerMode: "A",
-  soundgoodizerAmount: 50,
-  reverbRoom: 15,
-  reverbWet: 10,
+  soundgoodizerAmount: 62,
+  reverbRoom: 8,
+  reverbWet: 6,
+  outputGain: 1.15,
+};
+
+export const ORIGINAL_RAW_SETTINGS = {
+  denoise: 0,
+  noiseGate: -60,
+  lowCut: false,
+  deEsser: 0,
+  pitchShift: 0,
+  eqLow: 0,
+  eqMid: 0,
+  eqHigh: 0,
+  eqAir: 0,
+  soundgoodizerMode: "A",
+  soundgoodizerAmount: 0,
+  reverbRoom: 0,
+  reverbWet: 0,
   outputGain: 1.0,
 };
 
@@ -290,15 +399,21 @@ export function createVoiceFLGraph(audioContext, settings = DEFAULT_FL_SETTINGS)
   dryGain.gain.value = 0;
 
   // Output stage
+  // Dry / Bypass stage: connects straight to analyserNode (100% pure raw, bypassing all effects, limiter, and master gain)
+  dryGain.connect(analyserNode);
+
+  // Wet stage: passes through limiter and masterGain
   wetSum.connect(limiter);
-  dryGain.connect(limiter);
   limiter.connect(masterGain);
   masterGain.connect(analyserNode);
+
+  let currentSettings = { ...settings };
 
   /**
    * Smoothly updates rack parameters without any audio glitches
    */
   function updateSettings(nextSettings, isBypassed = false) {
+    currentSettings = { ...nextSettings };
     const t = ctx.currentTime;
     const ramp = 0.04;
 
@@ -306,11 +421,13 @@ export function createVoiceFLGraph(audioContext, settings = DEFAULT_FL_SETTINGS)
       dryGain.gain.setTargetAtTime(1, t, ramp);
       wetGain.gain.setTargetAtTime(0, t, ramp);
       reverbWetGain.gain.setTargetAtTime(0, t, ramp);
+      masterGain.gain.setTargetAtTime(0, t, ramp);
       return;
     }
 
     dryGain.gain.setTargetAtTime(0, t, ramp);
     wetGain.gain.setTargetAtTime(1, t, ramp);
+    masterGain.gain.setTargetAtTime(nextSettings.outputGain || 1.0, t, ramp);
 
     // Low Cut
     lowCutNode.frequency.setTargetAtTime(nextSettings.lowCut ? 80 : 20, t, ramp);
@@ -342,9 +459,10 @@ export function createVoiceFLGraph(audioContext, settings = DEFAULT_FL_SETTINGS)
     reverbDelay.delayTime.setTargetAtTime(revT, t, ramp);
     reverbFeedback.gain.setTargetAtTime(0.25 + ((nextSettings.reverbRoom || 10) / 100) * 0.35, t, ramp);
     reverbWetGain.gain.setTargetAtTime(((nextSettings.reverbWet || 10) / 100) * 0.5, t, ramp);
+  }
 
-    // Master
-    masterGain.gain.setTargetAtTime(nextSettings.outputGain || 1.0, t, ramp);
+  function setBypassed(bypassed) {
+    updateSettings(currentSettings, Boolean(bypassed));
   }
 
   return {
@@ -352,6 +470,7 @@ export function createVoiceFLGraph(audioContext, settings = DEFAULT_FL_SETTINGS)
     outputNode: analyserNode,
     analyserNode,
     updateSettings,
+    setBypassed,
   };
 }
 

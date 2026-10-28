@@ -21,7 +21,7 @@ export const TimelineAudioClip = memo(function TimelineAudioClip({
   const width = timelineDuration > 0 ? (segment.duration / timelineDuration) * 100 : 0;
   return (
     <div
-      className={`audio-clip ${segment.sourceKind === "video-source" ? "is-video-source" : ""} ${selected ? "is-selected" : ""}`}
+      className={`audio-clip ${segment.sourceKind === "video-source" ? "is-video-source" : ""} ${selected ? "is-selected" : ""} ${segment.flSettings && !segment.isFlBypassed ? "has-fl-master" : ""}`}
       data-timeline-segment-track="audio"
       data-timeline-segment-id={segment.id}
       data-range-selected={rangeSelected || undefined}
@@ -31,6 +31,11 @@ export const TimelineAudioClip = memo(function TimelineAudioClip({
       onClick={(event) => handlersRef.current.selectAudioClip(event, segment.id)}
     >
       {waveformVisible ? <WaveformStrip peaks={segment.peaks} volume={segment.volume ?? 1} timeline active /> : null}
+      {segment.flSettings && !segment.isFlBypassed && (
+        <span className="audio-clip-fl-live-tag" title="Voice FL Studio Realtime Live Master Active">
+          🎛️ FL Live
+        </span>
+      )}
       <TimelineGain volume={segment.volume ?? 1} disabled={gainDisabled} t={t} onChange={(volume) => handlersRef.current.setAudioSegments((items) => items.map((item) => item.id === segment.id ? { ...item, volume } : item))} />
       <span className="audio-clip-duration" data-compact-duration={formatCompactDuration(segment.duration)}>{formatTime(segment.duration)}</span>
     </div>

@@ -41,6 +41,7 @@ import {
   setStoredGeminiKey,
   verifyGeminiKey,
   directVoiceoverWithGemini,
+  synthesizeWithGemini,
 } from "../../lib/geminiRuntime.js";
 import "./VoiceCloneStudioPage.css";
 import { VoiceFLRack } from "../../components/VoiceFLStudio/VoiceFLRack.jsx";
@@ -79,6 +80,13 @@ const LANGUAGES = [
   { id: "en", label: "🇬🇧 English (អង់គ្លេស)" }
 ];
 
+const GENERATION_PIPELINE_STAGES = [
+  { id: "director", num: 1, name: "Gemini AI Director", desc: "វិភាគ & កែលម្អសូរសំនៀង" },
+  { id: "acoustic", num: 2, name: "Speaker DNA Profile", desc: "ស្រង់លក្ខណៈសូរសំឡេងគំរូ" },
+  { id: "neural", num: 3, name: "Neural Flow-Matching", desc: "សំយោគរលកសំឡេង 32-Step" },
+  { id: "mastering", num: 4, name: "Studio Mastering", desc: "តម្រឹមដង្ហើម & Waveform" },
+];
+
 const BONDETH_AUTH_TOKEN =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YzdkYTNlZi0xMDBhLTQ3ZjItODc3YS01M2QzYTQ1MGJkZmIiLCJ0eXBlIjoiYWNjZXNzIiwiaWF0IjoxNzkyODEyMjQzLCJleHAiOjE5NTA0OTIyNDN9.Ca3Zxsn26DM6Myiw35v_4MoZ6h_3nRy7kahd3tfI_yc";
 
@@ -114,7 +122,7 @@ export function VoiceCloneStudioPage({
   const [showAdvancedModal, setShowAdvancedModal] = useState(false);
   const [ttsSpeed, setTtsSpeed] = useState(1.0);
   const [ttsPitch, setTtsPitch] = useState(1.0);
-  const [ttsModelEngine, setTtsModelEngine] = useState("auto"); // "auto" | "voxcpm2" | "omnivoice" | "mms"
+  const [ttsModelEngine, setTtsModelEngine] = useState("voxcpm2"); // "voxcpm2" | "omnivoice"
   const [cloneModelEngine, setCloneModelEngine] = useState("voxcpm2"); // "voxcpm2" | "omnivoice"
 
   // Text Area Input
@@ -124,9 +132,12 @@ export function VoiceCloneStudioPage({
 
   // Generation & Audio Output State
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationCompletedInModal, setGenerationCompletedInModal] = useState(false);
+  const modalAudioRef = useRef(null);
   const [generationStatusText, setGenerationStatusText] = useState("");
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStage, setGenerationStage] = useState("");
+  const [pipelineStageIndex, setPipelineStageIndex] = useState(0);
   const [generationElapsed, setGenerationElapsed] = useState(0);
   const [generationOverlayDismissed, setGenerationOverlayDismissed] = useState(false);
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState(null);
@@ -145,6 +156,9 @@ export function VoiceCloneStudioPage({
   const [keyVerifyStatus, setKeyVerifyStatus] = useState(null);
   const [isDirecting, setIsDirecting] = useState(false);
   const [directorNotes, setDirectorNotes] = useState(null);
+  const [directorIntent, setDirectorIntent] = useState(null);
+  const [directorTargetAcoustic, setDirectorTargetAcoustic] = useState(null);
+  const [directorPhonetics, setDirectorPhonetics] = useState([]);
   const [detectedScriptType, setDetectedScriptType] = useState(null);
   const [originalScriptBeforeDirect, setOriginalScriptBeforeDirect] = useState(null);
   const [autoDirectOnGenerate, setAutoDirectOnGenerate] = useState(true);
@@ -159,8 +173,26 @@ export function VoiceCloneStudioPage({
       abortControllerRef.current.abort();
     }
     setIsGenerating(false);
+    setGenerationCompletedInModal(false);
     setGenerationStatusText("");
     notify("បានបោះបង់ការផលិតសំឡេង", "info");
+  };
+
+  const handleCloseCompletionModal = () => {
+    if (modalAudioRef.current) {
+      modalAudioRef.current.pause();
+    }
+    setIsGenerating(false);
+    setGenerationCompletedInModal(false);
+    setGenerationStatusText("");
+    setTimeout(() => {
+      const audioSec = document.querySelector(".vs-audio-section");
+      if (audioSec) {
+        audioSec.scrollIntoView({ behavior: "smooth", block: "center" });
+        audioSec.classList.add("vs-audio-section-highlight");
+        setTimeout(() => audioSec.classList.remove("vs-audio-section-highlight"), 2500);
+      }
+    }, 150);
   };
 
   // Saved Voices from Backend API
@@ -405,13 +437,11 @@ export function VoiceCloneStudioPage({
     );
   }, [activeVoice, apiVoices]);
 
-  // Dynamically resolved synthesis engine for Auto-Detect mode
+  // Dynamically resolved synthesis engine for VoxCPM2, OmniVoice, and Gemini 2.5 Flash Native Voice
   const activeResolvedEngine = useMemo(() => {
-    if (ttsModelEngine === "auto") {
-      return isCustomVoice ? "voxcpm2" : "mms";
-    }
-    return ttsModelEngine;
-  }, [ttsModelEngine, isCustomVoice]);
+    if (ttsModelEngine === "gemini") return "gemini";
+    return ttsModelEngine === "omnivoice" ? "omnivoice" : "voxcpm2";
+  }, [ttsModelEngine]);
 
   // Keep selectedVoiceId in sync when voices change
   useEffect(() => {
@@ -619,23 +649,22 @@ export function VoiceCloneStudioPage({
 
     setIsGenerating(true);
     setGenerationOverlayDismissed(false);
+    setPipelineStageIndex(0);
     setGenerationProgress(5);
     setGenerationElapsed(0);
 
     const abortCtrl = new AbortController();
     abortControllerRef.current = abortCtrl;
 
-    const baseEngineName = resolvedEngine === "voxcpm2"
-      ? "✨ VoxCPM2 (OpenBMB 48kHz Studio)"
-      : resolvedEngine === "omnivoice"
-      ? "⚡ OmniVoice (F5-TTS Neural)"
-      : "🎙️ Meta MMS-TTS Khmer Offline";
+    const baseEngineName = resolvedEngine === "gemini"
+      ? "🌐 Google Gemini 2.5 Flash Native Voice (Cloud Real-Time HD)"
+      : resolvedEngine === "voxcpm2"
+      ? "✨ VoxCPM2 + AI Gemini (48kHz Deep Neural - Full Power)"
+      : "⚡ OmniVoice + AI Gemini (F5-TTS 36-Step - Full Power)";
 
-    const displayEngineLabel = ttsModelEngine === "auto"
-      ? `⚡ Auto-Detect (${resolvedEngine === "voxcpm2" ? "VoxCPM2 48kHz" : "Meta MMS-TTS"})`
-      : baseEngineName;
+    const displayEngineLabel = baseEngineName;
 
-    setGenerationStage("Connecting Neural Engine...");
+    setGenerationStage(resolvedEngine === "gemini" ? "Connecting Google Gemini Flash Audio..." : "Connecting Neural Engine...");
     setGenerationStatusText(`កំពុងរៀបចំការផលិតសំឡេងជាមួយ ${displayEngineLabel}...`);
 
     const startTime = Date.now();
@@ -643,35 +672,39 @@ export function VoiceCloneStudioPage({
       setGenerationElapsed(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
 
-    let progressSim = 5;
-    const progressInterval = setInterval(() => {
-      progressSim = Math.min(85, progressSim + (progressSim < 30 ? 3 : progressSim < 60 ? 1 : 0.5));
-      setGenerationProgress((prev) => Math.max(prev, Math.floor(progressSim)));
+    let currentDisplayProgress = 5;
+    let targetProgress = 8;
+    let currentJobStatus = "initializing";
+    let currentQueuePosition = 1;
 
-      if (progressSim < 25) {
-        setGenerationStage("Extracting Speaker Acoustic Features & Phonemes...");
-      } else if (progressSim < 55) {
-        setGenerationStage(
-          resolvedEngine === "voxcpm2"
-            ? "Continuous 48kHz Flow-Matching Diffusion..."
-            : resolvedEngine === "omnivoice"
-            ? "F5-TTS Neural Audio Synthesis..."
-            : "Synthesizing Khmer Speech Phonemes..."
-        );
-      } else if (progressSim < 80) {
-        setGenerationStage("Khmer Tone Prosody Alignment & Denoising...");
-      } else {
-        setGenerationStage("Finalizing Waveform Output...");
+    // Silky smooth, strictly truthful progress interpolator (updates every 50ms)
+    const progressInterval = setInterval(() => {
+      if (currentJobStatus === "queued") {
+        targetProgress = Math.min(18, targetProgress + 0.1);
+        setGenerationStage(`ស្ថិតក្នុងជួររង់ចាំ (Queue #${currentQueuePosition})...`);
       }
-    }, 600);
+
+      // Smooth step towards targetProgress
+      if (currentDisplayProgress < targetProgress) {
+        const delta = targetProgress - currentDisplayProgress;
+        const step = Math.max(1, Math.ceil(delta * 0.14));
+        currentDisplayProgress = Math.min(targetProgress, currentDisplayProgress + step);
+        setGenerationProgress(currentDisplayProgress);
+      }
+    }, 50);
+
+    let blob = null;
 
     try {
       let scriptToSynthesize = ttsText.trim();
 
       // Step A: Integrated 1-Click AI Auto-Director (Gemini + Local AI)
       if (autoDirectOnGenerate && geminiApiKey && scriptToSynthesize) {
-        setGenerationStage("🎬 Gemini AI Director: កំពុងវិភាគ និងកែលម្អចង្វាក់ដកដង្ហើម...");
-        setGenerationStatusText("Gemini AI Director កំពុងកែលម្អអត្ថបទ និងលៃលកអារម្មណ៍...");
+        setPipelineStageIndex(0);
+        targetProgress = 18;
+        const targetModelLabel = resolvedEngine === "voxcpm2" ? "VoxCPM2 48kHz" : resolvedEngine === "omnivoice" ? "OmniVoice F5-TTS" : resolvedEngine === "gemini" ? "Gemini Native" : "Meta MMS";
+        setGenerationStage(`🎬 Gemini Director: កំពុងវិភាគស៊ីជម្រៅ & រៀបចំសូរសំឡេងសម្រាប់ ${targetModelLabel}...`);
+        setGenerationStatusText(`Gemini Director កំពុងវិភាគចេតនា និងផ្គូផ្គងជាមួយ ${targetModelLabel}...`);
         try {
           const directorResult = await directVoiceoverWithGemini({
             apiKey: geminiApiKey,
@@ -686,12 +719,22 @@ export function VoiceCloneStudioPage({
           });
 
           if (directorResult) {
+            targetProgress = 24;
             if (directorResult.directedText && directorResult.directedText.trim()) {
               if (!originalScriptBeforeDirect) {
                 setOriginalScriptBeforeDirect(scriptToSynthesize);
               }
               scriptToSynthesize = directorResult.directedText.trim();
               setTtsText(scriptToSynthesize);
+            }
+            if (directorResult.userIntent) {
+              setDirectorIntent(directorResult.userIntent);
+            }
+            if (directorResult.targetEngineAcoustics) {
+              setDirectorTargetAcoustic(directorResult.targetEngineAcoustics);
+            }
+            if (directorResult.phoneticImprovements && Array.isArray(directorResult.phoneticImprovements)) {
+              setDirectorPhonetics(directorResult.phoneticImprovements);
             }
             if (directorResult.suggestedStyle || directorResult.selectedStyle) {
               const rawSt = String(directorResult.suggestedStyle || directorResult.selectedStyle).toLowerCase();
@@ -734,12 +777,44 @@ export function VoiceCloneStudioPage({
         .replace(/\s+/g, " ")
         .trim();
 
-      let blob = null;
+      if (resolvedEngine === "gemini") {
+        // --- 1. DIRECT GOOGLE GEMINI 2.5 FLASH NATIVE AUDIO (Cloud Real-Time HD) ---
+        setPipelineStageIndex(1);
+        targetProgress = 30;
+        setGenerationStatusText("Google Gemini 2.5 Flash កំពុងរៀបចំសំយោគសំឡេង...");
+        setGenerationStage("Executing Google Gemini Flash Native Audio (24kHz HD)...");
 
-      if (resolvedEngine === "mms") {
-        // --- 1. STRICT EXECUTION: META MMS-TTS (Khmer Offline) ---
-        setGenerationStatusText("AI Meta MMS-TTS (Khmer Offline 16kHz) កំពុងសំយោគសំឡេង...");
-        
+        let refBlob = null;
+        if (activeVoice?.audioBlob) {
+          refBlob = activeVoice.audioBlob;
+        } else if (activeVoice?.audioUrl) {
+          refBlob = await fetch(activeVoice.audioUrl, { signal: abortCtrl.signal }).then((r) => r.blob()).catch(() => null);
+        }
+
+        setPipelineStageIndex(2);
+        targetProgress = 45;
+
+        blob = await synthesizeWithGemini({
+          apiKey: geminiApiKey,
+          text: cleanScriptForLocalEngine,
+          voiceName: "Aoede",
+          referenceAudioBlob: refBlob,
+          vocalStyle: selectedStyle,
+          onProgress: (pct) => {
+            targetProgress = Math.max(targetProgress, pct);
+            if (pct >= 85) setPipelineStageIndex(3);
+          },
+        });
+      } else if (resolvedEngine === "mms") {
+        // --- 2. STRICT LOCAL EXECUTION: META MMS-TTS KHMER (Offline 16kHz - Full Power) ---
+        setPipelineStageIndex(1);
+        targetProgress = 30;
+        setGenerationStatusText("AI Meta MMS-TTS (Khmer Offline 16kHz - Full Power) កំពុងសំយោគសំឡេង...");
+        setGenerationStage("Executing Meta MMS-TTS Khmer Synthesis (Multi-Core Full Power)...");
+
+        setPipelineStageIndex(2);
+        targetProgress = 55;
+
         // Timeout guard: 75 seconds max for TTS synthesis
         const ttsTimeoutId = setTimeout(() => {
           abortCtrl.abort(new Error("ដំណើរការ Meta MMS-TTS លើសរយៈពេលកំណត់ (Timeout 75s)"));
@@ -763,25 +838,30 @@ export function VoiceCloneStudioPage({
             const errData = await res.json().catch(() => ({}));
             throw new Error(errData.detail || `Meta MMS-TTS បរាជ័យក្នុងការសំយោគសំឡេង (HTTP ${res.status})`);
           }
+          setPipelineStageIndex(3);
+          targetProgress = 90;
           blob = await res.blob();
         } catch (fetchErr) {
           clearTimeout(ttsTimeoutId);
           throw fetchErr;
         }
       } else {
-        // --- 2. STRICT EXECUTION: NEURAL VOICE CLONE (VoxCPM2 48kHz OR OmniVoice F5-TTS) ---
+        // --- 3. STRICT EXECUTION: NEURAL VOICE CLONE (VoxCPM2 48kHz OR OmniVoice F5-TTS 32-Step) ---
+        setPipelineStageIndex(1);
+        targetProgress = 28;
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(activeVoice?.id));
         const isTrained = String(activeVoice?.id).startsWith("trained_");
         const isSavedBackendVoice = isUuid || isTrained || apiVoices.some((v) => v.id === activeVoice?.id);
 
         setGenerationStatusText(`កំពុងបញ្ជូនសំណើទៅកាន់ ${displayEngineLabel}...`);
+        setGenerationStage("Acoustic Alignment & Speaker Reference Profiling...");
 
         const formData = new FormData();
         formData.append("text", cleanScriptForLocalEngine);
         formData.append("consent", "true");
         formData.append("lang", selectedLang);
         formData.append("speed", String(Math.max(0.5, Math.min(2.0, ttsSpeed))));
-        formData.append("model", resolvedEngine || "voxcpm2"); // Auto-detected or strictly chosen model
+        formData.append("model", resolvedEngine || "omnivoice"); // Auto-detected or strictly chosen model
 
         if (isSavedBackendVoice) {
           formData.append("voice_id", activeVoice.id);
@@ -816,7 +896,12 @@ export function VoiceCloneStudioPage({
         }
 
         let job = await cloneRes.json();
+        currentJobStatus = job.status;
+        if (job.queue_position) currentQueuePosition = job.queue_position;
         setGenerationStatusText(`ស្ថានភាព ${displayEngineLabel}: ${job.status}...`);
+
+        setPipelineStageIndex(2);
+        targetProgress = 35;
 
         let attempts = 0;
         const maxAttempts = 360;
@@ -832,8 +917,15 @@ export function VoiceCloneStudioPage({
           });
           if (pollRes.ok) {
             job = await pollRes.json();
+            currentJobStatus = job.status;
+            if (job.queue_position) currentQueuePosition = job.queue_position;
             if (job.progress && job.progress > 0) {
-              setGenerationProgress(job.progress);
+              targetProgress = Math.max(targetProgress, job.progress);
+              if (job.progress >= 85) {
+                setPipelineStageIndex(3);
+              } else if (job.progress >= 30) {
+                setPipelineStageIndex(2);
+              }
             }
             if (job.stage) {
               setGenerationStage(job.stage);
@@ -850,6 +942,9 @@ export function VoiceCloneStudioPage({
           throw new Error(job.error || `${displayEngineLabel} បានបរាជ័យក្នុងការសំយោគសំឡេង`);
         }
 
+        currentJobStatus = "done";
+        setPipelineStageIndex(3);
+        targetProgress = 94;
         setGenerationStage("Finalizing Waveform Output...");
         setGenerationStatusText(`កំពុងទាញយកសំឡេងដែលបានផលិតដោយ ${displayEngineLabel}...`);
         const audioRes = await fetch(`/api/v1/clone/jobs/${job.job_id}/audio`, {
@@ -864,16 +959,19 @@ export function VoiceCloneStudioPage({
         throw new Error("មិនទទួលបានទិន្នន័យសំឡេងពី AI Model នោះទេ");
       }
 
+      setPipelineStageIndex(4);
+      targetProgress = 100;
+      currentDisplayProgress = 100;
       setGenerationProgress(100);
       setGenerationStage("Voice Generation Complete 100%!");
       setGenerationStatusText("ការផលិតសំឡេងបានជោគជ័យ 100%!");
-      await new Promise((r) => setTimeout(r, 450));
 
       const audioUrl = URL.createObjectURL(blob);
       setGeneratedAudioBlob(blob);
       setGeneratedAudioUrl(audioUrl);
       setGeneratedDuration(`0:${textMetrics.estSec < 10 ? "0" + textMetrics.estSec : textMetrics.estSec}`);
       setGeneratedTimestamp("Generated just now");
+      setGenerationCompletedInModal(true);
 
       // Add to history
       setHistoryItems((prev) => [
@@ -896,8 +994,20 @@ export function VoiceCloneStudioPage({
     } finally {
       clearInterval(timerInterval);
       clearInterval(progressInterval);
-      setIsGenerating(false);
-      setGenerationStatusText("");
+      if (!blob) {
+        setIsGenerating(false);
+        setGenerationStatusText("");
+        setGenerationCompletedInModal(false);
+      } else {
+        // Also highlight and scroll the underlying page player
+        setTimeout(() => {
+          const audioSec = document.querySelector(".vs-audio-section");
+          if (audioSec) {
+            audioSec.classList.add("vs-audio-section-highlight");
+            setTimeout(() => audioSec.classList.remove("vs-audio-section-highlight"), 2500);
+          }
+        }, 200);
+      }
     }
   };
 
@@ -1113,7 +1223,7 @@ export function VoiceCloneStudioPage({
       formData.append("consent", "true");
       formData.append("lang", cloneLang);
       formData.append("speed", String(Math.max(0.5, Math.min(2.0, cloneSpeed))));
-      formData.append("model", cloneModelEngine || "voxcpm2");
+      formData.append("model", cloneModelEngine || "omnivoice");
       if (cloneRefTranscript.trim()) {
         formData.append("reference_text", cloneRefTranscript.trim());
       }
@@ -1463,10 +1573,19 @@ export function VoiceCloneStudioPage({
         if (direction.suggestedPitch) {
           setTtsPitch(Math.max(0.8, Math.min(1.2, Number(direction.suggestedPitch))));
         }
+        if (direction.userIntent) {
+          setDirectorIntent(direction.userIntent);
+        }
+        if (direction.targetEngineAcoustics) {
+          setDirectorTargetAcoustic(direction.targetEngineAcoustics);
+        }
+        if (direction.phoneticImprovements && Array.isArray(direction.phoneticImprovements)) {
+          setDirectorPhonetics(direction.phoneticImprovements);
+        }
         if (direction.directorNotes) {
           setDirectorNotes(direction.directorNotes);
         }
-        notify("🎬 AI Auto Director បានកែលម្អចង្វាក់ដកដង្ហើម និងប៉ារ៉ាម៉ែត្រដោយជោគជ័យ!", "success");
+        notify("🎬 Gemini Director: វិភាគយល់ពីចេតនា & ផ្គូផ្គងជាមួយ Model រួចរាល់!", "success");
       }
     } catch (err) {
       console.error("Directing error:", err);
@@ -1481,6 +1600,9 @@ export function VoiceCloneStudioPage({
       setTtsText(originalScriptBeforeDirect);
       setOriginalScriptBeforeDirect(null);
       setDirectorNotes(null);
+      setDirectorIntent(null);
+      setDirectorTargetAcoustic(null);
+      setDirectorPhonetics([]);
       notify("បានស្ដារអត្ថបទដើមឡើងវិញ", "info");
     }
   };
@@ -1961,11 +2083,9 @@ export function VoiceCloneStudioPage({
                   value={ttsModelEngine}
                   onChange={(e) => setTtsModelEngine(e.target.value)}
                 >
-                  <option value="auto">⚡ Auto-Detect (Voice Clone & TTS Smart)</option>
-                  <option value="voice_fl">🎛️ Voice FL Studio (Mastering & Vocal Polish)</option>
-                  <option value="voxcpm2">✨ VoxCPM2 (OpenBMB 48kHz)</option>
-                  <option value="omnivoice">⚡ OmniVoice (F5-TTS Neural)</option>
-                  <option value="mms">🎙️ Meta MMS-TTS (Khmer Offline)</option>
+                  <option value="voxcpm2">✨ VoxCPM2 + AI Gemini (OpenBMB 48kHz Deep Neural - Full Power)</option>
+                  <option value="omnivoice">⚡ OmniVoice + AI Gemini (F5-TTS 36-Step Flow-Matching - Full Power)</option>
+                  <option value="gemini">🌐 Google Gemini 2.5 Flash Native Voice (Cloud Real-Time HD)</option>
                 </select>
               </div>
 
@@ -2147,88 +2267,207 @@ export function VoiceCloneStudioPage({
             {isGenerating && !generationOverlayDismissed && typeof document !== "undefined" && createPortal(
               <div className="vs-studio-generation-overlay" role="dialog" aria-modal="true" onClick={() => {}}>
                 <div className="vs-studio-3d-loading-card" onClick={(e) => e.stopPropagation()}>
-                  {/* Top Bar with Cancel on Left, Background on Right */}
-                  <div className="vs-3d-modal-topbar">
-                    <button
-                      type="button"
-                      className="vs-3d-dismiss-btn"
-                      style={{ color: "#f87171", borderColor: "rgba(248, 113, 113, 0.4)" }}
-                      title="បោះបង់ការផលិត (Cancel)"
-                      onClick={handleCancelGeneration}
-                    >
-                      <X size={14} weight="bold" />
-                      <span>បោះបង់</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="vs-3d-dismiss-btn"
-                      title="ដំណើរការនៅខាងក្រោយ"
-                      onClick={() => setGenerationOverlayDismissed(true)}
-                    >
-                      <span>ដំណើរការខាងក្រោយ</span>
-                      <Minus size={14} weight="bold" />
-                    </button>
-                  </div>
+                  {generationCompletedInModal && generatedAudioUrl ? (
+                    <div className="vs-3d-completion-view">
+                      {/* Top Bar with Success Badge and Close Button */}
+                      <div className="vs-3d-modal-topbar">
+                        <div
+                          className="vs-3d-badge-status"
+                          style={{
+                            background: "rgba(16, 185, 129, 0.16)",
+                            borderColor: "rgba(16, 185, 129, 0.4)",
+                            color: "#34d399",
+                          }}
+                        >
+                          <CheckCircle size={14} weight="bold" />
+                          <span>100% រួចរាល់ (READY)</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="vs-3d-dismiss-btn"
+                          title="បិទ (Close)"
+                          onClick={handleCloseCompletionModal}
+                        >
+                          <X size={14} weight="bold" />
+                          <span>បិទ</span>
+                        </button>
+                      </div>
 
-                  {/* 3D Dynamic Glowing Orb */}
-                  <div className={`vs-3d-progress-orb vs-orb-${activeResolvedEngine || "voxcpm2"}`}>
-                    <div className="vs-3d-progress-orb-glow" />
-                    <div className="vs-3d-progress-orb-inner-ring" />
-                    <div className="vs-3d-orb-content">
-                      <span className="vs-3d-pct-text">{generationProgress}%</span>
-                      <span className="vs-3d-pct-label">SYNTHESIZING</span>
+                      {/* Glowing Success Orb */}
+                      <div className="vs-3d-progress-orb vs-orb-success">
+                        <div className="vs-3d-progress-orb-glow" />
+                        <div className="vs-3d-progress-orb-inner-ring" />
+                        <div className="vs-3d-orb-content">
+                          <Waveform size={38} weight="bold" color="#34d399" />
+                          <span className="vs-3d-pct-label" style={{ color: "#34d399", marginTop: 4 }}>
+                            VOICE READY
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Success Titles */}
+                      <div className="vs-3d-stage-title" style={{ color: "#6ee7b7" }}>
+                        🎉 ផលិតសំឡេងបានជោគជ័យ 100%!
+                      </div>
+                      <div className="vs-3d-stage-subtitle">
+                        សំឡេង AI ត្រូវបានសំយោគចប់សព្វគ្រប់។ លោកអ្នកអាចចាក់ស្តាប់ ឬទាញយកភ្លាមៗ៖
+                      </div>
+
+                      {/* Embedded Audio Player */}
+                      <div className="vs-3d-modal-audio-player">
+                        <audio
+                          ref={modalAudioRef}
+                          src={generatedAudioUrl}
+                          controls
+                          autoPlay
+                          className="vs-3d-audio-element"
+                        />
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="vs-3d-modal-actions">
+                        <button
+                          type="button"
+                          className="vs-3d-action-btn primary"
+                          onClick={() => {
+                            handleInsertToTimelineAction();
+                            handleCloseCompletionModal();
+                          }}
+                        >
+                          <FilmStrip size={16} weight="bold" />
+                          <span>បញ្ចូលទៅ Timeline</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="vs-3d-action-btn secondary"
+                          onClick={() => handleDownload()}
+                        >
+                          <DownloadSimple size={16} weight="bold" />
+                          <span>ទាញយក (WAV)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="vs-3d-action-btn text-only"
+                          onClick={handleCloseCompletionModal}
+                        >
+                          <span>រួចរាល់</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      {/* Top Bar with Cancel on Left, Background on Right */}
+                      <div className="vs-3d-modal-topbar">
+                        <button
+                          type="button"
+                          className="vs-3d-dismiss-btn"
+                          style={{ color: "#f87171", borderColor: "rgba(248, 113, 113, 0.4)" }}
+                          title="បោះបង់ការផលិត (Cancel)"
+                          onClick={handleCancelGeneration}
+                        >
+                          <X size={14} weight="bold" />
+                          <span>បោះបង់</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="vs-3d-dismiss-btn"
+                          title="ដំណើរការនៅខាងក្រោយ"
+                          onClick={() => setGenerationOverlayDismissed(true)}
+                        >
+                          <span>ដំណើរការខាងក្រោយ</span>
+                          <Minus size={14} weight="bold" />
+                        </button>
+                      </div>
 
-                  {/* Stage and Status Titles */}
-                  <div className="vs-3d-stage-title">
-                    {generationStage || "Neural Voice Flow Matching..."}
-                  </div>
-                  <div className="vs-3d-stage-subtitle">
-                    {generationStatusText || "AI កំពុងដំណើរការសំយោគសំឡេង..."}
-                  </div>
+                      {/* 3D Dynamic Glowing Orb */}
+                      <div className={`vs-3d-progress-orb vs-orb-${activeResolvedEngine || "omnivoice"}`}>
+                        <div className="vs-3d-progress-orb-glow" />
+                        <div className="vs-3d-progress-orb-inner-ring" />
+                        <div className="vs-3d-orb-content">
+                          <span className="vs-3d-pct-text">{generationProgress}%</span>
+                          <span className="vs-3d-pct-label">SYNTHESIZING</span>
+                        </div>
+                      </div>
 
-                  {/* Audio Frequency Equalizer Animation */}
-                  <div className="vs-3d-wave-eq">
-                    <span className="vs-eq-bar bar-1" />
-                    <span className="vs-eq-bar bar-2" />
-                    <span className="vs-eq-bar bar-3" />
-                    <span className="vs-eq-bar bar-4" />
-                    <span className="vs-eq-bar bar-5" />
-                    <span className="vs-eq-bar bar-6" />
-                    <span className="vs-eq-bar bar-7" />
-                    <span className="vs-eq-bar bar-8" />
-                  </div>
+                      {/* Stage and Status Titles */}
+                      <div className="vs-3d-stage-title">
+                        {generationStage || "Neural Voice Flow Matching..."}
+                      </div>
+                      <div className="vs-3d-stage-subtitle">
+                        {generationStatusText || "AI កំពុងដំណើរការសំយោគសំឡេង..."}
+                      </div>
 
-                  {/* Animated Progress Bar */}
-                  <div className="vs-3d-progress-bar-shell">
-                    <div
-                      className="vs-3d-progress-bar-fill"
-                      style={{ width: `${Math.max(5, Math.min(100, generationProgress))}%` }}
-                    >
-                      <div className="vs-3d-progress-bar-shimmer" />
-                    </div>
-                  </div>
+                      {/* Multi-Stage Pipeline Stepper Card Widget */}
+                      <div className="vs-3d-pipeline-stepper">
+                        {GENERATION_PIPELINE_STAGES.map((stg, i) => {
+                          const isDone = pipelineStageIndex > i;
+                          const isActive = pipelineStageIndex === i;
+                          return (
+                            <div key={stg.id} className={`vs-3d-step-item ${isDone ? "done" : isActive ? "active" : "pending"}`}>
+                              <div className="vs-3d-step-indicator">
+                                {isDone ? <Check size={12} weight="bold" /> : <span>{stg.num}</span>}
+                              </div>
+                              <div className="vs-3d-step-body">
+                                <span className="vs-3d-step-label">
+                                  {stg.name}
+                                  <span style={{ display: "block", fontSize: "10px", color: isDone ? "#34d399" : isActive ? "#c084fc" : "#64748b", fontWeight: "normal" }}>
+                                    {stg.desc}
+                                  </span>
+                                </span>
+                                <span className="vs-3d-step-badge">
+                                  {isDone ? "✓ រួចរាល់" : isActive ? "កំពុងដំណើរការ..." : "រង់ចាំ"}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
 
-                  {/* Metrics Badges */}
-                  <div className="vs-3d-metrics-pills">
-                    <div className="vs-3d-metric-badge">
-                      <span>ម៉ូដែល AI:</span>
-                      <strong style={{ color: activeResolvedEngine === "voxcpm2" ? "#38bdf8" : activeResolvedEngine === "omnivoice" ? "#f59e0b" : "#a855f7" }}>
-                        {ttsModelEngine === "auto"
-                          ? `⚡ Auto (${activeResolvedEngine === "voxcpm2" ? "VoxCPM2 48kHz" : "Meta MMS-TTS"})`
-                          : activeResolvedEngine === "voxcpm2"
-                          ? "✨ VoxCPM2 48kHz Studio"
-                          : activeResolvedEngine === "omnivoice"
-                          ? "⚡ OmniVoice F5-TTS"
-                          : "🎙️ Meta MMS-TTS Khmer"}
-                      </strong>
-                    </div>
-                    <div className="vs-3d-metric-badge">
-                      <span>រយៈពេល:</span>
-                      <strong>{generationElapsed}s</strong>
-                    </div>
-                  </div>
+                      {/* Animated Progress Bar */}
+                      <div className="vs-3d-progress-bar-shell">
+                        <div
+                          className="vs-3d-progress-bar-fill"
+                          style={{ width: `${Math.max(5, Math.min(100, generationProgress))}%` }}
+                        >
+                          <div className="vs-3d-progress-bar-shimmer" />
+                        </div>
+                      </div>
+
+                      {/* Metrics Badges */}
+                      <div className="vs-3d-metrics-pills">
+                        <div className="vs-3d-metric-badge">
+                          <span>ម៉ូដែល AI:</span>
+                          <strong style={{
+                            color: activeResolvedEngine === "voxcpm2"
+                              ? "#38bdf8"
+                              : activeResolvedEngine === "omnivoice"
+                              ? "#f59e0b"
+                              : activeResolvedEngine === "gemini"
+                              ? "#34d399"
+                              : "#f59e0b"
+                          }}>
+                            {activeResolvedEngine === "voxcpm2"
+                              ? "✨ VoxCPM2 + AI Gemini (48kHz Full Power)"
+                              : activeResolvedEngine === "gemini"
+                              ? "🌐 Google Gemini 2.5 Flash Native Voice"
+                              : "⚡ OmniVoice + AI Gemini (F5-TTS Full Power)"}
+                          </strong>
+                        </div>
+                        <div className="vs-3d-metric-badge">
+                          <span>ដំណាក់កាល:</span>
+                          <strong style={{ color: "#c084fc" }}>
+                            {pipelineStageIndex + 1}/4
+                          </strong>
+                        </div>
+                        <div className="vs-3d-metric-badge">
+                          <span>រយៈពេល:</span>
+                          <strong>{generationElapsed}s</strong>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>,
               document.body
@@ -2285,22 +2524,54 @@ export function VoiceCloneStudioPage({
                 </div>
               </div>
 
-              {/* Director Advice Banner if present */}
+              {/* Deep Gemini Director Analysis & Model Synergy Banner */}
               {directorNotes && (
-                <div className="vs-director-notes-banner">
-                  <div className="vs-director-notes-body">
-                    <Sparkle size={15} weight="fill" color="#c084fc" />
-                    <span><strong>AI Director Advice:</strong> {directorNotes}</span>
+                <div className="vs-director-notes-banner vs-director-deep-banner">
+                  <div className="vs-director-deep-top">
+                    <div className="vs-director-deep-headline">
+                      <Sparkle size={16} weight="fill" color="#c084fc" />
+                      <span className="vs-director-title-text">Gemini Director: ការវិភាគស៊ីជម្រៅ & Model Synergy</span>
+                    </div>
+                    <div className="vs-director-top-actions">
+                      {directorTargetAcoustic && (
+                        <span className="vs-director-engine-badge">
+                          ⚡ {directorTargetAcoustic}
+                        </span>
+                      )}
+                      {originalScriptBeforeDirect && (
+                        <button
+                          type="button"
+                          className="vs-director-revert-pill"
+                          onClick={handleRevertScript}
+                          title="ស្ដារអត្ថបទដើមវិញ"
+                        >
+                          ↩ Revert Original
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {originalScriptBeforeDirect && (
-                    <button
-                      type="button"
-                      className="vs-director-revert-pill"
-                      onClick={handleRevertScript}
-                      title="ស្ដារអត្ថបទដើមវិញ"
-                    >
-                      ↩ Revert Original
-                    </button>
+
+                  {directorIntent && (
+                    <div className="vs-director-intent-row">
+                      <span className="vs-intent-tag">🎯 ចេតនាអ្នកនិពន្ធ:</span>
+                      <span className="vs-intent-text">{directorIntent}</span>
+                    </div>
+                  )}
+
+                  <div className="vs-director-notes-body">
+                    <span className="vs-notes-label">💡 ការណែនាំសំឡេង:</span>
+                    <span>{directorNotes}</span>
+                  </div>
+
+                  {directorPhonetics && directorPhonetics.length > 0 && (
+                    <div className="vs-director-phonetics-row">
+                      <span className="vs-phonetics-label">🗣️ ពាក្យពិបាកកែជាសូរសំឡេង ({directorPhonetics.length}):</span>
+                      <div className="vs-phonetics-pills">
+                        {directorPhonetics.map((p, idx) => (
+                          <span key={idx} className="vs-phonetic-pill">{p}</span>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -2326,15 +2597,11 @@ export function VoiceCloneStudioPage({
                 <div className="vs-director-card">
                   <span className="vs-director-label">SYNTHESIS ENGINE</span>
                   <span className="vs-director-val">
-                    {ttsModelEngine === "auto"
-                      ? `⚡ Auto (${activeResolvedEngine === "voxcpm2" ? "VoxCPM2 48kHz" : "Meta MMS-TTS"})`
-                      : ttsModelEngine === "voxcpm2"
-                      ? "VoxCPM2 48kHz Studio"
-                      : ttsModelEngine === "omnivoice"
-                      ? "OmniVoice (F5-TTS Neural)"
-                      : ttsModelEngine === "mms"
-                      ? "Meta MMS-TTS Khmer Offline"
-                      : "Neural Audio Synthesis"}
+                    {activeResolvedEngine === "voxcpm2"
+                      ? "✨ VoxCPM2 + AI Gemini (48kHz Full Power)"
+                      : activeResolvedEngine === "gemini"
+                      ? "🌐 Google Gemini 2.5 Flash Native Voice"
+                      : "⚡ OmniVoice + AI Gemini (F5-TTS Full Power)"}
                   </span>
                 </div>
                 <div className="vs-director-card">
@@ -2837,9 +3104,8 @@ export function VoiceCloneStudioPage({
                           value={cloneModelEngine}
                           onChange={(e) => setCloneModelEngine(e.target.value)}
                         >
-                          <option value="voxcpm2">✨ VoxCPM2 (48kHz)</option>
-                          <option value="voice_fl">🎛️ Voice FL Studio (Edison + NewTone)</option>
-                          <option value="omnivoice">⚡ OmniVoice (F5-TTS)</option>
+                          <option value="voxcpm2">✨ VoxCPM2 (48kHz Studio)</option>
+                          <option value="omnivoice">⚡ OmniVoice (F5-TTS Neural)</option>
                         </select>
                       </div>
                     </div>

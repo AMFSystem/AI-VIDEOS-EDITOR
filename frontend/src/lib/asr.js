@@ -528,12 +528,54 @@ async function tryLocalAiBackendStt(blob, { preferredLanguage = "auto", timeline
   formData.append("file", blob, "timeline_audio.wav");
   formData.append("language", preferredLanguage || "auto");
 
-  onProgress?.({ progress: 28, phase: `កំពុងដំណើរការ Local AI Whisper (${preferredLanguage || "auto"})...` });
-  const response = await fetch("/api/v1/stt", {
-    method: "POST",
-    body: formData,
-    signal,
-  });
+  const isKhmer = preferredLanguage === "km" || preferredLanguage === "auto";
+  const modelName = isKhmer ? "Khmer Turbo STT (AI Local)" : `Whisper (${preferredLanguage.toUpperCase()})`;
+
+  onProgress?.({ progress: 28, phase: `កំពុងដំណើរការ ${modelName}...` });
+
+  // Dynamic smooth progress ticker to avoid getting stuck visually at 28%
+  let currentProgress = 28;
+  const progressPhases = [
+    { at: 35, text: `កំពុងដំណើរការ ${modelName}...` },
+    { at: 48, text: "AI កំពុងវិភាគរលកសំឡេង និងស្រង់ពាក្យសម្ដី..." },
+    { at: 64, text: "កំពុងបំប្លែងសំឡេងជាអក្សរ និងពិនិត្យវេយ្យាករណ៍..." },
+    { at: 78, text: "កំពុងរៀបចំចង្វាក់ Subtitle Segments និង Timestamps..." },
+    { at: 88, text: "កំពុងបញ្ចប់ការស្រង់ Subtitles ដោយជោគជ័យ..." },
+  ];
+
+  const progressInterval = setInterval(() => {
+    if (currentProgress < 90) {
+      currentProgress += 1.5;
+      const rounded = Math.round(currentProgress);
+      const phaseObj = [...progressPhases].reverse().find((p) => rounded >= p.at) || progressPhases[0];
+      onProgress?.({ progress: rounded, phase: phaseObj.text });
+    }
+  }, 350);
+
+  let response;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s safe timeout
+    const onAbort = () => controller.abort();
+    if (signal) {
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+
+    try {
+      response = await fetch("/api/v1/stt", {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+      if (signal) {
+        signal.removeEventListener("abort", onAbort);
+      }
+    }
+  } finally {
+    clearInterval(progressInterval);
+  }
 
   if (!response.ok) {
     throw new Error(`Local AI STT response status: ${response.status}`);
@@ -541,18 +583,44 @@ async function tryLocalAiBackendStt(blob, { preferredLanguage = "auto", timeline
 
   const data = await response.json();
   let rawSegments = Array.isArray(data.segments) ? data.segments : [];
+
+  // Fallback splitting if empty segments or just 1 very long segment
   if (rawSegments.length === 0 && data.text?.trim()) {
-    const phrases = data.text
-      .split(/(?<=[.!?。！？\n])\s+/)
+    const text = data.text.trim();
+    // Split on punctuation or spaces
+    const phrases = text
+      .split(/(?<=[.!?。！？\n])\s+|(?<=[,，;；])\s+/)
       .map((p) => p.trim())
       .filter(Boolean);
     const dur = data.duration || 5;
     const piece = dur / Math.max(1, phrases.length);
-    rawSegments = phrases.map((text, idx) => ({
+    rawSegments = phrases.map((t, idx) => ({
       start: idx * piece,
       end: (idx + 1) * piece,
-      text,
+      text: t,
     }));
+  }
+
+  // If a single long segment exists, split into smaller subtitle cards
+  if (rawSegments.length === 1 && rawSegments[0].end - rawSegments[0].start > 4.5) {
+    const s = rawSegments[0];
+    const words = (s.text || "").split(/\s+/).filter(Boolean);
+    if (words.length > 5) {
+      const chunkSize = 4;
+      const numChunks = Math.ceil(words.length / chunkSize);
+      const chunkDur = (s.end - s.start) / numChunks;
+      const newSegments = [];
+      for (let i = 0; i < words.length; i += chunkSize) {
+        const slice = words.slice(i, i + chunkSize);
+        const idx = i / chunkSize;
+        newSegments.push({
+          start: s.start + idx * chunkDur,
+          end: Math.min(s.end, s.start + (idx + 1) * chunkDur),
+          text: slice.join(" "),
+        });
+      }
+      rawSegments = newSegments;
+    }
   }
 
   if (rawSegments.length === 0) {
@@ -573,7 +641,7 @@ async function tryLocalAiBackendStt(blob, { preferredLanguage = "auto", timeline
     duration: data.duration || 0,
     language: data.detected_language || preferredLanguage,
     languageDetected: Boolean(data.detected_language),
-    model: "Local AI Whisper",
+    model: isKhmer ? "Khmer Turbo STT (Local AI)" : "Local AI Whisper",
   };
 }
 
@@ -584,6 +652,7 @@ export async function transcribeAudioToCaptionSegments(blob, options = {}) {
     try {
       return await tryLocalAiBackendStt(blob, options);
     } catch (backendError) {
+      if (options.signal?.aborted) throw backendError;
       console.warn("Local AI backend STT unavailable, using in-browser Whisper fallback:", backendError);
       options.onProgress?.({ progress: 10, phase: "Local AI មិនទាន់ឆ្លើយតប — ប្តូរទៅកាន់ In-Browser Local Whisper..." });
       return await runTranscription(blob, options);

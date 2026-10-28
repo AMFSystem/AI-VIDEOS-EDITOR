@@ -73,7 +73,7 @@ async def create_clone_job(
     reference_text: str | None = Form(None, description="Transcript of reference_audio; transcribed automatically if omitted"),
     lang: Literal["auto", "km", "en"] = Form("auto"),
     speed: float = Form(1.0, ge=0.5, le=2.0),
-    model: str = Form("voxcpm2"),
+    model: str = Form("omnivoice"),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
@@ -89,7 +89,7 @@ async def create_clone_job(
         raise HTTPException(413, f"Text exceeds {settings.clone_max_chars} characters")
 
     # Strict model engine normalization
-    target_engine = (model or "voxcpm2").strip().lower()
+    target_engine = (model or "omnivoice").strip().lower()
     if target_engine not in ("voxcpm2", "voxcpm", "omnivoice", "f5_tts", "f5tts"):
         raise HTTPException(
             400,
@@ -121,10 +121,10 @@ async def create_clone_job(
                                 pass
             if not target_ref_audio or not target_ref_audio.exists():
                 raise HTTPException(404, f"Trained voice model {voice_str} not found or reference audio missing")
-            ref_txt = (target_manifest.get("description") or target_manifest.get("name") or "គំរូសំឡេងបានបង្វឹក")
+            ref_txt = target_manifest.get("reference_transcript") or None
             job = CloneJob(**common, work_dir=queue.new_work_dir(job_id), voice_id=voice_str,
                            reference_path=target_ref_audio, delete_reference=False,
-                           ref_text=ref_txt, ref_text_source="saved_voice")
+                           ref_text=ref_txt, ref_text_source="trained_voice")
         else:
             try:
                 v_uuid = uuid.UUID(voice_str)

@@ -34,7 +34,15 @@ class NothingToSpeak(ValueError):
 
 class _Voice:
     def __init__(self, repo: str, cache_dir: str):
+        import os
+        import torch
         from transformers import AutoTokenizer, VitsModel
+
+        # Run Local AI at full hardware power across all available CPU cores
+        try:
+            torch.set_num_threads(max(1, os.cpu_count() or 4))
+        except Exception:
+            pass
 
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(repo, cache_dir=cache_dir, local_files_only=True)
@@ -65,6 +73,11 @@ class TtsService:
         self._repos = {"km": settings.tts_model_km, "en": settings.tts_model_en}
         self._voices: dict[str, _Voice] = {}
         self._load_lock = threading.Lock()
+        if settings.tts_preload:
+            try:
+                self.load("km")
+            except Exception as e:
+                logger.warning("Could not preload Khmer TTS: %s", e)
 
     def loaded_languages(self) -> list[str]:
         return sorted(self._voices)

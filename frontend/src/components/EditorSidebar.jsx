@@ -84,7 +84,7 @@ export function EditorSidebar({ model: d }) {
         ) : null}
       </div>
 
-      <aside className={`media-panel ${d.activeTool === "dubber" ? "is-dubber-tool" : ""} ${d.mobilePanel === "tools" && d.selectedLibraryAssetId ? "has-mobile-asset-actions" : ""} ${d.mobilePanel === "tools" && d.activeTool === "stickers" ? "has-mobile-sticker-actions" : ""}`}>
+      <aside className={`media-panel ${d.activeTool === "dubber" ? "is-dubber-tool" : ""} ${d.activeTool === "voice-fl" ? "is-voice-fl-tool" : ""} ${d.mobilePanel === "tools" && d.selectedLibraryAssetId ? "has-mobile-asset-actions" : ""} ${d.mobilePanel === "tools" && d.activeTool === "stickers" ? "has-mobile-sticker-actions" : ""}`}>
         {d.activeTool === "media" ? (
           <MediaPanel
             t={d.t}
@@ -226,6 +226,12 @@ export function EditorSidebar({ model: d }) {
             replaceAudio={d.replaceAudio}
             applyAssetToTrack={d.applyAssetToTrack}
             currentTime={d.currentTime}
+            isPlaying={d.isPlaying}
+            togglePlay={d.togglePlay || d.handlePlayToggle}
+            handlePlayToggle={d.handlePlayToggle || d.togglePlay}
+            seekTimeline={d.seekTimeline || d.seekTo}
+            audioSegments={d.audioSegments}
+            selectedAudioSegmentId={d.selectedAudioSegmentId}
             selectedAudioSegment={d.selectedAudioSegment}
             updateAudioSegment={d.updateAudioSegment}
             selectTool={d.selectTool}

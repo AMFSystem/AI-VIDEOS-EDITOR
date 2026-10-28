@@ -1238,10 +1238,10 @@ export function ToolPanel(props) {
   const [captionFontStatus, setCaptionFontStatus] = useState("");
   const [captionStyleMenuOpen, setCaptionStyleMenuOpen] = useState(false);
   const [captionEditTarget, setCaptionEditTarget] = useState("master");
-  const [captionStudioTab, setCaptionStudioTab] = useState("auto");
-  const [autoCaptionLang, setAutoCaptionLang] = useState("auto");
+  const [autoCaptionLang, setAutoCaptionLang] = useState(uiLanguage === "km" ? "km" : "auto");
   const [selectedCapCutTemplateId, setSelectedCapCutTemplateId] = useState("tiktok-viral");
   const [selectedAudioSourceType, setSelectedAudioSourceType] = useState("timeline");
+  const [captionStudioTab, setCaptionStudioTab] = useState("auto");
 
   const captionFontOptions = useMemo(
     () => getCaptionFontsForLanguage(uiLanguage),
@@ -1381,14 +1381,102 @@ export function ToolPanel(props) {
   }
 
   if (activeTool === "voice-fl") {
+    const activeSegment = props.selectedAudioSegment ||
+      (props.audioSegments && props.audioSegments.find((s) => s.id === props.selectedAudioSegmentId)) ||
+      (props.audioSegments && props.audioSegments.length > 0 ? props.audioSegments[0] : null) ||
+      props.selectedAudioToolTarget ||
+      null;
+
+    // Cache the pristine original source media if not yet cached
+    if (activeSegment && !activeSegment.originalBlob && activeSegment.blob) {
+      activeSegment.originalBlob = activeSegment.blob;
+      activeSegment.originalUrl = activeSegment.url;
+      activeSegment.originalName = (activeSegment.name || "Voice").replace(/\s*\[FL Master\]/g, "");
+    }
+
+    const rawOriginalUrl = activeSegment?.originalUrl ||
+      (activeSegment?.originalBlob ? URL.createObjectURL(activeSegment.originalBlob) : null);
+
+    const timelineAudioUrl = (activeSegment?.isFlBypassed && rawOriginalUrl ? rawOriginalUrl : null) ||
+      activeSegment?.url ||
+      (activeSegment?.blob ? URL.createObjectURL(activeSegment.blob) : null) ||
+      (props.selectedTrack === "source" && props.sourceAudioBlob ? URL.createObjectURL(props.sourceAudioBlob) : null) ||
+      (props.audioBlob ? URL.createObjectURL(props.audioBlob) : null) ||
+      null;
+
+    const timelineAudioName = activeSegment?.originalName ||
+      activeSegment?.name ||
+      activeSegment?.text ||
+      (props.selectedTrack === "source" ? props.sourceAudioName || "Source Audio" : "Timeline Voice") ||
+      "Timeline Voice Clip";
+
+    const handleApplyToTimeline = (mastered) => {
+      if (activeSegment && props.updateAudioSegment) {
+        props.updateAudioSegment(activeSegment.id, {
+          originalBlob: activeSegment.originalBlob || activeSegment.blob,
+          originalUrl: activeSegment.originalUrl || activeSegment.url,
+          originalName: activeSegment.originalName || (activeSegment.name || "Voice").replace(/\s*\[FL Master\]/g, ""),
+          blob: mastered.blob,
+          url: mastered.url,
+          name: `${(activeSegment.originalName || activeSegment.name || "Voice").replace(/\s*\[FL Master\]/g, "")} [FL Master]`,
+          flSettings: mastered.settings,
+          isFlBypassed: false,
+        });
+        props.notify?.("✨ បានកែប្រែ និង Master សំឡេងលើ Timeline ដោយជោគជ័យ!");
+      } else if (props.applyAssetToTrack || props.replaceAudio) {
+        (props.applyAssetToTrack || props.replaceAudio)({
+          audioUrl: mastered.url,
+          blob: mastered.blob,
+          name: `${timelineAudioName} [FL Master]`,
+          duration: mastered.duration || 3.0,
+        });
+        props.notify?.("✨ បានបញ្ចូលសំឡេង Master ទៅលើ Timeline!");
+      }
+    };
+
+    const handleRestoreOriginal = () => {
+      if (activeSegment && props.updateAudioSegment) {
+        const restoredBlob = activeSegment.originalBlob || activeSegment.blob;
+        const restoredUrl = activeSegment.originalUrl || activeSegment.url;
+        const cleanName = activeSegment.originalName || (activeSegment.name || "Voice").replace(/\s*\[FL Master\]/g, "");
+        props.updateAudioSegment(activeSegment.id, {
+          blob: restoredBlob,
+          url: restoredUrl,
+          name: cleanName,
+          flSettings: null,
+          isFlBypassed: true,
+        });
+        props.notify?.("📻 បានត្រឡប់ទៅសំឡេងដើម (Original Voice 100%)");
+      }
+    };
+
+    const handleLiveSettingsChange = (liveSettings, liveBypassed) => {
+      if (activeSegment && props.updateAudioSegment) {
+        props.updateAudioSegment(activeSegment.id, {
+          flSettings: liveSettings,
+          isFlBypassed: Boolean(liveBypassed),
+        });
+      }
+    };
+
     return (
       <div className="tool-panel voice-fl-tool-panel mobile-panel-scroll-body" style={{ padding: "6px 8px", width: "100%", boxSizing: "border-box", overflowY: "auto", overflowX: "hidden", maxHeight: "100%" }}>
         <VoiceFLRack
-          initialAudioUrl={audioBlob ? URL.createObjectURL(audioBlob) : null}
-          initialAudioName={sourceAudioName || "Audio Clip"}
+          initialAudioUrl={timelineAudioUrl}
+          initialAudioName={timelineAudioName}
+          activeTimelineSegment={activeSegment}
+          timelineCurrentTime={props.currentTime}
+          timelineIsPlaying={props.isPlaying}
+          onTimelineTogglePlay={props.handlePlayToggle || props.togglePlay}
+          onTimelineSeek={props.seekTo || props.seekTimeline}
+          initialSettings={activeSegment?.flSettings}
+          initialBypassed={activeSegment?.isFlBypassed}
+          onLiveSettingsChange={handleLiveSettingsChange}
+          onUpdateTimelineSegment={handleApplyToTimeline}
+          onRestoreOriginal={handleRestoreOriginal}
           voiceProfiles={props.voiceProfiles || []}
-          onInsertToTimeline={applyAssetToTrack || replaceAudio}
-          notify={notify}
+          onInsertToTimeline={handleApplyToTimeline}
+          notify={props.notify || notify}
         />
       </div>
     );

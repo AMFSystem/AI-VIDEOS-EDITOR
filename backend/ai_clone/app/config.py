@@ -39,28 +39,28 @@ class Settings(BaseSettings):
     stt_model: str = "large-v3-turbo"
     stt_device: str = "cpu"  # "cuda" on a GPU server
     stt_compute_type: str = "int8"  # "float16" on GPU
-    stt_beam_size: int = 5
-    stt_max_concurrency: int = 1  # CPU inference is heavy; queue extra requests
-    stt_preload: bool = False  # load the models at startup instead of first request
+    stt_beam_size: int = 2
+    stt_max_concurrency: int = 2  # queue extra requests
+    stt_preload: bool = True  # preload models at startup for instant user response
     stt_en_threshold: float = 0.6  # auto mode: English only if detection is this confident
 
     # Khmer STT: Khmer fine-tuned Whisper (MIT), CTranslate2 int8. Pinned for reproducibility.
     stt_km_model: str = "kavatana/whisper-turbo-khmer-v9-ct2-int8"
     stt_km_model_revision: str = "d164d0b854f4262d82470caec80f040c6189ea37"
     stt_km_compute_type: str = "int8"
-    stt_km_batch_size: int = 4  # speech chunks decoded together
+    stt_km_batch_size: int = 8  # speech chunks decoded together
 
     # Text-to-speech (Meta MMS-TTS). NOTE: these weights are CC-BY-NC 4.0 (non-commercial).
     tts_model_km: str = "facebook/mms-tts-khm"
     tts_model_en: str = "facebook/mms-tts-eng"
     tts_max_chars: int = 5000
-    tts_preload: bool = False
+    tts_preload: bool = True
 
     # Voice cloning (OmniVoice & VoxCPM2). NOTE: OmniVoice is CC-BY-NC, VoxCPM2 is Apache-2.0.
     clone_model: str = "k2-fsa/OmniVoice"
     clone_model_revision: str = "c5fdb5ccb189668d56333f77ba2629f4cd7535f4"
     clone_voxcpm_model: str = "openbmb/VoxCPM2"
-    clone_engine_default: str = "voxcpm2"
+    clone_engine_default: str = "omnivoice"
     clone_device: str = "auto"  # auto -> cuda, then mps (Apple Silicon), then cpu
     clone_max_chars: int = 5000
     clone_ref_min_s: float = 3.0

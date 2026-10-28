@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { logger } from "../../utils/logger.js";
+import { config } from "../../config/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BACKEND_DIR = path.resolve(__dirname, "../../../");
@@ -296,7 +297,7 @@ export const pyvideotransService = {
         tmpOutput,
       ];
 
-      const proc = spawn("ffmpeg", args);
+      const proc = spawn(config.ffmpegPath, args);
       proc.on("close", (code) => {
         try { fs.unlinkSync(tmpInput); } catch {}
         if (code === 0 && fs.existsSync(tmpOutput)) {

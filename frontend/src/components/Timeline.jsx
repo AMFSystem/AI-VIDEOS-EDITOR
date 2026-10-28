@@ -938,9 +938,9 @@ export function Timeline({
     if (track) setMobileClipActionTrack(track);
     setMobileClipActionsVisible(true);
   };
-  const activateAudioToolForClipSelection = () => {
+  const activateAudioToolForClipSelection = (tool = "voice-fl") => {
     const isMobile = window.matchMedia?.("(max-width: 760px)").matches ?? false;
-    if (shouldActivateToolRailForClip(isMobile)) setActiveTool("audio");
+    if (shouldActivateToolRailForClip(isMobile)) setActiveTool(tool);
   };
   const activateStickerToolForClipSelection = () => {
     const isMobile = window.matchMedia?.("(max-width: 760px)").matches ?? false;
@@ -1188,7 +1188,7 @@ export function Timeline({
     ? (musicSegments.length ? musicSegments : [{ id: "music-audio", start: musicStartPercent / 100 * timelineDuration, duration: musicDuration, peaks: musicPeaks }])
       .find((segment) => segment.id === contextMenu.segmentId)
     : null;
-  const trackTool = (track) => ({ image: "media", overlay: "media", sticker: "stickers", caption: "caption", source: "audio", audio: "audio", music: "audio" })[track] || "media";
+  const trackTool = (track) => ({ image: "media", overlay: "media", sticker: "stickers", caption: "caption", source: "voice-fl", audio: "voice-fl", music: "audio" })[track] || "media";
   const openTrackPanel = (track) => {
     setSelectedTrack(track);
     setActiveTool(trackTool(track));

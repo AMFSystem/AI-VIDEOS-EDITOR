@@ -17,32 +17,115 @@ import {
   Stop,
   Eye,
   EyeSlash,
+  CaretDown,
+  Plus,
+  Trash,
+  FloppyDisk,
+  Check,
+  X,
 } from "@phosphor-icons/react";
 import {
   VOICE_FL_PRESETS,
   DEFAULT_FL_SETTINGS,
+  ORIGINAL_RAW_SETTINGS,
   createVoiceFLGraph,
   renderMasteredAudioOffline,
 } from "../../lib/voiceFLAudioEngine.js";
+import { analyzeAudioUrl } from "../../lib/aiAudioAnalysis.js";
 import "./VoiceFLRack.css";
 
 export function VoiceFLRack({
   initialAudioUrl = null,
   initialAudioName = "Audio Clip",
+  activeTimelineSegment = null,
+  timelineCurrentTime = null,
+  timelineIsPlaying = false,
+  onTimelineTogglePlay = null,
+  onTimelineSeek = null,
+  initialSettings = null,
+  initialBypassed = false,
+  onLiveSettingsChange = null,
+  onUpdateTimelineSegment = null,
+  onRestoreOriginal = null,
   voiceProfiles = [],
   onInsertToTimeline = null,
   onSaveToLibrary = null,
   notify = console.log,
 }) {
   // Preset & Active Settings
-  const [activePresetId, setActivePresetId] = useState("podcast_crisp");
-  const [settings, setSettings] = useState(DEFAULT_FL_SETTINGS);
-  const [isBypassed, setIsBypassed] = useState(false); // A/B Testing
-  const [activeCardTab, setActiveCardTab] = useState("all"); // "all" | "card1" | "card2"
+  const [activePresetId, setActivePresetId] = useState("podcast_studio_master");
+  const [settings, setSettings] = useState(() => initialSettings || DEFAULT_FL_SETTINGS);
+  const [isBypassed, setIsBypassed] = useState(() => Boolean(initialBypassed)); // A/B Testing
+  const [isPresetDropdownOpen, setIsPresetDropdownOpen] = useState(false);
+  const presetDropdownRef = useRef(null);
+  const liveTimerRef = useRef(null);
+  const savedMasterSettingsRef = useRef(null);
+
+  // Custom Presets Management (Persistent in localStorage)
+  const [customPresets, setCustomPresets] = useState(() => {
+    try {
+      const saved = localStorage.getItem("vfl_custom_presets_v1");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const saveCustomPresets = (nextPresets) => {
+    setCustomPresets(nextPresets);
+    try {
+      localStorage.setItem("vfl_custom_presets_v1", JSON.stringify(nextPresets));
+    } catch (e) {
+      console.warn("Failed to persist custom presets:", e);
+    }
+  };
+
+  const allPresets = useMemo(() => {
+    return [...customPresets, ...VOICE_FL_PRESETS];
+  }, [customPresets]);
+
+  const activePreset = useMemo(
+    () => allPresets.find((p) => p.id === activePresetId) || allPresets[0] || VOICE_FL_PRESETS[0],
+    [allPresets, activePresetId]
+  );
+
+  const isSettingsModified = useMemo(() => {
+    if (!activePreset?.settings) return false;
+    return Object.keys(activePreset.settings).some((key) => {
+      return activePreset.settings[key] !== settings[key];
+    });
+  }, [activePreset, settings]);
+
+  // AI Audio Analysis State
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
+  const [aiReport, setAiReport] = useState(null);
+  const [showAiModal, setShowAiModal] = useState(false);
+
+  // Custom Preset Creation State
+  const [isCreatingPreset, setIsCreatingPreset] = useState(false);
+  const [newPresetName, setNewPresetName] = useState("");
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (presetDropdownRef.current && !presetDropdownRef.current.contains(e.target)) {
+        setIsPresetDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Audio Playback & Web Audio State
   const [audioUrl, setAudioUrl] = useState(initialAudioUrl);
   const [audioName, setAudioName] = useState(initialAudioName);
+
+  // Sync when timeline selection changes
+  useEffect(() => {
+    if (initialAudioUrl) {
+      setAudioUrl(initialAudioUrl);
+      if (initialAudioName) setAudioName(initialAudioName);
+    }
+  }, [initialAudioUrl, initialAudioName]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -55,6 +138,25 @@ export function VoiceFLRack({
 
   // Source selection modal/dropdown
   const [showVoiceSelect, setShowVoiceSelect] = useState(false);
+
+  // Timeline Clip & Synced Playback Timing
+  const clipStart = Number(activeTimelineSegment?.start) || 0;
+  const clipDuration = Number(activeTimelineSegment?.duration) || Number(duration) || 0;
+  const hasTimelineSegment = Boolean(activeTimelineSegment);
+
+  const isInside = hasTimelineSegment && typeof timelineCurrentTime === "number"
+    ? (timelineCurrentTime >= (clipStart - 0.04) && timelineCurrentTime <= (clipStart + clipDuration + 0.05))
+    : false;
+
+  let currentClipTime = currentTime;
+  let isEffectivePlaying = isPlaying;
+
+  if (hasTimelineSegment && typeof timelineCurrentTime === "number") {
+    currentClipTime = isInside
+      ? Math.max(0, Math.min(clipDuration, timelineCurrentTime - clipStart))
+      : (timelineCurrentTime < clipStart ? 0 : clipDuration);
+    isEffectivePlaying = Boolean(timelineIsPlaying && isInside);
+  }
 
   // Audio Context & Graph References
   const audioContextRef = useRef(null);
@@ -79,37 +181,220 @@ export function VoiceFLRack({
     return audioContextRef.current;
   }, []);
 
-  // Update Settings helper
+  // Sync settings whenever active clip changes
+  useEffect(() => {
+    if (activeTimelineSegment?.flSettings) {
+      setSettings(activeTimelineSegment.flSettings);
+    } else if (activeTimelineSegment?.isFlBypassed || activeTimelineSegment?.flSettings === null) {
+      setSettings(ORIGINAL_RAW_SETTINGS);
+      setActivePresetId("original_raw_voice");
+    } else if (initialSettings) {
+      setSettings(initialSettings);
+    }
+    if (activeTimelineSegment?.isFlBypassed !== undefined) {
+      setIsBypassed(Boolean(activeTimelineSegment.isFlBypassed));
+    }
+  }, [activeTimelineSegment?.id, activeTimelineSegment?.flSettings, activeTimelineSegment?.isFlBypassed, initialSettings]);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (liveTimerRef.current) clearTimeout(liveTimerRef.current);
+    };
+  }, []);
+
+  const emitLiveChange = useCallback((nextSettings, nextBypassed) => {
+    if (typeof onLiveSettingsChange !== "function") return;
+    if (liveTimerRef.current) clearTimeout(liveTimerRef.current);
+    liveTimerRef.current = setTimeout(() => {
+      onLiveSettingsChange(nextSettings, nextBypassed);
+    }, 25);
+  }, [onLiveSettingsChange]);
+
+  const emitImmediateLiveChange = useCallback((nextSettings, nextBypassed) => {
+    if (typeof onLiveSettingsChange !== "function") return;
+    if (liveTimerRef.current) clearTimeout(liveTimerRef.current);
+    onLiveSettingsChange(nextSettings, nextBypassed);
+  }, [onLiveSettingsChange]);
+
+  // Update Settings helper with live Timeline sync
   const handleSettingChange = (key, value) => {
     setSettings((prev) => {
       const updated = { ...prev, [key]: value };
       if (rackRef.current) {
         rackRef.current.updateSettings(updated, isBypassed);
       }
+      emitLiveChange(updated, isBypassed);
       return updated;
     });
   };
 
-  // Switch Presets
+  // Switch Presets with immediate Timeline sync
   const handleSelectPreset = (preset) => {
     setActivePresetId(preset.id);
     setSettings(preset.settings);
+    const isOriginal = preset.id === "original_raw_voice";
+    const nextBypass = isOriginal;
+    setIsBypassed(nextBypass);
     if (rackRef.current) {
-      rackRef.current.updateSettings(preset.settings, isBypassed);
+      rackRef.current.updateSettings(preset.settings, nextBypass);
+      if (typeof rackRef.current.setBypassed === "function") {
+        rackRef.current.setBypassed(nextBypass);
+      }
     }
-    notify(`🎛️ បានអនុវត្ត Preset: ${preset.nameKm || preset.name}`);
+    emitImmediateLiveChange(preset.settings, nextBypass);
+    if (isOriginal && typeof onRestoreOriginal === "function") {
+      onRestoreOriginal();
+    }
+    setIsPresetDropdownOpen(false);
+    notify(isOriginal ? "📻 បានប្តូរទៅសំឡេងដើម Original Voice 100%" : `🎛️ បានអនុវត្ត Preset: ${preset.nameKm || preset.name}`);
   };
 
-  // Toggle A/B Bypass
-  const handleToggleBypass = () => {
-    setIsBypassed((prev) => {
-      const next = !prev;
+  // AI Audio Analysis & Auto-Master Action
+  const handleRunAiAnalysis = async () => {
+    if (!audioUrl) {
+      notify("⚠️ សូមជ្រើសរើសសំឡេង ឬ Clip នៅលើ Timeline ជាមុនសិន");
+      return;
+    }
+    setIsAiAnalyzing(true);
+    notify("🤖 AI កំពុងវិភាគប្រេកង់ និង acoustic សំឡេង...");
+    try {
+      const ctx = getOrCreateAudioContext();
+      const report = await analyzeAudioUrl(audioUrl, ctx);
+
+      // Apply generated settings live immediately
+      setSettings(report.generatedSettings);
       if (rackRef.current) {
-        rackRef.current.updateSettings(settings, next);
+        rackRef.current.updateSettings(report.generatedSettings, isBypassed);
       }
-      notify(next ? "🔇 Bypass FL Master (ស្តាប់សំឡេងដើម Raw)" : "✨ បើកដំណើរការ Voice FL Master");
-      return next;
-    });
+      emitImmediateLiveChange(report.generatedSettings, isBypassed);
+
+      // Save as AI Podcast Master in custom presets
+      const aiPresetId = "ai_podcast_master";
+      const aiPreset = {
+        id: aiPresetId,
+        name: "AI Studio Podcast",
+        nameKm: "ផតខាស វិភាគដោយ AI",
+        icon: "🤖",
+        desc: "Preset វិភាគដោយ AI ពិសេសសម្រាប់ Voice នេះ (កែសម្រួលបន្ថែមបាន)",
+        settings: { ...report.generatedSettings },
+        isCustom: true,
+        isAiGenerated: true,
+      };
+
+      const next = [aiPreset, ...customPresets.filter((p) => p.id !== aiPresetId)];
+      saveCustomPresets(next);
+      setActivePresetId(aiPresetId);
+
+      setAiReport(report);
+      setShowAiModal(true);
+      notify("✨ AI បានវិភាគ និង Master សំឡេងទៅជា Studio Podcast 100% រួចរាល់!");
+    } catch (err) {
+      console.error("AI Analysis failed:", err);
+      notify("⚠️ មិនអាចវិភាគសំឡេងបានទេ: " + (err.message || "Error"));
+    } finally {
+      setIsAiAnalyzing(false);
+    }
+  };
+
+  const handleSaveAsCustomPreset = () => {
+    const trimmed = newPresetName.trim();
+    if (!trimmed) {
+      notify("⚠️ សូមបញ្ចូលឈ្មោះ Preset");
+      return;
+    }
+    const id = `custom_${Date.now()}`;
+    const newPreset = {
+      id,
+      name: trimmed,
+      nameKm: trimmed,
+      icon: "⭐",
+      desc: "Preset កែសម្រួលផ្ទាល់ខ្លួន",
+      settings: { ...settings },
+      isCustom: true,
+    };
+    const next = [newPreset, ...customPresets];
+    saveCustomPresets(next);
+    setActivePresetId(id);
+    setIsCreatingPreset(false);
+    setNewPresetName("");
+    notify(`💾 បានរក្សាទុក Preset ផ្ទាល់ខ្លួន: ${trimmed}`);
+  };
+
+  const handleUpdateCurrentCustomPreset = () => {
+    if (!activePreset?.isCustom) return;
+    const updated = customPresets.map((p) =>
+      p.id === activePreset.id ? { ...p, settings: { ...settings } } : p
+    );
+    saveCustomPresets(updated);
+    notify(`💾 បាន Update ការកែប្រែទៅលើ Preset: ${activePreset.name}`);
+  };
+
+  const handleDeleteCustomPreset = (id, e) => {
+    if (e) e.stopPropagation();
+    const target = customPresets.find((p) => p.id === id);
+    const filtered = customPresets.filter((p) => p.id !== id);
+    saveCustomPresets(filtered);
+    if (activePresetId === id) {
+      setActivePresetId(VOICE_FL_PRESETS[0].id);
+      setSettings(VOICE_FL_PRESETS[0].settings);
+      if (rackRef.current) rackRef.current.updateSettings(VOICE_FL_PRESETS[0].settings, isBypassed);
+      emitImmediateLiveChange(VOICE_FL_PRESETS[0].settings, isBypassed);
+    }
+    notify(`🗑️ បានលុប Preset "${target?.name || "Custom"}"`);
+  };
+
+  // Dedicated Original Voice Activation & Reversion (100% Real Time)
+  const handleActivateOriginalVoice = () => {
+    if (!isBypassed) {
+      // Remember current master settings so user can switch back seamlessly
+      savedMasterSettingsRef.current = { ...settings };
+
+      // Revert settings to clean 0dB raw values
+      const rawSettings = { ...ORIGINAL_RAW_SETTINGS };
+      setSettings(rawSettings);
+      setActivePresetId("original_raw_voice");
+      setIsBypassed(true);
+
+      // Realtime audio graph bypass
+      if (rackRef.current) {
+        rackRef.current.updateSettings(rawSettings, true);
+        if (typeof rackRef.current.setBypassed === "function") {
+          rackRef.current.setBypassed(true);
+        }
+      }
+
+      // Realtime timeline synchronization
+      emitImmediateLiveChange(rawSettings, true);
+
+      // If active timeline segment was previously modified/baked, revert to pristine original source clip
+      if (typeof onRestoreOriginal === "function") {
+        onRestoreOriginal();
+      }
+
+      notify("📻 បានត្រឡប់មកសំឡេងដើម Original Voice 100% (គ្មាន Effects)");
+    } else {
+      // Toggle back to FL Mastered mode
+      const restoredSettings = savedMasterSettingsRef.current || DEFAULT_FL_SETTINGS;
+      setSettings(restoredSettings);
+      setActivePresetId("podcast_studio_master");
+      setIsBypassed(false);
+
+      if (rackRef.current) {
+        rackRef.current.updateSettings(restoredSettings, false);
+        if (typeof rackRef.current.setBypassed === "function") {
+          rackRef.current.setBypassed(false);
+        }
+      }
+
+      emitImmediateLiveChange(restoredSettings, false);
+      notify("✨ បានបើកដំណើរការ Voice FL Studio Master ឡើងវិញ");
+    }
+  };
+
+  // Toggle A/B Bypass with immediate Timeline sync
+  const handleToggleBypass = () => {
+    handleActivateOriginalVoice();
   };
 
   // Setup Web Audio Node graph with Audio element
@@ -181,7 +466,8 @@ export function VoiceFLRack({
       }
 
       const analyser = rackRef.current?.analyserNode;
-      if (!analyser || !isPlaying) {
+      const isAnyPlaying = isPlaying || isEffectivePlaying;
+      if (!isAnyPlaying) {
         // Draw static center line
         ctx.strokeStyle = "rgba(0, 229, 255, 0.25)";
         ctx.beginPath();
@@ -191,9 +477,24 @@ export function VoiceFLRack({
         return;
       }
 
-      const bufferLength = analyser.frequencyBinCount;
+      const bufferLength = analyser?.frequencyBinCount || 64;
       const dataArray = new Uint8Array(bufferLength);
-      analyser.getByteFrequencyData(dataArray);
+      if (analyser) analyser.getByteFrequencyData(dataArray);
+
+      // If playing via Timeline WebAudio, generate lively responsive EQ harmonics if analyser has no local data
+      const hasRealAudio = dataArray.some((val) => val > 0);
+      if (!hasRealAudio && isEffectivePlaying) {
+        const timeNow = performance.now() / 250;
+        const lowGain = (settings?.eqLow || 0) + 12;
+        const midGain = (settings?.eqMid || 0) + 12;
+        const highGain = (settings?.eqHigh || 0) + 12;
+        for (let i = 0; i < bufferLength; i++) {
+          const normIdx = i / bufferLength;
+          const weight = normIdx < 0.33 ? (lowGain / 24) : (normIdx < 0.66 ? (midGain / 24) : (highGain / 24));
+          const wave = Math.sin(timeNow + i * 0.35) * 0.45 + Math.cos(timeNow * 1.6 + i * 0.2) * 0.3 + 0.45;
+          dataArray[i] = Math.max(15, Math.min(235, Math.floor(wave * 180 * Math.max(0.4, weight))));
+        }
+      }
 
       // Draw FL Studio Fruity Parametric EQ 2 glowing spectrum curve
       const gradient = ctx.createLinearGradient(0, height, 0, 0);
@@ -249,7 +550,7 @@ export function VoiceFLRack({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isPlaying]);
+  }, [isPlaying, isEffectivePlaying, settings]);
 
   // Handle Play/Pause
   const handleTogglePlay = async () => {
@@ -384,21 +685,73 @@ export function VoiceFLRack({
     notify("💾 បានទាញយក Audio Mastered រួចរាល់!");
   };
 
-  // Insert to Timeline
-  const handleInsertToTimelineAction = async () => {
-    if (typeof onInsertToTimeline !== "function") {
-      notify("⚠️ Timeline មិនទាន់ត្រៀមរួចរាល់ទេ");
-      return;
-    }
+  // Apply Mastered FL directly to Timeline Segment or Insert as New Clip
+  const handleApplyToTimelineAction = async () => {
     const res = await handleRenderMastered();
     if (!res) return;
 
-    onInsertToTimeline({
-      audioUrl: res.url,
-      name: `${audioName} [FL Master]`,
-      duration: duration || 3.0,
-    });
-    notify("🎬 បានបញ្ចូលសំឡេងទៅកាន់ Timeline!");
+    if (typeof onUpdateTimelineSegment === "function") {
+      onUpdateTimelineSegment({
+        blob: res.blob,
+        url: res.url,
+        name: `${audioName} [FL Master]`,
+        settings,
+      });
+      notify("⚡ បាន Update សំឡេង Master ទៅកាន់ Timeline ដោយជោគជ័យ!");
+      return;
+    }
+
+    if (typeof onInsertToTimeline === "function") {
+      onInsertToTimeline({
+        audioUrl: res.url,
+        name: `${audioName} [FL Master]`,
+        duration: duration || 3.0,
+      });
+      notify("🎬 បានបញ្ចូលសំឡេងទៅកាន់ Timeline!");
+      return;
+    }
+
+    notify("⚠️ Timeline មិនទាន់ត្រៀមរួចរាល់ទេ");
+  };
+
+  // Auto-loop when timeline reaches end of segment if looping enabled
+  useEffect(() => {
+    if (!isLooping || !timelineIsPlaying || !hasTimelineSegment || typeof onTimelineSeek !== "function") return;
+    if (timelineCurrentTime >= (clipStart + clipDuration - 0.05)) {
+      onTimelineSeek(clipStart);
+    }
+  }, [isLooping, timelineIsPlaying, hasTimelineSegment, timelineCurrentTime, clipStart, clipDuration, onTimelineSeek]);
+
+  const handleSyncedPlayToggle = () => {
+    if (hasTimelineSegment && typeof onTimelineTogglePlay === "function") {
+      if (!timelineIsPlaying) {
+        if (typeof onTimelineSeek === "function") {
+          if (timelineCurrentTime < clipStart || timelineCurrentTime >= (clipStart + clipDuration - 0.05)) {
+            onTimelineSeek(clipStart);
+          }
+        }
+        onTimelineTogglePlay();
+      } else {
+        if (!isInside && typeof onTimelineSeek === "function") {
+          onTimelineSeek(clipStart);
+        } else {
+          onTimelineTogglePlay();
+        }
+      }
+      return;
+    }
+    handleTogglePlay();
+  };
+
+  const handleSyncedRewind = () => {
+    if (hasTimelineSegment && typeof onTimelineSeek === "function") {
+      onTimelineSeek(clipStart);
+      return;
+    }
+    if (audioElementRef.current) {
+      audioElementRef.current.currentTime = 0;
+      setCurrentTime(0);
+    }
   };
 
   return (
@@ -417,41 +770,10 @@ export function VoiceFLRack({
         />
       )}
 
-      {/* Responsive Segmented Mode Nav: View All, Card 1, or Card 2 */}
-      <div className="vfl-card-segmented-nav">
-        <button
-          type="button"
-          className={`vfl-nav-tab ${activeCardTab === "all" ? "active" : ""}`}
-          onClick={() => setActiveCardTab("all")}
-          title="បង្ហាញផ្ទាំងទាំងពីរ"
-        >
-          <span>👀 ទាំងអស់</span>
-        </button>
-        <button
-          type="button"
-          className={`vfl-nav-tab ${activeCardTab === "card1" ? "active" : ""}`}
-          onClick={() => setActiveCardTab("card1")}
-          title="Card 1: Presets & Audio"
-        >
-          <span>🎛️ Presets & Audio</span>
-        </button>
-        <button
-          type="button"
-          className={`vfl-nav-tab ${activeCardTab === "card2" ? "active" : ""}`}
-          onClick={() => setActiveCardTab("card2")}
-          title="Card 2: Vocal FX Rack"
-        >
-          <span>⚡ Vocal FX Rack</span>
-        </button>
-      </div>
-
-      {/* =========================================================================
-          CARD 1: MASTER CONTROLLER, AUDIO INPUT, PRESETS & SPECTRUM MONITOR
-          ========================================================================= */}
-      {(activeCardTab === "all" || activeCardTab === "card1") && (
-        <div className="vfl-card vfl-card-master">
-          {/* Header Row: Brand Badge + Bypass A/B Toggle */}
-          <div className="vfl-card-header">
+      {/* Unified Single Hardware Card */}
+      <div className="vfl-card vfl-card-unified">
+        {/* Header Row: Brand Badge + Original Voice & Bypass A/B Toggle */}
+        <div className="vfl-card-header">
             <div className="vfl-brand-badge">
               <div className="vfl-logo-glow">🎛️</div>
               <div className="vfl-brand-text">
@@ -460,28 +782,44 @@ export function VoiceFLRack({
               </div>
             </div>
 
-            <button
-              type="button"
-              className={`vfl-bypass-toggle ${isBypassed ? "is-bypassed" : ""}`}
-              onClick={handleToggleBypass}
-              title="A/B Compare: Turn FL processing ON/OFF"
-            >
-              {isBypassed ? <EyeSlash size={14} weight="bold" /> : <Eye size={14} weight="bold" />}
-              <span>{isBypassed ? "BYPASS" : "MASTER ON"}</span>
-            </button>
+            <div className="vfl-header-actions">
+              <button
+                type="button"
+                className={`vfl-header-original-btn ${isBypassed ? "is-active" : ""}`}
+                onClick={handleActivateOriginalVoice}
+                title={isBypassed ? "បិទសំឡេងដើម (ត្រឡប់មក FL Mastered)" : "ស្តាប់សំឡេងដើម Original Voice (Raw 100% គ្មាន Effects)"}
+              >
+                <span className={`vfl-header-led ${isBypassed ? "is-active" : ""}`} />
+                <span>{isBypassed ? "📻 សំឡេងដើម (Raw Active)" : "📻 Original Voice"}</span>
+              </button>
+
+              <button
+                type="button"
+                className={`vfl-bypass-toggle ${isBypassed ? "is-bypassed" : ""}`}
+                onClick={handleToggleBypass}
+                title="A/B Compare: Turn FL processing ON/OFF"
+              >
+                {isBypassed ? <EyeSlash size={14} weight="bold" /> : <Eye size={14} weight="bold" />}
+                <span>{isBypassed ? "BYPASS" : "MASTER ON"}</span>
+              </button>
+            </div>
           </div>
 
-          {/* Audio Input, Transport & Player Bar */}
+          {/* Timeline Synchronized Audio Player Bar */}
           <div className="vfl-audio-transport-section">
             <div className="vfl-source-info-row">
               <div className="vfl-source-meta">
-                <Waveform size={18} className="vfl-wave-icon" />
+                <Waveform
+                  size={18}
+                  weight={isEffectivePlaying ? "fill" : "regular"}
+                  className={`vfl-wave-icon ${isEffectivePlaying ? "is-playing" : ""}`}
+                />
                 <div className="vfl-source-text">
-                  <span className="vfl-source-title">{audioName || "No Audio Loaded"}</span>
+                  <span className="vfl-source-title">{audioName || "Timeline Voice"}</span>
                   <small>
-                    {duration > 0
-                      ? `${currentTime.toFixed(1)}s / ${duration.toFixed(1)}s`
-                      : "ថត ឬបញ្ចូលសំឡេង"}
+                    {clipDuration > 0
+                      ? `${currentClipTime.toFixed(1)}s / ${clipDuration.toFixed(1)}s ${isEffectivePlaying ? (isBypassed ? "• Playing Original Raw Voice" : "• Playing Live FL Master") : (isBypassed ? "• Original Raw Voice" : "• Timeline Audio Clip")}`
+                      : (isBypassed ? "• Original Raw Voice" : "• Timeline Audio Clip")}
                   </small>
                 </div>
               </div>
@@ -489,12 +827,11 @@ export function VoiceFLRack({
               <div className="vfl-transport-inline">
                 <button
                   type="button"
-                  className="vfl-transport-play-btn"
-                  onClick={handleTogglePlay}
-                  disabled={!audioUrl}
-                  title={isPlaying ? "Pause" : "Play with Live FL Master"}
+                  className={`vfl-transport-play-btn ${isEffectivePlaying ? "is-active-playing" : ""}`}
+                  onClick={handleSyncedPlayToggle}
+                  title={isEffectivePlaying ? "Pause Timeline Voice" : "Play Timeline Voice with FL Master"}
                 >
-                  {isPlaying ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}
+                  {isEffectivePlaying ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}
                 </button>
                 <button
                   type="button"
@@ -507,90 +844,238 @@ export function VoiceFLRack({
                 <button
                   type="button"
                   className="vfl-transport-sub-btn"
-                  onClick={() => {
-                    if (audioElementRef.current) {
-                      audioElementRef.current.currentTime = 0;
-                      setCurrentTime(0);
-                    }
-                  }}
-                  title="Rewind"
-                  disabled={!audioUrl}
+                  onClick={handleSyncedRewind}
+                  title="Rewind to start of clip"
                 >
                   <ArrowCounterClockwise size={14} />
                 </button>
               </div>
             </div>
-
-            {/* Input Action Pills: Upload, Record, Library */}
-            <div className="vfl-input-actions-grid">
-              <label className="vfl-action-chip" title="Upload local audio file">
-                <UploadSimple size={13} weight="bold" />
-                <span>Upload</span>
-                <input type="file" accept="audio/*" onChange={handleFileUpload} hidden />
-              </label>
-
-              {isRecording ? (
-                <button
-                  type="button"
-                  className="vfl-action-chip is-recording"
-                  onClick={handleStopRecord}
-                  title="Stop recording"
-                >
-                  <Stop size={13} weight="fill" />
-                  <span>{recordDuration}s Stop</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="vfl-action-chip"
-                  onClick={handleStartRecord}
-                  title="Record from microphone"
-                >
-                  <Microphone size={13} weight="bold" />
-                  <span>Record</span>
-                </button>
-              )}
-
-              {voiceProfiles?.length > 0 && (
-                <button
-                  type="button"
-                  className="vfl-action-chip"
-                  onClick={() => setShowVoiceSelect((prev) => !prev)}
-                  title="Select a cloned/trained voice from Library"
-                >
-                  <SpeakerHigh size={13} weight="bold" />
-                  <span>Voices ({voiceProfiles.length})</span>
-                </button>
-              )}
-            </div>
           </div>
 
-          {/* Presets Grid: 2 Columns, No Overflow, Beautiful Khmer & English Titles */}
-          <div className="vfl-presets-section">
-            <div className="vfl-section-label">
-              <span>🎛️ FL Vocal Presets</span>
-              <small>{VOICE_FL_PRESETS.length} ម៉ូដ</small>
+          {/* FL Vocal Presets Dropdown & AI Studio Podcast Analysis */}
+          <div className="vfl-presets-section" ref={presetDropdownRef}>
+            <div className="vfl-presets-header-row">
+              <div className="vfl-section-label">
+                <span>🎛️ FL Vocal Presets</span>
+                <small>{allPresets.length} ម៉ូដ</small>
+              </div>
+
+              <div className="vfl-presets-quick-actions">
+                <button
+                  type="button"
+                  className={`vfl-ai-analyze-btn ${isAiAnalyzing ? "is-analyzing" : ""}`}
+                  onClick={handleRunAiAnalysis}
+                  disabled={isAiAnalyzing || !audioUrl}
+                  title="AI វិភាគសំឡេង និង Master ស្វ័យប្រវត្តិកម្រិត Studio Podcast 100%"
+                >
+                  <Sparkle size={13} weight="fill" />
+                  <span>{isAiAnalyzing ? "AI វិភាគ..." : "✨ AI Analysis"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="vfl-new-preset-btn"
+                  onClick={() => setIsCreatingPreset((v) => !v)}
+                  title="បង្កើត Preset ថ្មីពីកម្រិតបច្ចុប្បន្ន"
+                >
+                  <Plus size={12} weight="bold" />
+                  <span>+ Preset</span>
+                </button>
+              </div>
             </div>
 
-            <div className="vfl-presets-grid-2col">
-              {VOICE_FL_PRESETS.map((preset) => {
-                const isActive = activePresetId === preset.id;
-                return (
+            {/* Inline Preset Creator */}
+            {isCreatingPreset && (
+              <div className="vfl-preset-create-inline">
+                <input
+                  type="text"
+                  placeholder="ឈ្មោះ Preset ថ្មី (ឧ. My Podcast Studio)..."
+                  value={newPresetName}
+                  onChange={(e) => setNewPresetName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSaveAsCustomPreset()}
+                  className="vfl-preset-create-input"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className="vfl-preset-create-save-btn"
+                  onClick={handleSaveAsCustomPreset}
+                >
+                  រក្សាទុក
+                </button>
+                <button
+                  type="button"
+                  className="vfl-preset-create-cancel-btn"
+                  onClick={() => setIsCreatingPreset(false)}
+                >
+                  បោះបង់
+                </button>
+              </div>
+            )}
+
+            {/* Custom Preset Modified Alert Bar */}
+            {isSettingsModified && (
+              <div className="vfl-preset-modified-bar">
+                <span>
+                  {activePreset?.isCustom ? (
+                    <>⭐ Preset <strong>{activePreset.name}</strong> បានកែសម្រួល</>
+                  ) : (
+                    <>🎛️ បានកែប្រែពី <strong>{activePreset.name}</strong></>
+                  )}
+                </span>
+                <div className="vfl-preset-modified-actions">
+                  {activePreset?.isCustom ? (
+                    <button
+                      type="button"
+                      className="vfl-preset-update-btn"
+                      onClick={handleUpdateCurrentCustomPreset}
+                      title="Update settings into this custom preset"
+                    >
+                      <FloppyDisk size={12} weight="fill" />
+                      <span>Update</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="vfl-preset-update-btn"
+                      onClick={() => {
+                        setNewPresetName(`${activePreset.name} (Custom)`);
+                        setIsCreatingPreset(true);
+                      }}
+                      title="Save as a new custom preset"
+                    >
+                      <Plus size={12} weight="bold" />
+                      <span>រក្សាទុកជា Preset</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* AI Diagnosis Report Card */}
+            {showAiModal && aiReport && (
+              <div className="vfl-ai-report-card">
+                <div className="vfl-ai-report-header">
+                  <div className="vfl-ai-report-title">
+                    <Sparkle size={15} weight="fill" />
+                    <span>AI Studio Podcast Doctor (100% Master)</span>
+                  </div>
                   <button
-                    key={preset.id}
                     type="button"
-                    className={`vfl-preset-card-item ${isActive ? "is-active" : ""}`}
-                    onClick={() => handleSelectPreset(preset)}
-                    title={preset.desc}
+                    className="vfl-ai-report-close"
+                    onClick={() => setShowAiModal(false)}
+                    title="Close report"
                   >
-                    <div className="vfl-preset-top">
-                      <span className="vfl-preset-emoji">{preset.icon}</span>
-                      <strong className="vfl-preset-title-en">{preset.name}</strong>
-                    </div>
-                    <span className="vfl-preset-title-km">{preset.nameKm || preset.name}</span>
+                    ×
                   </button>
-                );
-              })}
+                </div>
+
+                <div className="vfl-ai-diagnosis-grid">
+                  {aiReport.diagnosis.map((d, idx) => (
+                    <div key={idx} className="vfl-ai-diag-item">
+                      <div className="vfl-ai-diag-item-head">
+                        <span>{d.icon}</span>
+                        <span>{d.label}</span>
+                      </div>
+                      <span className="vfl-ai-diag-item-val">{d.value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="vfl-ai-summary-text">
+                  {aiReport.summaryKm}
+                </div>
+              </div>
+            )}
+
+            {/* Presets Dropdown Container */}
+            <div className="vfl-preset-dropdown-container">
+              <button
+                type="button"
+                className={`vfl-preset-dropdown-trigger ${isPresetDropdownOpen ? "is-open" : ""}`}
+                onClick={() => setIsPresetDropdownOpen((v) => !v)}
+                title="ជ្រើសរើស FL Vocal Preset (Dropdown)"
+              >
+                <div className="vfl-preset-dropdown-current">
+                  <span className="vfl-preset-dropdown-emoji">{activePreset?.icon || "🎛️"}</span>
+                  <div className="vfl-preset-dropdown-meta">
+                    <strong className="vfl-preset-dropdown-title-en">{activePreset?.name || "Select Preset"}</strong>
+                    <span className="vfl-preset-dropdown-title-km">{activePreset?.nameKm || ""}</span>
+                  </div>
+                </div>
+                <div className="vfl-preset-dropdown-action">
+                  <span className="vfl-preset-badge-tag">{activePreset?.isCustom ? "CUSTOM" : "ACTIVE"}</span>
+                  <CaretDown size={14} weight="bold" className={`vfl-dropdown-caret ${isPresetDropdownOpen ? "is-rotated" : ""}`} />
+                </div>
+              </button>
+
+              {isPresetDropdownOpen && (
+                <div className="vfl-preset-dropdown-menu">
+                  {customPresets.length > 0 && (
+                    <>
+                      <div className="vfl-preset-group-header">🌟 PRESETS ផ្ទាល់ខ្លួន & AI ({customPresets.length})</div>
+                      {customPresets.map((preset) => {
+                        const isSelected = activePresetId === preset.id;
+                        return (
+                          <div
+                            key={preset.id}
+                            className={`vfl-preset-dropdown-item ${isSelected ? "is-selected" : ""}`}
+                            onClick={() => {
+                              handleSelectPreset(preset);
+                              setIsPresetDropdownOpen(false);
+                            }}
+                            title={preset.desc}
+                            role="button"
+                            tabIndex={0}
+                          >
+                            <span className="vfl-preset-dropdown-item-icon">{preset.icon || "⭐"}</span>
+                            <div className="vfl-preset-dropdown-item-text">
+                              <span className="vfl-preset-dropdown-item-en">{preset.name}</span>
+                              <span className="vfl-preset-dropdown-item-km">{preset.nameKm || "Preset ផ្ទាល់ខ្លួន"}</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              {isSelected && <span className="vfl-preset-dropdown-check">✓</span>}
+                              <button
+                                type="button"
+                                className="vfl-preset-item-delete"
+                                onClick={(e) => handleDeleteCustomPreset(preset.id, e)}
+                                title="លុប Preset នេះ"
+                              >
+                                <Trash size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  <div className="vfl-preset-group-header">🎛️ STUDIO FACTORY PRESETS ({VOICE_FL_PRESETS.length})</div>
+                  {VOICE_FL_PRESETS.map((preset) => {
+                    const isSelected = activePresetId === preset.id;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        className={`vfl-preset-dropdown-item ${isSelected ? "is-selected" : ""}`}
+                        onClick={() => {
+                          handleSelectPreset(preset);
+                          setIsPresetDropdownOpen(false);
+                        }}
+                        title={preset.desc}
+                      >
+                        <span className="vfl-preset-dropdown-item-icon">{preset.icon}</span>
+                        <div className="vfl-preset-dropdown-item-text">
+                          <span className="vfl-preset-dropdown-item-en">{preset.name}</span>
+                          <span className="vfl-preset-dropdown-item-km">{preset.nameKm}</span>
+                        </div>
+                        {isSelected && <span className="vfl-preset-dropdown-check">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -619,15 +1104,9 @@ export function VoiceFLRack({
               </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* =========================================================================
-          CARD 2: VOCAL FX HARDWARE RACK & MASTER EXPORT
-          ========================================================================= */}
-      {(activeCardTab === "all" || activeCardTab === "card2") && (
-        <div className="vfl-card vfl-card-fx-rack">
-          <div className="vfl-card-header">
+          {/* Section Divider: Vocal FX Rack Hardware Edition */}
+          <div className="vfl-rack-section-divider">
             <div className="vfl-card-title-group">
               <div className="vfl-rack-icon-badge">⚡</div>
               <div>
@@ -905,8 +1384,32 @@ export function VoiceFLRack({
             </div>
           </div>
 
-          {/* Master Export Actions */}
+          {/* Master Export Actions with Bottom Original Voice Button */}
           <div className="vfl-master-actions-card">
+            <button
+              type="button"
+              className={`vfl-export-btn is-original-btn ${isBypassed ? "is-active" : ""}`}
+              onClick={handleActivateOriginalVoice}
+              title={isBypassed ? "បិទសំឡេងដើម (ត្រឡប់មក FL Mastered វិញ)" : "ស្តាប់សំឡេងដើម Original Voice (Raw 100% គ្មាន Effects)"}
+            >
+              <span className={`vfl-btn-led ${isBypassed ? "is-active" : ""}`} />
+              <SpeakerHigh size={15} weight={isBypassed ? "fill" : "bold"} />
+              <span>{isBypassed ? "📻 សំឡេងដើម (Raw Active)" : "📻 Original Voice"}</span>
+            </button>
+
+            {(onUpdateTimelineSegment || onInsertToTimeline) && (
+              <button
+                type="button"
+                className="vfl-export-btn is-timeline-primary"
+                onClick={handleApplyToTimelineAction}
+                disabled={!audioUrl || isProcessing}
+                title="Update and apply FL master to Timeline"
+              >
+                <Lightning size={16} weight="fill" />
+                <span>{isProcessing ? "កំពុង Master..." : "⚡ Update ទៅ Timeline ភ្លាមៗ"}</span>
+              </button>
+            )}
+
             <button
               type="button"
               className="vfl-export-btn is-download"
@@ -917,22 +1420,8 @@ export function VoiceFLRack({
               <DownloadSimple size={15} weight="bold" />
               <span>Download WAV</span>
             </button>
-
-            {onInsertToTimeline && (
-              <button
-                type="button"
-                className="vfl-export-btn is-timeline"
-                onClick={handleInsertToTimelineAction}
-                disabled={!audioUrl || isProcessing}
-                title="Insert Mastered Audio into Timeline"
-              >
-                <FilmStrip size={15} weight="bold" />
-                <span>To Timeline</span>
-              </button>
-            )}
           </div>
         </div>
-      )}
 
       {/* Voice Library Dropdown Modal */}
       {showVoiceSelect && voiceProfiles?.length > 0 && (

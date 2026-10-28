@@ -1447,15 +1447,83 @@
 }
 
 .vs-director-notes-banner {
-  background: linear-gradient(90deg, rgba(124, 58, 237, 0.14), rgba(219, 39, 119, 0.09));
-  border: 1px solid rgba(168, 85, 247, 0.35);
-  border-radius: 8px;
-  padding: 9px 12px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(219, 39, 119, 0.12));
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: vsFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.15);
+}
+
+.vs-director-deep-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  animation: vsFadeIn 0.25s ease;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+  padding-bottom: 8px;
+}
+
+.vs-director-deep-headline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #f3e8ff;
+  letter-spacing: 0.2px;
+}
+
+.vs-director-title-text {
+  background: linear-gradient(90deg, #e9d5ff, #fbcfe8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.vs-director-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vs-director-engine-badge {
+  background: rgba(168, 85, 247, 0.2);
+  border: 1px solid rgba(192, 132, 252, 0.5);
+  color: #f5d0fe;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.25);
+}
+
+.vs-director-intent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(147, 51, 234, 0.25);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.vs-intent-tag {
+  color: #38bdf8;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.vs-intent-text {
+  color: #e2e8f0;
 }
 
 .vs-director-notes-body {
@@ -1464,7 +1532,44 @@
   gap: 8px;
   font-size: 12px;
   color: #f3e8ff;
-  line-height: 1.45;
+  line-height: 1.5;
+}
+
+.vs-notes-label {
+  color: #fbbf24;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.vs-director-phonetics-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.vs-phonetics-label {
+  font-size: 11px;
+  color: #a78bfa;
+  font-weight: 600;
+}
+
+.vs-phonetics-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vs-phonetic-pill {
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  color: #fae8ff;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-family: inherit;
 }
 
 .vs-director-revert-pill {
@@ -4158,6 +4263,48 @@
   margin-top: 4px;
 }
 
+/* Gemini Flash Native Theme */
+.vs-orb-gemini {
+  background: radial-gradient(circle at 35% 30%, rgba(16, 185, 129, 0.35) 0%, rgba(59, 130, 246, 0.2) 45%, rgba(8, 14, 30, 0.95) 85%);
+  border: 3px solid rgba(52, 211, 153, 0.65);
+  box-shadow: 0 0 45px rgba(16, 185, 129, 0.5), inset 0 0 25px rgba(59, 130, 246, 0.35);
+}
+
+.vs-orb-gemini .vs-3d-progress-orb-glow {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px dashed rgba(52, 211, 153, 0.85);
+  animation: spin 10s linear infinite;
+}
+
+.vs-orb-gemini .vs-3d-progress-orb-inner-ring {
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(56, 189, 248, 0.6);
+  animation: spinReverse 7s linear infinite;
+}
+
+.vs-orb-gemini .vs-3d-pct-text {
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, #ffffff 0%, #34d399 50%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1;
+}
+
+.vs-orb-gemini .vs-3d-pct-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: #34d399;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
 /* Titles */
 .vs-3d-stage-title {
   font-size: 17px;
@@ -4255,6 +4402,123 @@
 }
 
 /* Metrics Pills */
+/* Multi-Stage Pipeline Stepper Card Widget */
+.vs-3d-pipeline-stepper {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(13, 16, 32, 0.75);
+  border: 1px solid rgba(139, 92, 246, 0.22);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin: 0 auto 16px auto;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 2;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.vs-3d-step-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+
+.vs-3d-step-item.pending {
+  opacity: 0.4;
+}
+
+.vs-3d-step-item.active {
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  opacity: 1;
+}
+
+.vs-3d-step-item.done {
+  opacity: 0.9;
+}
+
+.vs-3d-step-indicator {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  transition: all 0.25s ease;
+}
+
+.vs-3d-step-item.active .vs-3d-step-indicator {
+  background: rgba(168, 85, 247, 0.3);
+  border-color: #a855f7;
+  color: #f3e8ff;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.7);
+  animation: pulseDot 1.2s infinite;
+}
+
+.vs-3d-step-item.done .vs-3d-step-indicator {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #34d399;
+  color: #34d399;
+}
+
+.vs-3d-step-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+
+.vs-3d-step-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.vs-3d-step-item.active .vs-3d-step-label {
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.vs-3d-step-item.done .vs-3d-step-label {
+  color: #6ee7b7;
+}
+
+.vs-3d-step-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.vs-3d-step-item.active .vs-3d-step-badge {
+  background: rgba(168, 85, 247, 0.25);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+  color: #c084fc;
+}
+
+.vs-3d-step-item.done .vs-3d-step-badge {
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
 .vs-3d-metrics-pills {
   display: flex;
   align-items: center;
@@ -4349,6 +4613,133 @@
   border-radius: 6px;
   cursor: pointer;
 }
+
+/* 3D Completion View Styles */
+.vs-3d-completion-view {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: vsCardPopIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vs-orb-success {
+  background: radial-gradient(circle at 35% 30%, rgba(16, 185, 129, 0.28) 0%, rgba(5, 150, 105, 0.12) 50%, rgba(6, 30, 20, 0.95) 85%);
+  border: 3px solid rgba(52, 211, 153, 0.55);
+  box-shadow: 0 0 40px rgba(52, 211, 153, 0.4), inset 0 0 25px rgba(16, 185, 129, 0.3);
+}
+
+.vs-orb-success .vs-3d-progress-orb-glow {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px dashed rgba(52, 211, 153, 0.75);
+  animation: spin 12s linear infinite;
+}
+
+.vs-orb-success .vs-3d-progress-orb-inner-ring {
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(110, 231, 183, 0.5);
+  animation: spinReverse 8s linear infinite;
+}
+
+.vs-3d-modal-audio-player {
+  width: 100%;
+  margin: 16px 0 20px 0;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-sizing: border-box;
+}
+
+.vs-3d-audio-element {
+  width: 100%;
+  height: 42px;
+  outline: none;
+  border-radius: 8px;
+}
+
+.vs-3d-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.vs-3d-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: none;
+  outline: none;
+}
+
+.vs-3d-action-btn.primary {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 18px rgba(16, 185, 129, 0.45);
+}
+
+.vs-3d-action-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.6);
+  background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+}
+
+.vs-3d-action-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.vs-3d-action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.vs-3d-action-btn.text-only {
+  background: transparent;
+  color: #94a3b8;
+  padding: 10px 14px;
+}
+
+.vs-3d-action-btn.text-only:hover {
+  color: #ffffff;
+}
+
+/* Audio Section Highlight on Page */
+.vs-audio-section-highlight {
+  animation: pulseSectionBorder 2.5s ease-out;
+}
+
+@keyframes pulseSectionBorder {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7), 0 0 30px rgba(52, 211, 153, 0.4);
+    border-color: #34d399;
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(52, 211, 153, 0.3), 0 0 45px rgba(52, 211, 153, 0.6);
+    border-color: #10b981;
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
 
 
 

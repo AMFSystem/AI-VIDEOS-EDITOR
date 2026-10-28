@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { logger } from "../../utils/logger.js";
+import { config } from "../../config/index.js";
 
 function splitText(text, maxLen = 160) {
   if (!text) return [];
@@ -25,7 +26,7 @@ async function adjustSpeed(buffer, speed = 1.0) {
   if (speed === 1.0 || Math.abs(speed - 1.0) < 0.02) return buffer;
   const clamped = Math.max(0.5, Math.min(2.0, speed));
   return new Promise((resolve) => {
-    const proc = spawn("ffmpeg", [
+    const proc = spawn(config.ffmpegPath, [
       "-hide_banner",
       "-loglevel",
       "error",

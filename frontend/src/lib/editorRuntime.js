@@ -1,5 +1,6 @@
 import { RATIO_OPTIONS } from "../config/editor.js";
 import { applyAudioSpatialEffect, createAudioSpatialGraph, normalizeAudioSpatialAmount, normalizeAudioSpatialEffect } from "./audioSpatialEffects.js";
+import { createVoiceFLGraph } from "./voiceFLAudioEngine.js";
 import {
   BufferTarget,
   CanvasSource,
@@ -36,7 +37,7 @@ export function isAudioSegmentAudible(segment) {
 let timelineAudioContext = null;
 const timelineAudioGainNodes = new WeakMap();
 
-export function setTimelineAudioGain(media, value, spatialEffect = "original", spatialAmount = 1) {
+export function setTimelineAudioGain(media, value, spatialEffect = "original", spatialAmount = 1, flSettings = null, isFlBypassed = false) {
   if (!media) return;
   const gainValue = Math.max(0, Math.min(4, Number(value) || 0));
   let entry = timelineAudioGainNodes.get(media);
@@ -46,10 +47,15 @@ export function setTimelineAudioGain(media, value, spatialEffect = "original", s
       timelineAudioContext ||= AudioContextClass ? new AudioContextClass() : null;
       if (timelineAudioContext) {
         const source = timelineAudioContext.createMediaElementSource(media);
+        const flGraph = createVoiceFLGraph(timelineAudioContext, flSettings || {});
+        if (!flSettings || isFlBypassed) {
+          flGraph.updateSettings(flSettings || {}, true);
+        }
         const gain = timelineAudioContext.createGain();
-        source.connect(gain);
+        source.connect(flGraph.inputNode);
+        flGraph.outputNode.connect(gain);
         gain.connect(timelineAudioContext.destination);
-        entry = { context: timelineAudioContext, source, gain, spatialGraph: null };
+        entry = { context: timelineAudioContext, source, flGraph, gain, spatialGraph: null };
         timelineAudioGainNodes.set(media, entry);
       }
     } catch {
@@ -62,11 +68,22 @@ export function setTimelineAudioGain(media, value, spatialEffect = "original", s
       entry.gain.gain.value = gainValue;
       entry.gainValue = gainValue;
     }
+
+    // Realtime Voice FL Studio DSP Live Update
+    if (entry.flGraph) {
+      if (flSettings) {
+        entry.flGraph.updateSettings(flSettings, Boolean(isFlBypassed));
+      } else {
+        entry.flGraph.updateSettings({}, true);
+      }
+    }
+
     // Original audio needs only the source and gain nodes. Allocate the six
     // spatial-processing nodes when this clip actually uses a space effect.
     if (!entry.spatialGraph && normalizeAudioSpatialEffect(spatialEffect) !== "original" && normalizeAudioSpatialAmount(spatialAmount) > 0) {
-      entry.source.disconnect(entry.gain);
-      entry.spatialGraph = createAudioSpatialGraph(entry.context, entry.source, entry.gain);
+      const outputSource = entry.flGraph ? entry.flGraph.outputNode : entry.source;
+      outputSource.disconnect(entry.gain);
+      entry.spatialGraph = createAudioSpatialGraph(entry.context, outputSource, entry.gain);
       applyAudioSpatialEffect(entry.spatialGraph, "original", 1, { smooth: false });
     }
     if (entry.spatialGraph) applyAudioSpatialEffect(entry.spatialGraph, spatialEffect, spatialAmount);

@@ -1,4 +1,5 @@
 import { connectAudioSpatialEffect } from "./audioSpatialEffects.js";
+import { createVoiceFLGraph } from "./voiceFLAudioEngine.js";
 import { throwIfExportAborted } from "./exportCancellation.js";
 import { encodeAudioBufferAsWav, transcodeAudioToMp3 } from "./media.js";
 import { createPitchPreservedAudioBuffer } from "./pitchPreservingTimeStretch.js";
@@ -22,6 +23,8 @@ function makeAudioInput(segment, defaults = {}) {
     fadeOut: nonnegative(segment.fadeOut),
     spatialEffect: segment.spatialEffect ?? defaults.spatialEffect,
     spatialAmount: segment.spatialAmount ?? defaults.spatialAmount,
+    flSettings: segment.flSettings ?? defaults.flSettings,
+    isFlBypassed: segment.isFlBypassed ?? defaults.isFlBypassed,
   };
 }
 
@@ -153,7 +156,14 @@ export async function mixOfflineAudio({
       const outputStart = visibleStart - rangeStart;
       scheduleAudioEnvelope(gain.gain, input, clipDuration, localStart, localEnd, outputStart);
       source.connect(gain);
-      connectAudioSpatialEffect(context, gain, context.destination, input.spatialEffect, input.spatialAmount, { smooth: false });
+      if (input.flSettings && !input.isFlBypassed) {
+        const flRack = createVoiceFLGraph(context, input.flSettings);
+        flRack.updateSettings(input.flSettings, false);
+        gain.connect(flRack.inputNode);
+        connectAudioSpatialEffect(context, flRack.outputNode, context.destination, input.spatialEffect, input.spatialAmount, { smooth: false });
+      } else {
+        connectAudioSpatialEffect(context, gain, context.destination, input.spatialEffect, input.spatialAmount, { smooth: false });
+      }
       sources.push(source);
       source.start(outputStart, preservePitch ? 0 : offset, preservePitch ? localEnd - localStart : trimmedSourceDuration);
     }

@@ -59,7 +59,7 @@ async def speech_to_text(
             raise HTTPException(422, f"Could not transcribe audio: {exc}") from exc
 
     transcription_id = None
-    if user is not None and result.text:
+    if user is not None and result.text and getattr(request.app.state, "sessionmaker", None) is not None:
         async with request.app.state.sessionmaker() as session:
             row = Transcription(user_id=user.id, language_code=result.language,
                                 transcribed_text=result.text, audio_duration_seconds=result.duration)
