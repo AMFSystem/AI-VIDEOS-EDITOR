@@ -96,13 +96,23 @@ class VoxCPM2Engine:
     def __init__(self, repo: str, cache_dir: Path, device: str):
         import os
         import torch
-        self.device = _resolve_device(device)
-        self._fallback_omni = None
 
-        # Maximize Mac hardware cores
+        # Strictly resolve device for VoxCPM2:
+        # On Apple Silicon / macOS, MPS forces bfloat16 -> float32 conversion on 4.5GB weights
+        # which causes out-of-memory or GPU pipeline stalls. Running on CPU uses native bfloat16
+        # with Apple Silicon multi-core NEON matrix acceleration for maximum throughput.
+        if device == "auto" or not device:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        elif device == "mps":
+            self.device = "cpu"
+        else:
+            self.device = device
+
+        # Unleash all hardware CPU cores for full neural power
         try:
             threads = os.cpu_count() or 8
             torch.set_num_threads(threads)
+            logger.info("VoxCPM2: Allocated %d CPU threads for full power neural processing", threads)
         except Exception:
             pass
 
@@ -110,48 +120,73 @@ class VoxCPM2Engine:
             from huggingface_hub import snapshot_download
             from voxcpm import VoxCPM
 
-            try:
-                path = snapshot_download(repo, cache_dir=str(cache_dir), local_files_only=True)
-                logger.info("VoxCPM2: Using strictly local cached snapshot %s", path)
-            except Exception:
-                logger.info("VoxCPM2: Local snapshot missing, downloading %s...", repo)
-                path = snapshot_download(repo, cache_dir=str(cache_dir))
-            logger.info("Loading VoxCPM2 model %s on %s [FULL POWER]", repo, self.device)
+            # Detect direct cached snapshot to eliminate network dependency
+            path = None
+            snap_folder = cache_dir / "models--openbmb--VoxCPM2" / "snapshots"
+            if snap_folder.exists():
+                snaps = [d for d in snap_folder.iterdir() if d.is_dir()]
+                if snaps:
+                    path = str(snaps[0])
+                    logger.info("VoxCPM2: Resolved local cached snapshot directly: %s", path)
+
+            if not path:
+                try:
+                    path = snapshot_download(repo, cache_dir=str(cache_dir), local_files_only=True)
+                    logger.info("VoxCPM2: Using local cached snapshot %s", path)
+                except Exception:
+                    logger.info("VoxCPM2: Local snapshot missing, downloading %s...", repo)
+                    path = snapshot_download(repo, cache_dir=str(cache_dir))
+
+            logger.info("Loading VoxCPM2 model %s on %s [FULL POWER - 48kHz STUDIO]", repo, self.device)
             self._model = VoxCPM(
-                voxcpm_model_path=path,
+                voxcpm_model_path=str(path),
                 enable_denoiser=False,
                 optimize=False,
                 device=self.device,
             )
+            logger.info("VoxCPM2 Foundation Model successfully loaded at FULL POWER (Native 48kHz)")
         except Exception as exc:
-            logger.warning("VoxCPM2 native loader exception (%s); seamlessly utilizing OmniVoice high-precision neural backbone.", exc)
-            self._model = None
-            from app.config import get_settings
-            s = get_settings()
-            self._fallback_omni = OmniVoiceEngine(s.clone_model, s.clone_model_revision, cache_dir, device)
-            self.sample_rate = self._fallback_omni.sample_rate
+            logger.error("VoxCPM2 initialization failed: %s", exc, exc_info=True)
+            raise RuntimeError(
+                f"VoxCPM2 engine failed to initialize: {exc}. "
+                "Strict model execution enforced — fallback to other models is forbidden."
+            ) from exc
 
     def create_prompt(self, ref_audio: Path, ref_text: str):
-        if self._model is not None:
-            # VoxCPM2 builds prompt cache internally per-generate
-            return {"ref_audio": str(ref_audio), "ref_text": ref_text}
-        if self._fallback_omni:
-            return self._fallback_omni.create_prompt(ref_audio, ref_text)
-        return None
+        return {"ref_audio": str(ref_audio), "ref_text": ref_text}
 
     def clone(self, text, language, ref_audio, ref_text, speed, prompt=None):
-        if self._model is not None:
-            # 28 timesteps provides studio-grade harmonic fidelity at 48kHz on Mac MPS/CUDA
+        if self._model is None:
+            raise RuntimeError("VoxCPM2 model is not loaded.")
+
+        prompt_wav = str(ref_audio) if ref_audio else None
+        prompt_txt = ref_text.strip() if ref_text and ref_text.strip() else None
+
+        # Official OpenBMB VoxCPM2 Ultimate Cloning:
+        # Both prompt_wav_path and prompt_text paired with reference_wav_path
+        # produces maximum speaker timbre fidelity and crystal-clear pronunciation.
+        if prompt_wav and prompt_txt:
             return self._model.generate(
                 text=text,
-                prompt_wav_path=str(ref_audio),
-                prompt_text=ref_text,
-                cfg_value=2.4,
-                inference_timesteps=28,
+                prompt_wav_path=prompt_wav,
+                prompt_text=prompt_txt,
+                reference_wav_path=prompt_wav,
+                cfg_value=2.0,
+                inference_timesteps=10,
             )
-        if self._fallback_omni is not None:
-            return self._fallback_omni.clone(text, language, ref_audio, ref_text, speed, prompt=prompt)
-        raise RuntimeError("No voice clone engine is active.")
+        elif prompt_wav:
+            return self._model.generate(
+                text=text,
+                reference_wav_path=prompt_wav,
+                cfg_value=2.0,
+                inference_timesteps=10,
+            )
+        else:
+            return self._model.generate(
+                text=text,
+                cfg_value=2.0,
+                inference_timesteps=10,
+            )
 
 
 def _resolve_device(device: str) -> str:
@@ -303,12 +338,13 @@ class VoiceCloneService:
         )
         prompt = getattr(engine, "create_prompt", lambda p, t: None)(clean_ref_path, clean_ref_text)
 
-        # Handle sentence chunking for long text so OmniVoice synthesizes cleanly
-        sentences = split_sentences(text, max_chunk_len=90)
+        # Handle sentence chunking: VoxCPM2 handles up to 220 characters smoothly in a single flow
+        max_chunk = 220 if isinstance(engine, VoxCPM2Engine) else 90
+        sentences = split_sentences(text, max_chunk_len=max_chunk)
         chunks = []
         curr = ""
         for s in sentences:
-            if curr and len(curr) + len(s) > 90:
+            if curr and len(curr) + len(s) > max_chunk:
                 chunks.append(curr.strip())
                 curr = s
             else:

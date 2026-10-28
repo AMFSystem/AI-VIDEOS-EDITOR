@@ -191,13 +191,13 @@ export function Topbar({
       </div>
 
       <div className="topbar-center">
-        <button className="ghost-action" type="button" title={`${t("undo")} · ${shortcutModifier}+Z`} onClick={(event) => { undo(); releasePointerActivatedFocus(event); }}>
+        <button className="ghost-action topbar-undo-btn" type="button" title={`${t("undo")} · ${shortcutModifier}+Z`} onClick={(event) => { undo(); releasePointerActivatedFocus(event); }}>
           <ArrowCounterClockwise size={16} />
-          {t("undo")}
+          <span>{t("undo")}</span>
         </button>
-        <button className="ghost-action" type="button" title={`${t("redo")} · ${shortcutModifier}+Shift+Z`} onClick={(event) => { redo(); releasePointerActivatedFocus(event); }}>
+        <button className="ghost-action topbar-redo-btn" type="button" title={`${t("redo")} · ${shortcutModifier}+Shift+Z`} onClick={(event) => { redo(); releasePointerActivatedFocus(event); }}>
           <ArrowClockwise size={16} />
-          {t("redo")}
+          <span>{t("redo")}</span>
         </button>
         <span className="divider" />
         <div className="menu-anchor" ref={ratioAnchorRef}>
@@ -273,7 +273,7 @@ export function Topbar({
         </button>
         <button className="preview-button" type="button" title={`${t("shortcutPlayPause")} · Space`} onClick={(event) => { handlePlayToggle(); releasePointerActivatedFocus(event); }}>
           {isPlaying ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}
-          {t("preview")}
+          <span>{t("preview")}</span>
         </button>
         <div className="menu-anchor" ref={exportAnchorRef}>
           <button
@@ -284,7 +284,9 @@ export function Topbar({
             onClick={() => setShowExportMenu((open) => !open)}
           >
             <FileArrowDown size={17} weight="bold" />
-            {exporting ? t("exporting") : t(exportSettings.mediaType === "audio" ? "audioExportTitle" : "exportVideo")}
+            <span className="export-button-text">
+              {exporting ? t("exporting") : t(exportSettings.mediaType === "audio" ? "audioExportTitle" : "exportVideo")}
+            </span>
             {!exporting ? <CaretDown size={13} weight="bold" /> : null}
           </button>
           {showExportMenu ? (

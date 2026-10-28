@@ -73,7 +73,7 @@ async def create_clone_job(
     reference_text: str | None = Form(None, description="Transcript of reference_audio; transcribed automatically if omitted"),
     lang: Literal["auto", "km", "en"] = Form("auto"),
     speed: float = Form(1.0, ge=0.5, le=2.0),
-    model: str = Form("omnivoice"),
+    model: str = Form("voxcpm2"),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
@@ -88,13 +88,14 @@ async def create_clone_job(
     if len(text) > settings.clone_max_chars:
         raise HTTPException(413, f"Text exceeds {settings.clone_max_chars} characters")
 
-    # Strict model engine normalization
-    target_engine = (model or "omnivoice").strip().lower()
-    if target_engine not in ("voxcpm2", "voxcpm", "omnivoice", "f5_tts", "f5tts"):
-        raise HTTPException(
-            400,
-            f"Unsupported clone model: '{model}'. Strictly supported engines are 'voxcpm2' (OpenBMB 48kHz) and 'omnivoice' (F5-TTS 24kHz)."
-        )
+    # Strict model engine normalization (VoxCPM2 default)
+    target_engine = (model or getattr(settings, "clone_engine_default", "voxcpm2") or "voxcpm2").strip().lower()
+    if target_engine in ("voxcpm", "voxcpm2", "vox_cpm", "cpm"):
+        target_engine = "voxcpm2"
+    elif target_engine in ("omnivoice", "f5_tts", "f5tts"):
+        target_engine = "omnivoice"
+    else:
+        target_engine = "voxcpm2"
 
     job_id = uuid.uuid4().hex
     common = dict(id=job_id, user_id=str(user.id), text=text.strip(), lang=lang, speed=speed, model_engine=target_engine)
@@ -102,6 +103,8 @@ async def create_clone_job(
     if voice_id is not None and str(voice_id).strip():
         voice_str = str(voice_id).strip()
         if voice_str.startswith("trained_"):
+            # STRICT REQUIREMENT: All trained voice models MUST run exclusively on VoxCPM2 at full power!
+            common["model_engine"] = "voxcpm2"
             trained_dir = settings.model_dir / "trained_voices"
             target_manifest = None
             target_ref_audio = None

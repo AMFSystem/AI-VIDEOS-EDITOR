@@ -4179,13 +4179,15 @@
   margin-top: 4px;
 }
 
-/* OmniVoice Theme */
+/* VoxCPM2 & OmniVoice Theme */
+.vs-orb-voxcpm2,
 .vs-orb-omnivoice {
   background: radial-gradient(circle at 35% 30%, rgba(245, 158, 11, 0.28) 0%, rgba(217, 119, 6, 0.12) 50%, rgba(8, 14, 30, 0.95) 85%);
   border: 3px solid rgba(245, 158, 11, 0.45);
   box-shadow: 0 0 35px rgba(245, 158, 11, 0.35), inset 0 0 25px rgba(245, 158, 11, 0.25);
 }
 
+.vs-orb-voxcpm2 .vs-3d-progress-orb-glow,
 .vs-orb-omnivoice .vs-3d-progress-orb-glow {
   position: absolute;
   inset: -8px;
@@ -4194,6 +4196,7 @@
   animation: spin 12s linear infinite;
 }
 
+.vs-orb-voxcpm2 .vs-3d-progress-orb-inner-ring,
 .vs-orb-omnivoice .vs-3d-progress-orb-inner-ring {
   position: absolute;
   inset: 5px;
@@ -4202,6 +4205,7 @@
   animation: spinReverse 8s linear infinite;
 }
 
+.vs-orb-voxcpm2 .vs-3d-pct-text,
 .vs-orb-omnivoice .vs-3d-pct-text {
   font-size: 34px;
   font-weight: 900;
@@ -4212,6 +4216,7 @@
   line-height: 1;
 }
 
+.vs-orb-voxcpm2 .vs-3d-pct-label,
 .vs-orb-omnivoice .vs-3d-pct-label {
   font-size: 10px;
   font-weight: 800;

@@ -33,13 +33,29 @@ app.use("/storage", express.static(fileManager.baseDir));
 app.use("/api", apiRouter);
 
 // Production Static Frontend Hosting
-if (fs.existsSync(frontendDist)) {
-  app.use(express.static(frontendDist));
+let resolvedDist = frontendDist;
+if (!fs.existsSync(resolvedDist)) {
+  const candidates = [
+    path.resolve(__dirname, "../../frontend/dist"),
+    path.resolve(__dirname, "../frontend/dist"),
+    path.resolve(__dirname, "../dist"),
+    path.resolve(__dirname, "../../dist"),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) {
+      resolvedDist = c;
+      break;
+    }
+  }
+}
+
+if (fs.existsSync(resolvedDist)) {
+  app.use(express.static(resolvedDist));
   app.get("*", (req, res, next) => {
     if (req.path.startsWith("/api") || req.path.startsWith("/storage")) {
       return next();
     }
-    res.sendFile(path.join(frontendDist, "index.html"));
+    res.sendFile(path.join(resolvedDist, "index.html"));
   });
 }
 

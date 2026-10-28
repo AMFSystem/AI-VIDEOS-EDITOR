@@ -13,6 +13,7 @@ const isolationHeaders = {
 };
 
 export default defineConfig({
+  base: "./",
   build: {
     rollupOptions: {
       input: {

@@ -56,7 +56,7 @@ class CloneJob:
     speed: float
     work_dir: Path
     reference_path: Path
-    model_engine: str = "omnivoice"
+    model_engine: str = "voxcpm2"
     delete_reference: bool = True  # False for saved voices, whose audio must be kept
     ref_text: str | None = None
     ref_text_source: RefTextSource = "provided"

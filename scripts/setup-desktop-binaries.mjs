@@ -50,3 +50,21 @@ if (ffmpegOk && ffprobeOk) {
   console.log(`[Setup Binaries] ⚠️ Please ensure static FFmpeg and FFprobe binaries are placed in ${binDir}`);
 }
 
+// Ensure critical backend dependencies (like cors, express, ws) are present in backend/node_modules
+const backendNodeModules = path.join(rootDir, "backend", "node_modules");
+const rootNodeModules = path.join(rootDir, "node_modules");
+if (!fs.existsSync(backendNodeModules)) {
+  fs.mkdirSync(backendNodeModules, { recursive: true });
+}
+
+const requiredDeps = ["cors", "express", "ws"];
+for (const dep of requiredDeps) {
+  const targetDep = path.join(backendNodeModules, dep);
+  const srcDep = path.join(rootNodeModules, dep);
+  if (!fs.existsSync(targetDep) && fs.existsSync(srcDep)) {
+    console.log(`[Setup Binaries] Copying hoisted dependency '${dep}' to backend/node_modules...`);
+    fs.cpSync(srcDep, targetDep, { recursive: true });
+  }
+}
+
+

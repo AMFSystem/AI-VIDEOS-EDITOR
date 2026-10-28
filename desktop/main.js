@@ -199,6 +199,7 @@ async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegCo
   console.log("[Desktop] Packaged mode:", isPackaged);
   console.log("[Desktop] Storage directory:", storageDir);
   console.log("[Desktop] Models directory:", modelsDir);
+  console.log("[Desktop] Frontend dist path:", frontendDist);
   console.log("[Desktop] FFmpeg binary:", ffmpegConfig.ffmpegPath);
 
   const env = {
@@ -217,29 +218,44 @@ async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegCo
 
   let execCmd;
   if (isPackaged) {
-    // In packaged Electron, execute using Electron's internal Node engine
     execCmd = process.execPath;
     env.ELECTRON_RUN_AS_NODE = "1";
   } else {
     execCmd = isWindows ? "node.exe" : "node";
   }
 
-  backendProcess = spawn(execCmd, [backendScript], {
-    cwd: backendCwd,
-    env,
-    stdio: "inherit",
-    shell: !isPackaged && isWindows,
-  });
+  const logDir = path.join(app.getPath("userData"), "logs");
+  try {
+    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+  } catch {}
+  const logFile = path.join(logDir, "backend.log");
+  const logStream = fs.createWriteStream(logFile, { flags: "a" });
 
-  backendProcess.on("exit", (code) => {
-    if (code !== 0 && code !== null) {
-      console.error(`[Desktop] Local backend exited with code ${code}`);
-    }
-    backendProcess = null;
-  });
+  try {
+    backendProcess = spawn(execCmd, [backendScript], {
+      cwd: backendCwd,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: false,
+    });
+
+    backendProcess.stdout?.pipe(logStream);
+    backendProcess.stderr?.pipe(logStream);
+    backendProcess.stdout?.on("data", (d) => console.log(`[Backend] ${d}`));
+    backendProcess.stderr?.on("data", (d) => console.error(`[Backend ERR] ${d}`));
+
+    backendProcess.on("exit", (code) => {
+      if (code !== 0 && code !== null) {
+        console.error(`[Desktop] Local backend exited with code ${code}`);
+      }
+      backendProcess = null;
+    });
+  } catch (err) {
+    console.error("[Desktop] Failed to spawn backend process:", err);
+  }
 
   // Wait for port 3001 to come online
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 40; i++) {
     await new Promise((r) => setTimeout(r, 250));
     if (await checkPortOpen(3001)) {
       console.log("[Desktop] Local backend successfully online on port 3001");
@@ -257,7 +273,12 @@ async function createWindow() {
   let modelsDir;
 
   if (isPackaged) {
-    frontendDist = path.join(__dirname, "dist");
+    const candidateDists = [
+      path.join(resourcesPath, "frontend", "dist"),
+      path.join(resourcesPath, "dist"),
+      path.join(__dirname, "dist"),
+    ];
+    frontendDist = candidateDists.find((d) => fs.existsSync(d)) || candidateDists[0];
     modelsDir = path.join(app.getPath("userData"), "models");
     storageDir = path.join(app.getPath("userData"), "storage");
   } else {
@@ -302,6 +323,26 @@ async function createWindow() {
     mainWindow.show();
   });
 
+  const getFallbackHtmlPath = () => {
+    const candidates = isPackaged
+      ? [
+          path.join(resourcesPath, "frontend", "dist", "index.html"),
+          path.join(resourcesPath, "dist", "index.html"),
+          path.join(__dirname, "dist", "index.html"),
+        ]
+      : [path.resolve(__dirname, "../frontend/dist/index.html")];
+    return candidates.find((f) => fs.existsSync(f)) || candidates[0];
+  };
+
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.warn(`[Desktop] Page failed to load: ${validatedURL} (${errorCode}: ${errorDescription})`);
+    if (!validatedURL.startsWith("file://")) {
+      const fallback = getFallbackHtmlPath();
+      console.log("[Desktop] Falling back to file load:", fallback);
+      mainWindow.loadFile(fallback);
+    }
+  });
+
   if (!isPackaged) {
     const isDevRunning = await checkPortOpen(5173);
     if (isDevRunning) {
@@ -313,13 +354,17 @@ async function createWindow() {
     }
   }
 
-  // Priority: Production Local Backend Server (serves frontend/dist + API with COOP/COEP headers)
-  mainWindow.loadURL("http://127.0.0.1:3001").catch(() => {
-    const distPath = isPackaged
-      ? path.join(__dirname, "dist", "index.html")
-      : path.join(__dirname, "../frontend/dist/index.html");
-    mainWindow.loadFile(distPath);
-  });
+  const isBackendRunning = await checkPortOpen(3001);
+  if (isBackendRunning) {
+    console.log("[Desktop] Connecting to local server on http://127.0.0.1:3001");
+    mainWindow.loadURL("http://127.0.0.1:3001").catch((err) => {
+      console.warn("[Desktop] Failed loadURL to port 3001, loading file directly:", err);
+      mainWindow.loadFile(getFallbackHtmlPath());
+    });
+  } else {
+    console.warn("[Desktop] Backend port 3001 not responding, loading file directly");
+    mainWindow.loadFile(getFallbackHtmlPath());
+  }
 
   mainWindow.on("closed", () => {
     mainWindow = null;

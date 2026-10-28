@@ -45,6 +45,10 @@
         "to": "backend/node_modules"
       },
       {
+        "from": "../frontend/dist",
+        "to": "frontend/dist"
+      },
+      {
         "from": "bin",
         "to": "bin"
       }

@@ -124,7 +124,7 @@ export function VoiceCloneStudioPage({
   const [showAdvancedModal, setShowAdvancedModal] = useState(false);
   const [ttsSpeed, setTtsSpeed] = useState(1.0);
   const [ttsPitch, setTtsPitch] = useState(1.0);
-  const [ttsModelEngine, setTtsModelEngine] = useState("omnivoice"); // "omnivoice" | "gemini"
+  const [ttsModelEngine, setTtsModelEngine] = useState("voxcpm2"); // "voxcpm2" | "gemini"
 
   // Text Area Input
   const [ttsText, setTtsText] = useState(
@@ -380,11 +380,14 @@ export function VoiceCloneStudioPage({
     );
   }, [activeVoice, apiVoices]);
 
-  // Dynamically resolved synthesis engine for OmniVoice and Gemini 2.5 Flash Native Voice
+  // Dynamically resolved synthesis engine: strictly enforce VoxCPM2 for trained voices and full power synthesis
   const activeResolvedEngine = useMemo(() => {
+    if (activeVoice?.isTrainedModel || String(activeVoice?.id).startsWith("trained_")) {
+      return "voxcpm2";
+    }
     if (ttsModelEngine === "gemini") return "gemini";
-    return "omnivoice";
-  }, [ttsModelEngine]);
+    return "voxcpm2";
+  }, [activeVoice, ttsModelEngine]);
 
   // Keep selectedVoiceId in sync when voices change
   useEffect(() => {
@@ -599,9 +602,11 @@ export function VoiceCloneStudioPage({
     const abortCtrl = new AbortController();
     abortControllerRef.current = abortCtrl;
 
-    const baseEngineName = resolvedEngine === "gemini"
+    const baseEngineName = resolvedEngine === "voxcpm2"
+      ? "✨ VoxCPM2 48kHz Studio Quality (OpenBMB - ពេញកម្លាំង Full Power)"
+      : resolvedEngine === "gemini"
       ? "🌐 Google Gemini 2.5 Flash Native Voice (Cloud Real-Time HD)"
-      : "⚡ OmniVoice + AI Gemini (F5-TTS 36-Step - Full Power)";
+      : "✨ VoxCPM2 48kHz Neural Studio";
 
     const displayEngineLabel = baseEngineName;
 
@@ -643,7 +648,7 @@ export function VoiceCloneStudioPage({
       if (autoDirectOnGenerate && geminiApiKey && scriptToSynthesize) {
         setPipelineStageIndex(0);
         targetProgress = 18;
-        const targetModelLabel = resolvedEngine === "omnivoice" ? "OmniVoice F5-TTS" : resolvedEngine === "gemini" ? "Gemini Native" : "Meta MMS";
+        const targetModelLabel = resolvedEngine === "voxcpm2" ? "VoxCPM2 48kHz" : resolvedEngine === "gemini" ? "Gemini Native" : "VoxCPM2 48kHz";
         setGenerationStage(`🎬 Gemini Director: កំពុងវិភាគស៊ីជម្រៅ & រៀបចំសូរសំឡេងសម្រាប់ ${targetModelLabel}...`);
         setGenerationStatusText(`Gemini Director កំពុងវិភាគចេតនា និងផ្គូផ្គងជាមួយ ${targetModelLabel}...`);
         try {
@@ -787,7 +792,7 @@ export function VoiceCloneStudioPage({
           throw fetchErr;
         }
       } else {
-        // --- 3. STRICT EXECUTION: NEURAL VOICE CLONE (VoxCPM2 48kHz OR OmniVoice F5-TTS 32-Step) ---
+        // --- 3. STRICT EXECUTION: NEURAL VOICE CLONE (VoxCPM2 48kHz Studio Quality Full Power) ---
         setPipelineStageIndex(1);
         targetProgress = 28;
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(activeVoice?.id));
@@ -802,7 +807,7 @@ export function VoiceCloneStudioPage({
         formData.append("consent", "true");
         formData.append("lang", selectedLang);
         formData.append("speed", String(Math.max(0.5, Math.min(2.0, ttsSpeed))));
-        formData.append("model", resolvedEngine || "omnivoice"); // Auto-detected or strictly chosen model
+        formData.append("model", "voxcpm2"); // Strictly execute on VoxCPM2 at full power
 
         if (isSavedBackendVoice) {
           formData.append("voice_id", activeVoice.id);
@@ -1707,7 +1712,7 @@ export function VoiceCloneStudioPage({
                   value={ttsModelEngine}
                   onChange={(e) => setTtsModelEngine(e.target.value)}
                 >
-                  <option value="omnivoice">⚡ OmniVoice + AI Gemini (F5-TTS 36-Step Flow-Matching - Full Power)</option>
+                  <option value="voxcpm2">✨ VoxCPM2 48kHz Neural Studio (OpenBMB - ពេញកម្លាំង Full Power)</option>
                   <option value="gemini">🌐 Google Gemini 2.5 Flash Native Voice (Cloud Real-Time HD)</option>
                 </select>
               </div>
@@ -2005,7 +2010,7 @@ export function VoiceCloneStudioPage({
                       </div>
 
                       {/* 3D Dynamic Glowing Orb */}
-                      <div className={`vs-3d-progress-orb vs-orb-${activeResolvedEngine || "omnivoice"}`}>
+                      <div className={`vs-3d-progress-orb vs-orb-${activeResolvedEngine || "voxcpm2"}`}>
                         <div className="vs-3d-progress-orb-glow" />
                         <div className="vs-3d-progress-orb-inner-ring" />
                         <div className="vs-3d-orb-content">
@@ -2069,7 +2074,7 @@ export function VoiceCloneStudioPage({
                           }}>
                             {activeResolvedEngine === "gemini"
                               ? "🌐 Google Gemini 2.5 Flash Native Voice"
-                              : "⚡ OmniVoice + AI Gemini (F5-TTS Full Power)"}
+                              : "✨ VoxCPM2 48kHz Studio Quality (ពេញកម្លាំង Full Power)"}
                           </strong>
                         </div>
                         <div className="vs-3d-metric-badge">
@@ -2216,7 +2221,7 @@ export function VoiceCloneStudioPage({
                   <span className="vs-director-val">
                     {activeResolvedEngine === "gemini"
                       ? "🌐 Google Gemini 2.5 Flash Native Voice"
-                      : "⚡ OmniVoice + AI Gemini (F5-TTS Full Power)"}
+                      : "✨ VoxCPM2 48kHz Studio Quality (ពេញកម្លាំង Full Power)"}
                   </span>
                 </div>
                 <div className="vs-director-card">

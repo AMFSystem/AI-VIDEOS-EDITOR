@@ -185,15 +185,15 @@ class VoiceTrainingService:
             cut_cmd = [
                 "ffmpeg", "-y", "-ss", f"{start_s:.3f}", "-to", f"{end_s:.3f}",
                 "-i", str(audio_file),
-                "-af", "highpass=f=60,lowpass=f=11500,loudnorm=I=-16:TP=-1.5:LRA=11",
-                "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le",
+                "-af", "highpass=f=40,loudnorm=I=-16:TP=-1.5:LRA=11",
+                "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le",
                 str(chunk_path)
             ]
             subprocess.run(cut_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-            # Transcribe chunks with Whisper STT for accurate phoneme alignment
+            # Transcribe chunks with Khmer Whisper STT for accurate phoneme alignment
             text = ""
-            if idx < 6:
+            if idx < 15:
                 try:
                     res = self._stt.transcribe(chunk_path)
                     text = res.text.strip()
@@ -358,12 +358,13 @@ class VoiceTrainingService:
                     except Exception as exc:
                         logger.warning("Could not transcribe reference audio: %s", exc)
 
-            # Write manifest with exact verified transcript
+            # Write manifest with exact verified transcript & strict VoxCPM2 engine binding
             manifest = {
                 "id": f"trained_{job.id}",
                 "name": job.model_name,
                 "type": "trained_voice",
-                "base_architecture": "VoxCPM2 48kHz Foundation",
+                "base_architecture": "VoxCPM2 48kHz Foundation (Full Power)",
+                "engine": "voxcpm2",
                 "language": job.language,
                 "epochs": job.epochs,
                 "final_loss": job.current_loss,

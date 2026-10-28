@@ -56,12 +56,12 @@ class Settings(BaseSettings):
     tts_max_chars: int = 5000
     tts_preload: bool = True
 
-    # Voice cloning (OmniVoice & VoxCPM2). NOTE: OmniVoice is CC-BY-NC, VoxCPM2 is Apache-2.0.
+    # Voice cloning (OmniVoice & VoxCPM2). VoxCPM2 is Apache-2.0 48kHz Foundation.
     clone_model: str = "k2-fsa/OmniVoice"
     clone_model_revision: str = "c5fdb5ccb189668d56333f77ba2629f4cd7535f4"
     clone_voxcpm_model: str = "openbmb/VoxCPM2"
-    clone_engine_default: str = "omnivoice"
-    clone_device: str = "auto"  # auto -> cuda, then mps (Apple Silicon), then cpu
+    clone_engine_default: str = "voxcpm2"
+    clone_device: str = "auto"  # auto -> cuda if available, else cpu for optimal bfloat16
     clone_max_chars: int = 5000
     clone_ref_min_s: float = 3.0
     clone_ref_max_s: float = 30.0
