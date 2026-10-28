@@ -103,8 +103,10 @@ export function VoiceCloneStudioPage({
   notify = console.log,
   onOpenModelsManager,
 }) {
-  // Navigation View: "tts" (Main Studio & Library) | "clone" | "voice_fl" | "train" | "stt"
-  const [activeTab, setActiveTab] = useState(initialTab || "tts");
+  // Navigation View: "tts" (Main Studio & Library) | "train" | "stt"
+  const [activeTab, setActiveTab] = useState(
+    initialTab && initialTab !== "clone" && initialTab !== "voice_fl" ? initialTab : "tts"
+  );
 
   // Selected Voice in Library
   const [selectedVoiceId, setSelectedVoiceId] = useState(null);
@@ -122,8 +124,7 @@ export function VoiceCloneStudioPage({
   const [showAdvancedModal, setShowAdvancedModal] = useState(false);
   const [ttsSpeed, setTtsSpeed] = useState(1.0);
   const [ttsPitch, setTtsPitch] = useState(1.0);
-  const [ttsModelEngine, setTtsModelEngine] = useState("voxcpm2"); // "voxcpm2" | "omnivoice"
-  const [cloneModelEngine, setCloneModelEngine] = useState("voxcpm2"); // "voxcpm2" | "omnivoice"
+  const [ttsModelEngine, setTtsModelEngine] = useState("omnivoice"); // "omnivoice" | "gemini"
 
   // Text Area Input
   const [ttsText, setTtsText] = useState(
@@ -210,64 +211,6 @@ export function VoiceCloneStudioPage({
   const [newVoiceAutoTranscribing, setNewVoiceAutoTranscribing] = useState(false);
   const [newVoiceError, setNewVoiceError] = useState(null);
   const [newVoiceBusy, setNewVoiceBusy] = useState(false);
-
-  // --- TAB 2: Voice Clone Tab State ---
-  const [cloneRefFile, setCloneRefFile] = useState(null);
-  const [cloneRefDuration, setCloneRefDuration] = useState(null);
-  const [cloneRefTranscript, setCloneRefTranscript] = useState("");
-  const [cloneRefAudioUrl, setCloneRefAudioUrl] = useState(null);
-  const [cloneTargetText, setCloneTargetText] = useState(
-    "សួស្តី! នេះគឺជាសំឡេងដែលត្រូវបានក្លូន (Cloned Voice) តាមរយៈបច្ចេកវិទ្យា AI ដ៏ទំនើប។"
-  );
-  const [cloneSpeed, setCloneSpeed] = useState(1.0);
-  const [cloneLang, setCloneLang] = useState("auto");
-  const [cloneConsent, setCloneConsent] = useState(true);
-  const [cloneAlias, setCloneAlias] = useState("");
-  const [cloneBusy, setCloneBusy] = useState(false);
-  const [cloneStatusText, setCloneStatusText] = useState("");
-  const [cloneProgressPercent, setCloneProgressPercent] = useState(0);
-  const [cloneProgressStage, setCloneProgressStage] = useState("");
-  const [cloneResultUrl, setCloneResultUrl] = useState(null);
-  const [cloneResultBlob, setCloneResultBlob] = useState(null);
-  const [cloneAutoTranscribing, setCloneAutoTranscribing] = useState(false);
-  const [audioAnalysis, setAudioAnalysis] = useState(null);
-  const [isAnalyzingAudio, setIsAnalyzingAudio] = useState(false);
-  const [waveformBars, setWaveformBars] = useState([]);
-  const [cloneRefPlaying, setCloneRefPlaying] = useState(false);
-  const [cloneRefCurrentTime, setCloneRefCurrentTime] = useState(0);
-  const cloneRefAudioElRef = useRef(null);
-
-  const [cloneResPlaying, setCloneResPlaying] = useState(false);
-  const [cloneResCurrentTime, setCloneResCurrentTime] = useState(0);
-  const [cloneResDuration, setCloneResDuration] = useState(0);
-  const cloneResAudioElRef = useRef(null);
-
-  const formatAudioTime = (sec) => {
-    if (!sec || isNaN(sec)) return "00:00";
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  };
-
-  const togglePlayRefAudio = () => {
-    if (!cloneRefAudioElRef.current) return;
-    if (cloneRefPlaying) {
-      cloneRefAudioElRef.current.pause();
-      setCloneRefPlaying(false);
-    } else {
-      cloneRefAudioElRef.current.play().then(() => setCloneRefPlaying(true)).catch(() => {});
-    }
-  };
-
-  const togglePlayResAudio = () => {
-    if (!cloneResAudioElRef.current) return;
-    if (cloneResPlaying) {
-      cloneResAudioElRef.current.pause();
-      setCloneResPlaying(false);
-    } else {
-      cloneResAudioElRef.current.play().then(() => setCloneResPlaying(true)).catch(() => {});
-    }
-  };
 
   // --- TAB 3: Speech to Text Tab State ---
   const [sttFile, setSttFile] = useState(null);
@@ -437,10 +380,10 @@ export function VoiceCloneStudioPage({
     );
   }, [activeVoice, apiVoices]);
 
-  // Dynamically resolved synthesis engine for VoxCPM2, OmniVoice, and Gemini 2.5 Flash Native Voice
+  // Dynamically resolved synthesis engine for OmniVoice and Gemini 2.5 Flash Native Voice
   const activeResolvedEngine = useMemo(() => {
     if (ttsModelEngine === "gemini") return "gemini";
-    return ttsModelEngine === "omnivoice" ? "omnivoice" : "voxcpm2";
+    return "omnivoice";
   }, [ttsModelEngine]);
 
   // Keep selectedVoiceId in sync when voices change
@@ -658,8 +601,6 @@ export function VoiceCloneStudioPage({
 
     const baseEngineName = resolvedEngine === "gemini"
       ? "🌐 Google Gemini 2.5 Flash Native Voice (Cloud Real-Time HD)"
-      : resolvedEngine === "voxcpm2"
-      ? "✨ VoxCPM2 + AI Gemini (48kHz Deep Neural - Full Power)"
       : "⚡ OmniVoice + AI Gemini (F5-TTS 36-Step - Full Power)";
 
     const displayEngineLabel = baseEngineName;
@@ -702,7 +643,7 @@ export function VoiceCloneStudioPage({
       if (autoDirectOnGenerate && geminiApiKey && scriptToSynthesize) {
         setPipelineStageIndex(0);
         targetProgress = 18;
-        const targetModelLabel = resolvedEngine === "voxcpm2" ? "VoxCPM2 48kHz" : resolvedEngine === "omnivoice" ? "OmniVoice F5-TTS" : resolvedEngine === "gemini" ? "Gemini Native" : "Meta MMS";
+        const targetModelLabel = resolvedEngine === "omnivoice" ? "OmniVoice F5-TTS" : resolvedEngine === "gemini" ? "Gemini Native" : "Meta MMS";
         setGenerationStage(`🎬 Gemini Director: កំពុងវិភាគស៊ីជម្រៅ & រៀបចំសូរសំឡេងសម្រាប់ ${targetModelLabel}...`);
         setGenerationStatusText(`Gemini Director កំពុងវិភាគចេតនា និងផ្គូផ្គងជាមួយ ${targetModelLabel}...`);
         try {
@@ -1108,284 +1049,6 @@ export function VoiceCloneStudioPage({
       notify("បញ្ហា Speech-to-Text: " + err.message, "error");
     } finally {
       setBusyState(false);
-    }
-  };
-
-  // Client-side Web Audio Sound Analysis
-  const analyzeAudioFile = async (file) => {
-    if (!file) return;
-    setIsAnalyzingAudio(true);
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AudioCtx();
-      const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
-
-      const rawData = audioBuffer.getChannelData(0);
-      const sampleRate = audioBuffer.sampleRate;
-      const length = rawData.length;
-
-      // Compute RMS Energy & Peak
-      let sumSquares = 0;
-      let peak = 0;
-      let zeroCrossings = 0;
-      for (let i = 0; i < length; i++) {
-        const val = rawData[i];
-        sumSquares += val * val;
-        if (Math.abs(val) > peak) peak = Math.abs(val);
-        if (i > 0 && ((val >= 0 && rawData[i - 1] < 0) || (val < 0 && rawData[i - 1] >= 0))) {
-          zeroCrossings++;
-        }
-      }
-      const rms = Math.sqrt(sumSquares / length);
-      const estPitchHz = Math.round(zeroCrossings / (2 * (length / sampleRate)));
-
-      // Heuristic Signal to Noise & Clarity
-      const dynamicRangeDb = Math.min(60, Math.max(10, Math.round(20 * Math.log10(peak / (rms || 0.001)) * 3.5)));
-      const clarityScore = Math.min(99, Math.max(65, Math.round(85 + (peak > 0.4 ? 8 : -5) - (rms < 0.03 ? 12 : 0))));
-      const snrEstimated = Math.min(45, Math.max(18, Math.round(dynamicRangeDb * 0.75)));
-
-      let qualityGrade = "A+ (ស្ដង់ដារ Studio)";
-      if (clarityScore < 80) qualityGrade = "B (កម្រិតមធ្យម)";
-      else if (clarityScore < 90) qualityGrade = "A (កម្រិតច្បាស់ល្អ)";
-
-      const analysisData = {
-        sampleRate: `${(sampleRate / 1000).toFixed(1)} kHz`,
-        channels: audioBuffer.numberOfChannels === 1 ? "Mono" : "Stereo",
-        durationSec: audioBuffer.duration.toFixed(1),
-        rmsDb: `${(20 * Math.log10(rms || 0.001)).toFixed(1)} dB`,
-        peakDb: `${(20 * Math.log10(peak || 0.001)).toFixed(1)} dB`,
-        clarity: `${clarityScore}%`,
-        snr: `${snrEstimated} dB`,
-        pitch: estPitchHz > 60 && estPitchHz < 500 ? `${estPitchHz} Hz` : "165 Hz (Natural Voice)",
-        qualityGrade,
-        noiseFloor: snrEstimated > 30 ? "Low Noise" : "Moderate Noise"
-      };
-
-      // Compute 48 normalized waveform bars for visualizer
-      const barCount = 48;
-      const blockSize = Math.floor(length / barCount);
-      const bars = [];
-      for (let b = 0; b < barCount; b++) {
-        let blockStart = b * blockSize;
-        let sum = 0;
-        for (let j = 0; j < blockSize; j++) {
-          sum += Math.abs(rawData[blockStart + j] || 0);
-        }
-        let avg = sum / (blockSize || 1);
-        bars.push(Math.min(100, Math.max(14, Math.round(avg * 500))));
-      }
-      setWaveformBars(bars);
-
-      setAudioAnalysis(analysisData);
-      await ctx.close();
-    } catch (err) {
-      console.warn("Audio analysis fallback:", err);
-      setAudioAnalysis({
-        sampleRate: "44.1 kHz",
-        channels: "Stereo",
-        durationSec: cloneRefDuration ? cloneRefDuration.toFixed(1) : "12.0",
-        clarity: "92%",
-        snr: "32 dB",
-        pitch: "172 Hz",
-        qualityGrade: "A (កម្រិតច្បាស់ល្អ)",
-        noiseFloor: "ទាប (Low Noise ✓)"
-      });
-    } finally {
-      setIsAnalyzingAudio(false);
-    }
-  };
-
-  // --- TAB 2: Instant Voice Clone Action with Percent Progress ---
-  const handleInstantClone = async () => {
-    if (!cloneRefFile) {
-      notify("សូមជ្រើសរើសឯកសារសំឡេងគំរូ 3s - 30s!", "warning");
-      return;
-    }
-    if (!cloneTargetText.trim()) {
-      notify("សូមបញ្ចូលអត្ថបទដែលចង់ឱ្យសំឡេង Cloned និយាយ!", "warning");
-      return;
-    }
-    if (!cloneConsent) {
-      notify("សូមចុចបញ្ជាក់ការយល់ព្រម Consent ជាមុនសិន!", "warning");
-      return;
-    }
-
-    setCloneBusy(true);
-    setCloneProgressPercent(5);
-    setCloneProgressStage("Uploading Reference Audio");
-    setCloneStatusText("កំពុងបញ្ជូនឯកសារសំឡេង និងវិភាគរលកសូរសំឡេង (Audio Features)...");
-
-    try {
-      const formData = new FormData();
-      formData.append("reference_audio", cloneRefFile);
-      formData.append("text", cloneTargetText.trim());
-      formData.append("consent", "true");
-      formData.append("lang", cloneLang);
-      formData.append("speed", String(Math.max(0.5, Math.min(2.0, cloneSpeed))));
-      formData.append("model", cloneModelEngine || "omnivoice");
-      if (cloneRefTranscript.trim()) {
-        formData.append("reference_text", cloneRefTranscript.trim());
-      }
-
-      setCloneProgressPercent(15);
-      setCloneProgressStage("Connecting AI Server");
-
-      const postRes = await fetch("/api/v1/clone", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${BONDETH_AUTH_TOKEN}` },
-        body: formData
-      });
-
-      if (!postRes.ok) {
-        const errData = await postRes.json().catch(() => ({}));
-        throw new Error(errData.detail || `Clone job failed with HTTP ${postRes.status}`);
-      }
-
-      let job = await postRes.json();
-      setCloneProgressPercent(30);
-      setCloneProgressStage("Voice Extraction & Embedding");
-      setCloneStatusText(`ស្ថានភាពការងារ: ${job.status}...`);
-
-      let attempts = 0;
-      let simulatedProgress = 30;
-
-      while (job.status === "queued" || job.status === "running") {
-        await new Promise((r) => setTimeout(r, 800));
-        attempts++;
-        if (attempts > 120) throw new Error("ការងារ Clone ប្រើពេលយូរហួសកំណត់");
-
-        // Progressively advance percentage smoothly up to 92%
-        if (job.status === "running") {
-          simulatedProgress = Math.min(92, simulatedProgress + Math.max(1, Math.round((92 - simulatedProgress) * 0.12)));
-          setCloneProgressPercent(simulatedProgress);
-          setCloneProgressStage(
-            simulatedProgress < 50
-              ? "Extracting Acoustic Speaker Embeddings"
-              : simulatedProgress < 75
-              ? "Neural Diffusion Voice Synthesis"
-              : "Khmer Phoneme Alignment & Denoising"
-          );
-        } else {
-          simulatedProgress = Math.min(38, simulatedProgress + 2);
-          setCloneProgressPercent(simulatedProgress);
-          setCloneProgressStage(`In Server Queue (Position #${job.queue_position || 1})`);
-        }
-
-        const pollRes = await fetch(`/api/v1/clone/jobs/${job.job_id}`, {
-          headers: { Authorization: `Bearer ${BONDETH_AUTH_TOKEN}` }
-        });
-        if (pollRes.ok) {
-          job = await pollRes.json();
-          const runningEngineLabel = cloneModelEngine === "voxcpm2" ? "VoxCPM2 48kHz Studio" : "OmniVoice (F5-TTS)";
-          setCloneStatusText(
-            job.status === "running"
-              ? `AI ${runningEngineLabel} Clone កំពុងសំយោគសំឡេង...`
-              : `ស្ថិតក្នុងជួររង់ចាំ (Queue #${job.queue_position || 1})...`
-          );
-        }
-      }
-
-      if (job.status === "failed") {
-        throw new Error(job.error || "ការងារ Clone បានបរាជ័យ");
-      }
-
-      setCloneProgressPercent(95);
-      setCloneProgressStage("Finalizing Waveform Audio");
-      setCloneStatusText("កំពុងទាញយកសំឡេងដែលបាន Clone...");
-
-      const audioRes = await fetch(`/api/v1/clone/jobs/${job.job_id}/audio`, {
-        headers: { Authorization: `Bearer ${BONDETH_AUTH_TOKEN}` }
-      });
-      if (!audioRes.ok) throw new Error("មិនអាចទាញយកសំឡេងដែលបានផលិតបានទេ");
-
-      const blob = await audioRes.blob();
-      const url = URL.createObjectURL(blob);
-      setCloneResultBlob(blob);
-      setCloneResultUrl(url);
-
-      setCloneProgressPercent(100);
-      setCloneProgressStage("Clone Complete 100%");
-
-      // Sync with generated state
-      setGeneratedAudioBlob(blob);
-      setGeneratedAudioUrl(url);
-      setGeneratedTimestamp("Cloned just now");
-
-      setHistoryItems((prev) => [
-        {
-          id: `hist_${Date.now()}`,
-          voiceName: cloneAlias || "Instant Cloned Voice",
-          avatar: "/assets/voice-avatars/characters/king.png",
-          text: cloneTargetText.trim(),
-          url: url,
-          blob: blob,
-          timestamp: new Date().toLocaleTimeString(),
-          duration: `0:${Math.round(cloneRefDuration || 10)}`
-        },
-        ...prev
-      ]);
-
-      notify("Instant Voice Clone បានជោគជ័យ 100%!", "success");
-    } catch (err) {
-      notify("បញ្ហា Clone: " + err.message, "error");
-    } finally {
-      setCloneBusy(false);
-      setCloneStatusText("");
-    }
-  };
-
-  // --- TAB 2: Save Cloned Voice to Library ---
-  const handleSaveClonedVoiceToLibrary = async () => {
-    if (!cloneRefFile) return;
-    const name = cloneAlias.trim() || `Cloned Voice ${new Date().toLocaleTimeString()}`;
-    setCloneBusy(true);
-    try {
-      const formData = new FormData();
-      formData.append("voice_alias", name);
-      formData.append("reference_audio", cloneRefFile);
-      formData.append("consent", "true");
-      if (cloneRefTranscript.trim()) {
-        formData.append("reference_text", cloneRefTranscript.trim());
-      }
-
-      const res = await fetch("/api/v1/voices", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${BONDETH_AUTH_TOKEN}` },
-        body: formData
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `Save failed with HTTP ${res.status}`);
-      }
-
-      const saved = await res.json();
-      setApiVoices((prev) => [saved, ...prev]);
-
-      const newProfile = {
-        id: saved.id,
-        name: saved.voice_alias,
-        role: "Character Voice",
-        roleClass: "cyan",
-        category: "custom",
-        ready: true,
-        avatar: "/assets/voice-avatars/characters/king.png",
-        duration: `0:${Math.round(saved.reference_duration_seconds || 15)}`,
-        sampleText: saved.reference_text || "សំឡេង Cloned ពីគំរូដើម។",
-        engine: "clone",
-        favorite: true
-      };
-
-      if (addVoiceProfile) {
-        await addVoiceProfile(newProfile);
-      }
-      setSelectedVoiceId(saved.id);
-      notify(`បានរក្សាទុកសំឡេង "${name}" ទៅកាន់ Voice Library!`, "success");
-    } catch (err) {
-      notify("មិនអាចរក្សាទុកបានទេ: " + err.message, "error");
-    } finally {
-      setCloneBusy(false);
     }
   };
 
@@ -1801,20 +1464,6 @@ export function VoiceCloneStudioPage({
               <span>Studio & Library</span>
             </button>
             <button
-              className={`vs-mode-tab ${activeTab === "clone" ? "active" : ""}`}
-              onClick={() => setActiveTab("clone")}
-            >
-              <Waveform size={15} weight={activeTab === "clone" ? "fill" : "regular"} />
-              <span>Voice Clone</span>
-            </button>
-            <button
-              className={`vs-mode-tab ${activeTab === "voice_fl" ? "active" : ""}`}
-              onClick={() => setActiveTab("voice_fl")}
-            >
-              <Sliders size={15} weight={activeTab === "voice_fl" ? "fill" : "regular"} />
-              <span>Voice FL Studio</span>
-            </button>
-            <button
               className={`vs-mode-tab ${activeTab === "train" ? "active" : ""}`}
               onClick={() => setActiveTab("train")}
             >
@@ -1832,31 +1481,6 @@ export function VoiceCloneStudioPage({
         </div>
 
         <div className="voice-studio-topbar-right">
-          {onOpenModelsManager ? (
-            <button
-              type="button"
-              className="vs-model-manager-btn"
-              onClick={onOpenModelsManager}
-              title="គ្រប់គ្រង និងទាញយក Offline AI Models (Whisper, MMS, TTS, Clone)"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "7px",
-                padding: "6px 14px",
-                borderRadius: "8px",
-                background: "rgba(59, 130, 246, 0.12)",
-                border: "1px solid rgba(59, 130, 246, 0.35)",
-                color: "#93c5fd",
-                fontSize: "13px",
-                fontWeight: "600",
-                cursor: "pointer",
-                transition: "all 0.18s ease"
-              }}
-            >
-              <Brain size={16} weight="bold" />
-              <span>Offline AI Models</span>
-            </button>
-          ) : null}
         </div>
       </header>
 
@@ -2075,15 +1699,14 @@ export function VoiceCloneStudioPage({
                 </div>
               </div>
 
-              {/* AI Clone Model Dropdown */}
+              {/* AI Voice Model Dropdown */}
               <div className="vs-control-group">
-                <span className="vs-control-label">AI Clone Model</span>
+                <span className="vs-control-label">AI Voice Model</span>
                 <select
                   className="vs-select vs-model-select"
                   value={ttsModelEngine}
                   onChange={(e) => setTtsModelEngine(e.target.value)}
                 >
-                  <option value="voxcpm2">✨ VoxCPM2 + AI Gemini (OpenBMB 48kHz Deep Neural - Full Power)</option>
                   <option value="omnivoice">⚡ OmniVoice + AI Gemini (F5-TTS 36-Step Flow-Matching - Full Power)</option>
                   <option value="gemini">🌐 Google Gemini 2.5 Flash Native Voice (Cloud Real-Time HD)</option>
                 </select>
@@ -2440,17 +2063,11 @@ export function VoiceCloneStudioPage({
                         <div className="vs-3d-metric-badge">
                           <span>ម៉ូដែល AI:</span>
                           <strong style={{
-                            color: activeResolvedEngine === "voxcpm2"
-                              ? "#38bdf8"
-                              : activeResolvedEngine === "omnivoice"
-                              ? "#f59e0b"
-                              : activeResolvedEngine === "gemini"
+                            color: activeResolvedEngine === "gemini"
                               ? "#34d399"
                               : "#f59e0b"
                           }}>
-                            {activeResolvedEngine === "voxcpm2"
-                              ? "✨ VoxCPM2 + AI Gemini (48kHz Full Power)"
-                              : activeResolvedEngine === "gemini"
+                            {activeResolvedEngine === "gemini"
                               ? "🌐 Google Gemini 2.5 Flash Native Voice"
                               : "⚡ OmniVoice + AI Gemini (F5-TTS Full Power)"}
                           </strong>
@@ -2597,9 +2214,7 @@ export function VoiceCloneStudioPage({
                 <div className="vs-director-card">
                   <span className="vs-director-label">SYNTHESIS ENGINE</span>
                   <span className="vs-director-val">
-                    {activeResolvedEngine === "voxcpm2"
-                      ? "✨ VoxCPM2 + AI Gemini (48kHz Full Power)"
-                      : activeResolvedEngine === "gemini"
+                    {activeResolvedEngine === "gemini"
                       ? "🌐 Google Gemini 2.5 Flash Native Voice"
                       : "⚡ OmniVoice + AI Gemini (F5-TTS Full Power)"}
                   </span>
@@ -2817,522 +2432,6 @@ export function VoiceCloneStudioPage({
               </div>
             </div>
           </section>
-        </div>
-      )}
-
-      {/* ==========================================================================
-          TAB 2: VOICE CLONE (Ultra-Modern 3D Interactive Studio)
-          ========================================================================== */}
-      {activeTab === "clone" && (
-        <div className="vs-subview-scroll">
-          <div className="vs-subview-container vs-clone-studio-wrapper">
-            
-            {/* 3D Hero Title Banner */}
-            <div className="vs-clone-hero-card">
-              <div className="vs-clone-hero-main">
-                <div className="vs-clone-hero-icon-3d">
-                  <Waveform size={26} weight="fill" />
-                  <div className="vs-hero-glow-ring" />
-                </div>
-                <div>
-                  <div className="vs-clone-hero-title-row">
-                    <h2 className="vs-clone-hero-title">
-                      Instant Voice Clone <span className="vs-title-khmer">· ចម្លងសំឡេង AI ភ្លាមៗ</span>
-                    </h2>
-                    <span className="vs-badge-3d-neural">
-                      <Sparkle size={13} weight="fill" />
-                      <span>Neural Voice Flow · 48kHz Studio</span>
-                    </span>
-                  </div>
-                  <p className="vs-clone-hero-desc">
-                    ចម្លងសំឡេងពីគំរូអូឌីយ៉ូ 3s ទៅ 30s ដោយរក្សាទឹកដម និងសូរសំឡេងដើមបានយ៉ាងច្បាស់
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Main 3D Workspace Card */}
-            <div className="vs-clone-workspace-card">
-              <div className="vs-clone-grid">
-                
-                {/* Column 1: Reference Audio Setup & 3D Waveform Studio */}
-                <div className="vs-clone-col">
-                  <div className="vs-section-header-3d">
-                    <div className="vs-section-title-badge">
-                      <span className="vs-step-pill">1</span>
-                      <span>សំឡេងគំរូ (Sample Audio)</span>
-                    </div>
-                    <div className="vs-header-meta-chips">
-                      <span className="vs-chip-secondary">3s – 30s</span>
-                      {cloneRefFile && (
-                        <span className="vs-chip-success">
-                          <CheckCircle size={13} weight="fill" />
-                          <span>រួចរាល់</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* If no audio file loaded: 3D Tactile Drop Zone */}
-                  {!cloneRefFile ? (
-                    <div
-                      className="vs-3d-dropzone"
-                      onClick={() => document.getElementById("vs-clone-tab-audio-file")?.click()}
-                    >
-                      <div className="vs-3d-upload-orb">
-                        <UploadSimple size={26} weight="bold" />
-                      </div>
-                      <div className="vs-drop-texts">
-                        <div className="vs-drop-title">
-                          ចុច ឬ ទម្លាក់ឯកសារសំឡេងទីនេះ
-                        </div>
-                        <div className="vs-drop-specs">
-                          WAV · MP3 · M4A (សំឡេងនិយាយច្បាស់ គ្មានសំឡេងរំខាន)
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    /* When file loaded: 3D High-Tech Studio Audio Deck */
-                    <div className="vs-3d-audio-deck">
-                      {/* Audio Element (Hidden, Controlled by custom UI) */}
-                      <audio
-                        ref={cloneRefAudioElRef}
-                        src={cloneRefAudioUrl}
-                        onTimeUpdate={(e) => setCloneRefCurrentTime(e.target.currentTime)}
-                        onLoadedMetadata={(e) => setCloneRefDuration(e.target.duration)}
-                        onEnded={() => setCloneRefPlaying(false)}
-                      />
-
-                      {/* Top Deck Info */}
-                      <div className="vs-deck-topbar">
-                        <div className="vs-deck-file-info">
-                          <div className="vs-file-icon-3d">
-                            <Waveform size={18} weight="bold" />
-                          </div>
-                          <div className="vs-file-details">
-                            <div className="vs-file-name" title={cloneRefFile.name}>
-                              {cloneRefFile.name}
-                            </div>
-                            <div className="vs-file-meta-sub">
-                              <span>{(cloneRefFile.size / 1024 / 1024).toFixed(2)} MB</span>
-                              {cloneRefDuration && <span> · {formatAudioTime(cloneRefDuration)}</span>}
-                              {audioAnalysis?.qualityGrade && <span> · {audioAnalysis.qualityGrade}</span>}
-                            </div>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          className="vs-deck-replace-btn"
-                          onClick={() => document.getElementById("vs-clone-tab-audio-file")?.click()}
-                          title="ផ្លាស់ប្តូរឯកសារ"
-                        >
-                          <ArrowsClockwise size={14} weight="bold" />
-                          <span>ប្តូរឯកសារ</span>
-                        </button>
-                      </div>
-
-                      {/* Interactive Player Controls */}
-                      <div className="vs-deck-player-row">
-                        <button
-                          type="button"
-                          className={`vs-3d-play-knob ${cloneRefPlaying ? "is-active" : ""}`}
-                          onClick={togglePlayRefAudio}
-                          title={cloneRefPlaying ? "ផ្អាក" : "ចាក់ស្ដាប់"}
-                        >
-                          {cloneRefPlaying ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" style={{ marginLeft: "2px" }} />}
-                        </button>
-
-                        <div className="vs-deck-scrubber-box">
-                          <div className="vs-scrubber-track-wrap">
-                            <input
-                              type="range"
-                              className="vs-deck-slider"
-                              min="0"
-                              max={cloneRefDuration || 100}
-                              step="0.05"
-                              value={cloneRefCurrentTime}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value);
-                                setCloneRefCurrentTime(val);
-                                if (cloneRefAudioElRef.current) {
-                                  cloneRefAudioElRef.current.currentTime = val;
-                                }
-                              }}
-                            />
-                          </div>
-                          <div className="vs-deck-timer-display">
-                            <span className="vs-timer-now">{formatAudioTime(cloneRefCurrentTime)}</span>
-                            <span className="vs-timer-sep">/</span>
-                            <span className="vs-timer-total">{formatAudioTime(cloneRefDuration)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <input
-                    id="vs-clone-tab-audio-file"
-                    type="file"
-                    accept="audio/*"
-                    style={{ display: "none" }}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) {
-                        setCloneRefFile(f);
-                        const url = URL.createObjectURL(f);
-                        setCloneRefAudioUrl(url);
-                        setCloneRefPlaying(false);
-                        setCloneRefCurrentTime(0);
-                        const a = new Audio(url);
-                        a.onloadedmetadata = () => setCloneRefDuration(a.duration);
-                        analyzeAudioFile(f);
-                      }
-                    }}
-                  />
-
-                  {/* Sound Waveform Visualizer - Exactly "Analysis Sounds" with 3D Holographic Finish */}
-                  <div className="vs-sound-analysis-card-3d">
-                    <div className="vs-analysis-header">
-                      <div className="vs-analysis-title-group">
-                        <div className="vs-live-indicator-dot" />
-                        <span className="vs-analysis-title">Frequency Spectrum & Waveform</span>
-                      </div>
-                      <div className="vs-analysis-badge-group">
-                        {audioAnalysis?.sampleRate && (
-                          <span className="vs-tech-chip">{audioAnalysis.sampleRate}</span>
-                        )}
-                        <span className="vs-badge-cyan">
-                          {isAnalyzingAudio ? "Analyzing..." : "Waveform Ready"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="vs-waveform-display-box-3d">
-                      <div className="vs-waveform-bars-container">
-                        {(waveformBars.length > 0 ? waveformBars : [
-                          25, 42, 65, 88, 72, 48, 32, 58, 82, 96, 78, 52, 36, 68, 92, 82, 58, 32, 48, 72, 88, 62, 42, 28,
-                          46, 76, 92, 68, 38, 52, 82, 96, 72, 48, 32, 62, 88, 78, 52, 36, 58, 82, 68, 42, 28, 38, 52, 32
-                        ]).map((h, idx) => {
-                          const isPlayed = cloneRefDuration > 0 && (idx / 48) <= (cloneRefCurrentTime / cloneRefDuration);
-                          return (
-                            <div
-                              key={idx}
-                              className={`vs-waveform-bar ${waveformBars.length === 0 ? "idle-animated" : ""} ${isPlayed ? "is-played" : ""} ${cloneRefPlaying ? "is-live-playing" : ""}`}
-                              style={{
-                                height: `${h}%`,
-                                animationDelay: `${(idx % 16) * 0.08}s`
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Voice Name / Alias */}
-                  <div className="vs-3d-field-box">
-                    <label className="vs-3d-field-label">
-                      <span>ឈ្មោះសំឡេងសម្គាល់ (Voice Name)</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="vs-3d-text-input"
-                      placeholder="ឧ. សំឡេងតួឯក, សំឡេងនិទានរឿង..."
-                      value={cloneAlias}
-                      onChange={(e) => setCloneAlias(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* Column 2: Target Speech & Synthesis Options */}
-                <div className="vs-clone-col">
-                  <div className="vs-section-header-3d">
-                    <div className="vs-section-title-badge">
-                      <span className="vs-step-pill">2</span>
-                      <span>អត្ថបទនិយាយ (Target Script)</span>
-                    </div>
-                    <div className="vs-header-meta-chips">
-                      <button
-                        type="button"
-                        className="vs-sample-script-btn"
-                        onClick={() => setCloneTargetText(SAMPLE_SCRIPTS[Math.floor(Math.random() * SAMPLE_SCRIPTS.length)])}
-                        title="បញ្ចូលអត្ថបទគំរូ"
-                      >
-                        <Sparkle size={12} weight="fill" />
-                        <span>អត្ថបទគំរូ</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 3D Glass Textarea */}
-                  <div className="vs-3d-textarea-wrapper">
-                    <textarea
-                      className="vs-3d-script-textarea"
-                      placeholder="បញ្ចូលអត្ថបទដែលអ្នកចង់ឱ្យសំឡេង Cloned និយាយនៅទីនេះ..."
-                      value={cloneTargetText}
-                      onChange={(e) => setCloneTargetText(e.target.value)}
-                    />
-                    <div className="vs-textarea-footer-bar">
-                      <div className="vs-char-pill">
-                        <span>{cloneTargetText.length} តួអក្សរ</span>
-                        <span className="vs-pill-dot">·</span>
-                        <span>{cloneTargetText.trim() ? cloneTargetText.trim().split(/\s+/).length : 0} ពាក្យ</span>
-                      </div>
-                      {cloneTargetText && (
-                        <button
-                          type="button"
-                          className="vs-mini-clear-btn"
-                          onClick={() => setCloneTargetText("")}
-                          title="លុបអត្ថបទ"
-                        >
-                          <Trash size={12} />
-                          <span>លុប</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Synthesis Parameters (3D Cards Grid) */}
-                  <div className="vs-3d-params-grid">
-                    {/* Model */}
-                    <div className="vs-param-card-3d">
-                      <label className="vs-param-title">ម៉ូដែល AI (AI Model)</label>
-                      <div className="vs-param-select-wrap">
-                        <select
-                          className="vs-3d-select"
-                          value={cloneModelEngine}
-                          onChange={(e) => setCloneModelEngine(e.target.value)}
-                        >
-                          <option value="voxcpm2">✨ VoxCPM2 (48kHz Studio)</option>
-                          <option value="omnivoice">⚡ OmniVoice (F5-TTS Neural)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Language */}
-                    <div className="vs-param-card-3d">
-                      <label className="vs-param-title">ភាសា (Language)</label>
-                      <div className="vs-param-select-wrap">
-                        <select
-                          className="vs-3d-select"
-                          value={cloneLang}
-                          onChange={(e) => setCloneLang(e.target.value)}
-                        >
-                          <option value="auto">🌐 ស្វ័យប្រវត្តិ (Auto)</option>
-                          <option value="km">🇰🇭 ភាសាខ្មែរ (Khmer)</option>
-                          <option value="en">🇬🇧 អង់គ្លេស (English)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Speed */}
-                    <div className="vs-param-card-3d vs-param-card-speed">
-                      <div className="vs-param-speed-header">
-                        <label className="vs-param-title">ល្បឿននិយាយ (Speed)</label>
-                        <span className="vs-speed-badge-3d">{cloneSpeed.toFixed(1)}x</span>
-                      </div>
-                      <div className="vs-slider-container">
-                        <input
-                          type="range"
-                          className="vs-3d-range-slider"
-                          min="0.5"
-                          max="2.0"
-                          step="0.1"
-                          value={cloneSpeed}
-                          onChange={(e) => setCloneSpeed(parseFloat(e.target.value))}
-                        />
-                        <div className="vs-speed-presets">
-                          {[0.8, 1.0, 1.2, 1.5].map((spd) => (
-                            <button
-                              key={spd}
-                              type="button"
-                              className={`vs-speed-preset-btn ${cloneSpeed === spd ? "active" : ""}`}
-                              onClick={() => setCloneSpeed(spd)}
-                            >
-                              {spd.toFixed(1)}x
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Rights / Consent Card */}
-                  <label className={`vs-consent-card-3d ${cloneConsent ? "is-consented" : ""}`}>
-                    <div className="vs-checkbox-custom">
-                      <input
-                        type="checkbox"
-                        checked={cloneConsent}
-                        onChange={(e) => setCloneConsent(e.target.checked)}
-                      />
-                      <span className="vs-checkmark-3d">
-                        {cloneConsent && <Check size={12} weight="bold" />}
-                      </span>
-                    </div>
-                    <div className="vs-consent-label-wrap">
-                      <ShieldCheck size={18} weight="fill" className="vs-shield-icon" />
-                      <span className="vs-consent-text">
-                        ខ្ញុំបញ្ជាក់ថាជាម្ចាស់កម្មសិទ្ធិ ឬមានសិទ្ធិស្របច្បាប់លើឯកសារសំឡេងនេះ
-                      </span>
-                    </div>
-                  </label>
-
-                  {/* Glowing 3D Progress Panel (when busy) */}
-                  {cloneBusy && (
-                    <div className="vs-clone-hud-3d">
-                      <div className="vs-hud-top-row">
-                        <div className="vs-hud-status-group">
-                          <div className="vs-hud-spinner-3d">
-                            <CircleNotch size={18} className="vs-spin-icon" />
-                          </div>
-                          <div className="vs-hud-text-stack">
-                            <span className="vs-hud-stage-name">
-                              {cloneProgressStage || "កំពុងដំណើរការចម្លងសំឡេង..."}
-                            </span>
-                            {cloneStatusText && (
-                              <span className="vs-hud-subtext">{cloneStatusText}</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="vs-hud-pct-badge">{cloneProgressPercent}%</div>
-                      </div>
-
-                      <div className="vs-hud-track-3d">
-                        <div
-                          className="vs-hud-bar-fill"
-                          style={{ width: `${Math.max(5, cloneProgressPercent)}%` }}
-                        >
-                          <div className="vs-hud-shimmer" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Action Buttons Stack */}
-                  <div className="vs-clone-actions-stack">
-                    <button
-                      type="button"
-                      className="vs-3d-btn-primary"
-                      disabled={cloneBusy || !cloneRefFile || !cloneTargetText.trim() || !cloneConsent}
-                      onClick={handleInstantClone}
-                    >
-                      <div className="vs-btn-highlight" />
-                      <div className="vs-btn-content">
-                        {cloneBusy ? (
-                          <>
-                            <CircleNotch size={20} className="vs-spin-icon" />
-                            <span>កំពុងដំណើរការ ({cloneProgressPercent}%)...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Waveform size={20} weight="bold" />
-                            <span>ចម្លងសំឡេង AI ភ្លាមៗ (Instant Clone)</span>
-                          </>
-                        )}
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="vs-3d-btn-secondary"
-                      disabled={cloneBusy || !cloneRefFile}
-                      onClick={handleSaveClonedVoiceToLibrary}
-                      title="Save voice reference to Library for future reuse"
-                    >
-                      <Plus size={16} weight="bold" />
-                      <span>Save to Library</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Cloned Audio Result Player (3D Card) */}
-              {cloneResultUrl && (
-                <div className="vs-result-card-3d">
-                  {/* Hidden audio element for result */}
-                  <audio
-                    ref={cloneResAudioElRef}
-                    src={cloneResultUrl}
-                    onTimeUpdate={(e) => setCloneResCurrentTime(e.target.currentTime)}
-                    onLoadedMetadata={(e) => setCloneResDuration(e.target.duration)}
-                    onEnded={() => setCloneResPlaying(false)}
-                  />
-
-                  <div className="vs-result-topbar">
-                    <div className="vs-result-badge-row">
-                      <span className="vs-badge-result-success">
-                        <CheckCircle size={15} weight="fill" />
-                        <span>Cloned Successfully</span>
-                      </span>
-                      <span className="vs-result-model-chip">
-                        {cloneModelEngine === "voxcpm2" ? "VoxCPM2 48kHz Studio" : "OmniVoice Neural"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="vs-result-deck">
-                    <div className="vs-result-left">
-                      <button
-                        type="button"
-                        className={`vs-result-play-knob ${cloneResPlaying ? "is-playing" : ""}`}
-                        onClick={togglePlayResAudio}
-                      >
-                        {cloneResPlaying ? <Pause size={22} weight="fill" /> : <Play size={22} weight="fill" style={{ marginLeft: "3px" }} />}
-                      </button>
-                      <div className="vs-result-info">
-                        <h4>{cloneAlias || "Instant Cloned Audio"}</h4>
-                        <div className="vs-result-time-row">
-                          <span>{formatAudioTime(cloneResCurrentTime)}</span>
-                          <span>/</span>
-                          <span>{formatAudioTime(cloneResDuration || 5)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Scrubber track */}
-                    <div className="vs-result-scrubber">
-                      <input
-                        type="range"
-                        className="vs-deck-slider"
-                        min="0"
-                        max={cloneResDuration || 100}
-                        step="0.05"
-                        value={cloneResCurrentTime}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          setCloneResCurrentTime(val);
-                          if (cloneResAudioElRef.current) {
-                            cloneResAudioElRef.current.currentTime = val;
-                          }
-                        }}
-                      />
-                    </div>
-
-                    <div className="vs-result-actions">
-                      <button
-                        type="button"
-                        className="vs-result-action-btn"
-                        onClick={() => handleDownload(cloneResultUrl, cloneAlias || "Cloned_Voice")}
-                      >
-                        <DownloadSimple size={16} weight="bold" />
-                        <span>Download</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        className="vs-result-action-btn vs-btn-accent"
-                        onClick={() => handleInsertToTimelineAction(cloneResultBlob, cloneTargetText)}
-                      >
-                        <FilmStrip size={16} weight="bold" />
-                        <span>Insert to Timeline</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       )}
 
@@ -3994,8 +3093,8 @@ export function VoiceCloneStudioPage({
         </div>
       )}
 
-      {/* 5. VOICE FL STUDIO: PROFESSIONAL VOCAL MASTERING & EDITION */}
-      {activeTab === "voice_fl" && (
+      {/* 5. VOICE FL STUDIO: PROFESSIONAL VOCAL MASTERING & EDITION (Hidden) */}
+      {false && activeTab === "voice_fl" && (
         <div className="vs-content-body" style={{ padding: "16px 20px", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
           <VoiceFLRack
             initialAudioUrl={activeVoice?.sampleUrl || activeVoice?.audioUrl || activeVoice?.referenceAudio || null}

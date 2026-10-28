@@ -9,6 +9,7 @@ __pycache__/
 dist/
 blob-report/
 desktop/release/
+desktop/bin/
 
 # AI model weights are hosted externally and downloaded at runtime.
 public/models/

@@ -1767,7 +1767,7 @@ export function App() {
           visualLocalTime, updateSelectedVisualEffects, updateSelectedSubjectEffect, updateSelectedClickRipple, removeSelectedSubjectEffect, miganRepair, hdRestoration, smartDenoise,
           mobilePanel, setMobilePanel: changeMobilePanel, applyAssetToTrack, handleGeneratedVector, generationPlugins,
           silenceRemoval,
-          currentTime, isPlaying, handlePlayToggle, togglePlay: handlePlayToggle, seekTimeline: seekTo, seekTo, replaceAudio, updateAudioSegment, selectedAudioSegment, audioSegments,
+          currentTime, isPlaying, handlePlayToggle, togglePlay: handlePlayToggle, seekTimeline: seekTo, replaceAudio, updateAudioSegment, selectedAudioSegment, audioSegments,
           visualSegments, selectedTransitionIndex, setSelectedTransitionIndex,
           updateTransitionAtIndex, applyTransitionToAll,
         }} />

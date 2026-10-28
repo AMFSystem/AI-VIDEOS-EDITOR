@@ -287,6 +287,7 @@ async function createWindow() {
     minHeight: 560,
     show: false,
     title: "Timeline Studio — AI Video Editor",
+    icon: path.join(__dirname, "build", "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

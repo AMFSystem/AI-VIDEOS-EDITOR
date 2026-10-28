@@ -88,14 +88,6 @@ const DEFAULT_MODELS = [
 
   // --- 3. VOICE CLONING ---
   {
-    id: "voxcpm2-clone",
-    name: "VoxCPM2 Neural Voice Clone (OpenBMB)",
-    category: "clone",
-    badge: "VoxCPM2 48kHz",
-    description: "ម៉ូដែលចម្លងសំឡេងកម្រិតស្ទូឌីយោ 48kHz Tokenizer-Free Foundation Model ដោយ OpenBMB (Apache 2.0)",
-    sizeFormatted: "2.4 GB",
-  },
-  {
     id: "omnivoice-clone",
     name: "OmniVoice F5 Voice Clone",
     category: "clone",

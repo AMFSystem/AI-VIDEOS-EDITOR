@@ -30,6 +30,12 @@ jobs:
 
       - name: Build Desktop (Mac)
         run: npm run desktop:build:mac
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERTS_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Upload Mac DMG Artifact
         uses: actions/upload-artifact@v4
