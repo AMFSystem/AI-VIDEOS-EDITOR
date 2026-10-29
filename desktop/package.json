@@ -6,13 +6,14 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder",
-    "build:mac": "electron-builder --mac",
-    "build:mac:arm64": "electron-builder --mac --arm64",
-    "build:mac:x64": "electron-builder --mac --x64",
-    "build:mac:universal": "electron-builder --mac --universal",
-    "build:win": "electron-builder --win",
-    "build:all": "electron-builder -mw"
+    "prep:backend": "npm install --prefix ../backend --install-strategy=nested --omit=dev",
+    "build": "npm run prep:backend && electron-builder",
+    "build:mac": "npm run prep:backend && electron-builder --mac",
+    "build:mac:arm64": "npm run prep:backend && electron-builder --mac --arm64",
+    "build:mac:x64": "npm run prep:backend && electron-builder --mac --x64",
+    "build:mac:universal": "npm run prep:backend && electron-builder --mac --universal",
+    "build:win": "npm run prep:backend && electron-builder --win",
+    "build:all": "npm run prep:backend && electron-builder -mw"
   },
   "devDependencies": {
     "electron": "34.5.8",

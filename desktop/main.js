@@ -215,6 +215,8 @@ async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegCo
   console.log("[Desktop] Frontend dist path:", frontendDist);
   console.log("[Desktop] FFmpeg binary:", ffmpegConfig.ffmpegPath);
 
+  const backendModules = path.join(backendCwd, "node_modules");
+
   const env = {
     ...process.env,
     PORT: "3001",
@@ -227,6 +229,7 @@ async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegCo
     FFMPEG_PATH: ffmpegConfig.ffmpegPath,
     FFPROBE_PATH: ffmpegConfig.ffprobePath,
     AI_CLONE_API_URL: "http://127.0.0.1:8000/api/v1/stt",
+    NODE_PATH: backendModules + (process.env.NODE_PATH ? path.delimiter + process.env.NODE_PATH : ""),
   };
 
   // 1. Bulletproof In-Process Backend Startup:
@@ -239,7 +242,7 @@ async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegCo
     await import(pathToFileURL(backendScript).href);
     console.log("[Desktop] In-process backend loaded successfully.");
   } catch (err) {
-    console.warn("[Desktop] In-process backend import failed, trying child process fallback:", err.message);
+    console.warn("[Desktop] In-process backend import failed, trying child process fallback:", err);
     const { utilityProcess } = require("electron");
     if (utilityProcess && typeof utilityProcess.fork === "function") {
       try {
@@ -253,12 +256,24 @@ async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegCo
       } catch (uErr) {
         console.warn("[Desktop] utilityProcess failed:", uErr.message);
       }
+    } else {
+      try {
+        backendProcess = spawn(process.execPath, [backendScript], {
+          cwd: backendCwd,
+          env: { ...env, ELECTRON_RUN_AS_NODE: "1" },
+          stdio: "pipe",
+        });
+        backendProcess.stdout?.on("data", (d) => console.log(`[Backend] ${d}`));
+        backendProcess.stderr?.on("data", (d) => console.error(`[Backend ERR] ${d}`));
+      } catch (spErr) {
+        console.warn("[Desktop] child_process spawn failed:", spErr.message);
+      }
     }
   }
 
-  // 2. Poll until port 3001 is listening
-  for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 150));
+  // 2. Poll until port 3001 is listening (up to 10 seconds)
+  for (let i = 0; i < 40; i++) {
+    await new Promise((r) => setTimeout(r, 250));
     if (await checkPortOpen(3001)) {
       console.log("[Desktop] Local backend successfully online on port 3001");
       return true;
