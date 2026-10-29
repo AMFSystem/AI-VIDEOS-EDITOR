@@ -397,11 +397,6 @@ async function createWindow() {
   });
 }
 
-  mainWindow.on("closed", () => {
-    mainWindow = null;
-  });
-}
-
 function terminateChildren() {
   if (devServerProcess) {
     try { devServerProcess.kill(); } catch {}
