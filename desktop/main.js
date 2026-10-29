@@ -227,14 +227,6 @@ async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegCo
     AI_CLONE_API_URL: "http://127.0.0.1:8000/api/v1/stt",
   };
 
-  let execCmd;
-  if (isPackaged) {
-    execCmd = process.execPath;
-    env.ELECTRON_RUN_AS_NODE = "1";
-  } else {
-    execCmd = isWindows ? "node.exe" : "node";
-  }
-
   const logDir = path.join(app.getPath("userData"), "logs");
   try {
     if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
@@ -242,35 +234,94 @@ async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegCo
   const logFile = path.join(logDir, "backend.log");
   const logStream = fs.createWriteStream(logFile, { flags: "a" });
 
-  try {
-    backendProcess = spawn(execCmd, [backendScript], {
-      cwd: backendCwd,
-      env,
-      stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
-    });
+  let launched = false;
+  // 1. In packaged apps, prefer Electron's native utilityProcess.fork (no external node required)
+  const { utilityProcess } = require("electron");
+  if (isPackaged && utilityProcess && typeof utilityProcess.fork === "function") {
+    try {
+      console.log("[Desktop] Launching backend via Electron utilityProcess.fork:", backendScript);
+      backendProcess = utilityProcess.fork(backendScript, [], {
+        cwd: backendCwd,
+        env,
+        stdio: "pipe",
+      });
 
-    backendProcess.stdout?.pipe(logStream);
-    backendProcess.stderr?.pipe(logStream);
-    backendProcess.stdout?.on("data", (d) => console.log(`[Backend] ${d}`));
-    backendProcess.stderr?.on("data", (d) => console.error(`[Backend ERR] ${d}`));
+      backendProcess.stdout?.pipe(logStream);
+      backendProcess.stderr?.pipe(logStream);
+      backendProcess.stdout?.on("data", (d) => console.log(`[Backend] ${d}`));
+      backendProcess.stderr?.on("data", (d) => console.error(`[Backend ERR] ${d}`));
 
-    backendProcess.on("exit", (code) => {
-      if (code !== 0 && code !== null) {
-        console.error(`[Desktop] Local backend exited with code ${code}`);
-      }
-      backendProcess = null;
-    });
-  } catch (err) {
-    console.error("[Desktop] Failed to spawn backend process:", err);
+      backendProcess.on("exit", (code) => {
+        if (code !== 0 && code !== null) {
+          console.error(`[Desktop] utilityProcess backend exited with code ${code}`);
+        }
+        backendProcess = null;
+      });
+      launched = true;
+    } catch (uErr) {
+      console.warn("[Desktop] utilityProcess.fork failed, trying spawn fallback:", uErr.message);
+    }
   }
 
-  // Wait for port 3001 to come online
-  for (let i = 0; i < 40; i++) {
-    await new Promise((r) => setTimeout(r, 250));
+  // 2. Child process spawn fallback
+  if (!launched) {
+    let execCmd = isPackaged ? process.execPath : (isWindows ? "node.exe" : "node");
+    if (isPackaged) env.ELECTRON_RUN_AS_NODE = "1";
+
+    try {
+      console.log("[Desktop] Spawning backend process with execCmd:", execCmd, backendScript);
+      backendProcess = spawn(execCmd, [backendScript], {
+        cwd: backendCwd,
+        env,
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: false,
+      });
+
+      backendProcess.stdout?.pipe(logStream);
+      backendProcess.stderr?.pipe(logStream);
+      backendProcess.stdout?.on("data", (d) => console.log(`[Backend] ${d}`));
+      backendProcess.stderr?.on("data", (d) => console.error(`[Backend ERR] ${d}`));
+
+      backendProcess.on("exit", (code) => {
+        if (code !== 0 && code !== null) {
+          console.error(`[Desktop] Local backend exited with code ${code}`);
+        }
+        backendProcess = null;
+      });
+    } catch (err) {
+      console.error("[Desktop] Failed to spawn backend process:", err);
+    }
+  }
+
+  // 3. Wait for port 3001 to come online
+  let isPortOpen = false;
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 200));
     if (await checkPortOpen(3001)) {
+      isPortOpen = true;
       console.log("[Desktop] Local backend successfully online on port 3001");
       break;
+    }
+  }
+
+  // 4. Bulletproof In-Process Fallback:
+  // If external child process failed to bind port 3001 (due to Windows restrictions or permissions),
+  // launch Express HTTP & WebSocket server directly inside Electron's Main Node process!
+  if (!isPortOpen) {
+    console.log("[Desktop] Child process did not bind port 3001. Starting Node backend in-process fallback...");
+    try {
+      const { pathToFileURL } = require("node:url");
+      Object.assign(process.env, env);
+      await import(pathToFileURL(backendScript).href);
+      for (let i = 0; i < 20; i++) {
+        await new Promise((r) => setTimeout(r, 200));
+        if (await checkPortOpen(3001)) {
+          console.log("[Desktop] In-process backend successfully online on port 3001!");
+          break;
+        }
+      }
+    } catch (inProcessErr) {
+      console.error("[Desktop] In-process backend start error:", inProcessErr);
     }
   }
 }

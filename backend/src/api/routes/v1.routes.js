@@ -98,14 +98,16 @@ v1Router.use(async (req, res, next) => {
     await fs.writeFile(manifestPath, JSON.stringify(data, null, 2), "utf-8");
   };
 
+  const cleanUrl = req.url.split("?")[0].replace(/\/$/, "");
+
   // 1. GET /api/v1/voices
-  if (req.method === "GET" && (req.url === "/voices" || req.url === "/voices/")) {
+  if (req.method === "GET" && cleanUrl === "/voices") {
     const voices = await loadManifest();
     return res.json(voices);
   }
 
   // 2. POST /api/v1/voices (Adding new character voice)
-  if (req.method === "POST" && (req.url === "/voices" || req.url === "/voices/")) {
+  if (req.method === "POST" && cleanUrl === "/voices") {
     try {
       const formData = await new Response(Readable.toWeb(req), {
         headers: { "content-type": req.headers["content-type"] || "multipart/form-data" },
