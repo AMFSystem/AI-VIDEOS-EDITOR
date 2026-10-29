@@ -12,6 +12,7 @@ export class FileManager {
       projects: path.join(this.baseDir, "projects"),
       temp: path.join(this.baseDir, "temp"),
       exports: path.join(this.baseDir, "exports"),
+      voices: path.join(this.baseDir, "voices"),
     };
   }
 

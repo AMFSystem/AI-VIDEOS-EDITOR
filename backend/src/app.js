@@ -5,6 +5,7 @@ import express from "express";
 import cors from "cors";
 import { corsConfig } from "./config/corsConfig.js";
 import { apiRouter } from "./api/routes/index.js";
+import { v1Router } from "./api/routes/v1.routes.js";
 import { errorHandler } from "./api/middlewares/errorHandler.js";
 import { fileManager } from "./services/storage/fileManager.js";
 
@@ -23,6 +24,10 @@ app.use((_req, res, next) => {
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   next();
 });
+
+// Master /api/v1 Router (FastAPI Proxy & Zero-Failure Local Storage for Voices)
+app.use("/api/v1", v1Router);
+
 app.use(express.json({ limit: "500mb" }));
 app.use(express.urlencoded({ extended: true, limit: "500mb" }));
 

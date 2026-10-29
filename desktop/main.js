@@ -110,6 +110,8 @@ async function ensureFastApiServer(modelsDir, storageDir) {
       path.join(__dirname, "../backend/ai_clone/.venv", venvBin, pyExe),
       path.join(__dirname, "../backend/python/.venv", venvBin, pyExe),
       path.join(__dirname, "../.venv", venvBin, pyExe),
+      path.join(process.cwd(), "backend", "ai_clone", ".venv", venvBin, pyExe),
+      "/Users/hr/Desktop/AI VIDEO EDITOR/backend/ai_clone/.venv/bin/python",
     ];
 
     for (const v of venvCandidates) {
@@ -123,12 +125,21 @@ async function ensureFastApiServer(modelsDir, storageDir) {
       pythonExec = isWindows ? "python" : "python3";
     }
 
-    pythonCwd = isPackaged
-      ? path.join(resourcesPath, "backend", "ai_clone")
-      : path.resolve(__dirname, "../backend/ai_clone");
+    const candidateCwds = [
+      path.join(resourcesPath, "backend", "ai_clone"),
+      path.resolve(__dirname, "../backend/ai_clone"),
+      path.join(process.cwd(), "backend", "ai_clone"),
+      "/Users/hr/Desktop/AI VIDEO EDITOR/backend/ai_clone",
+    ];
+    for (const c of candidateCwds) {
+      if (fs.existsSync(c)) {
+        pythonCwd = c;
+        break;
+      }
+    }
 
-    if (!fs.existsSync(pythonCwd)) {
-      console.warn("[Desktop] Python ai_clone directory not found, skipping FastAPI auto-start.");
+    if (!pythonCwd) {
+      console.warn("[Desktop] Python ai_clone directory not found, running with Node fallback.");
       return;
     }
 

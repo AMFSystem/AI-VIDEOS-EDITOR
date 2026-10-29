@@ -51,6 +51,15 @@
       {
         "from": "bin",
         "to": "bin"
+      },
+      {
+        "from": "../backend/ai_clone",
+        "to": "backend/ai_clone",
+        "filter": [
+          "app/**",
+          "alembic.ini",
+          "requirements.txt"
+        ]
       }
     ],
     "mac": {

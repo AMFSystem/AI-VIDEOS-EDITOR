@@ -14,7 +14,7 @@ desktop/bin/
 # AI model weights are hosted externally and downloaded at runtime.
 public/models/
 backend/storage/
-storage/
+/storage/
 backend/python/output/
 backend/python/tmp/
 backend/ai_clone/tmp/
