@@ -18,6 +18,8 @@ import { SmartDenoiseDialog } from "./components/SmartDenoiseDialog.jsx";
 import { WebMcpReview, WebMcpAiStatus } from "./components/WebMcpReview.jsx";
 import ProjectImportOverlay from "./components/ProjectImportOverlay.jsx";
 import { AIModelsManagerModal } from "./components/AIModelsManagerModal.jsx";
+import { AIModelGuideModal } from "./components/AIModelGuideModal.jsx";
+import { useAIModelGuard } from "./hooks/useAIModelGuard.js";
 import { UrlDownloaderPage, VoiceCloneStudioPage } from "./pages/index.js";
 import { downloaderService } from "./services/downloaderService.js";
 import {
@@ -212,6 +214,12 @@ export function App() {
     (end, marker) => Math.max(end, marker.type === "range" ? marker.endTime : marker.time), 0,
   ), [timelineMarkers]);
   const { notify, toast } = useToast(2600, uiLanguage || "km");
+  const {
+    isModelInstalled,
+    requireModel,
+    guideModalConfig,
+    closeGuideModal,
+  } = useAIModelGuard({ notify });
   const [previewVideoMediaTime, setPreviewVideoMediaTime] = useState(0);
   const [sourceAudioDragTargetLane, setSourceAudioDragTargetLane] = useState(null);
   const sourceVoiceColorOriginalRef = useRef(null);
@@ -1655,8 +1663,32 @@ export function App() {
     if (webMcp.isAiRunning()) { notify(webMcp.t("busy")); return; }
     return action(...args);
   };
-  const generateVoiceoverWhenIdle = guardAgentAi(generateVoiceover);
-  const generateCaptionsWhenIdle = guardAgentAi(generateCaptionsFromSourceAudio);
+  const generateVoiceoverWhenIdle = guardAgentAi((...args) => {
+    const isLocalKhmer = selectedVoice?.id?.includes("mms") || selectedVoiceProfile?.engine === "mms";
+    const isKokoro = selectedVoice?.id?.includes("kokoro") || selectedVoiceProfile?.engine === "kokoro";
+    const isPiper = selectedVoice?.id?.includes("piper") || selectedVoiceProfile?.engine === "piper";
+    const isClone = selectedVoice?.role === "cloned" || selectedVoiceProfile?.engine === "clone";
+
+    let requiredModel = null;
+    if (isLocalKhmer) requiredModel = "mms-tts-khm";
+    else if (isKokoro) requiredModel = "kokoro-82m";
+    else if (isPiper) requiredModel = "piper-tts";
+    else if (isClone) requiredModel = "voxcpm2-clone";
+
+    if (requiredModel) {
+      requireModel(requiredModel, () => generateVoiceover(...args));
+    } else {
+      generateVoiceover(...args);
+    }
+  });
+
+  const generateCaptionsWhenIdle = guardAgentAi((...args) => {
+    const opts = args[0] || {};
+    const lang = opts.language || uiLanguage || "auto";
+    const requiredModel = (lang === "km" || lang === "auto") ? "whisper-khmer" : "whisper-multilingual";
+
+    requireModel(requiredModel, () => generateCaptionsFromSourceAudio(...args));
+  });
 
   return (
     <main className={`app-shell ${isCompactViewport ? "is-compact-workspace" : ""} ${mobilePanel ? `mobile-panel-${mobilePanel}` : ""} ${isCompactViewport && mobileInspectorSection ? `mobile-section-${mobileInspectorSection}` : ""} ${isCompactViewport && mobileInspectorSection === "mask" && (selectedVisualOverlay || selectedVisualSegment)?.mask?.type && (selectedVisualOverlay || selectedVisualSegment).mask.type !== "none" ? "mobile-mask-active" : ""} ${mobilePanelClosing ? "is-mobile-panel-closing" : ""}`} lang={activeLanguage} onDragOver={(event) => {
@@ -2283,11 +2315,24 @@ export function App() {
           notify={notify}
           t={t}
           onOpenModelsManager={() => setShowModelsManager(true)}
+          requireModel={requireModel}
         />
       )}
       <AIModelsManagerModal
         isOpen={showModelsManager}
         onClose={() => setShowModelsManager(false)}
+        notify={notify}
+      />
+      <AIModelGuideModal
+        isOpen={guideModalConfig.isOpen}
+        modelId={guideModalConfig.modelId}
+        modelInfo={guideModalConfig.modelInfo}
+        onClose={closeGuideModal}
+        onProceed={guideModalConfig.onProceed}
+        onOpenFullHub={() => {
+          closeGuideModal();
+          setShowModelsManager(true);
+        }}
         notify={notify}
       />
       <ExportProgressOverlay

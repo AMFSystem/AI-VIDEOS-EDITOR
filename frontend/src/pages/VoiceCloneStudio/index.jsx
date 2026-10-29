@@ -102,6 +102,7 @@ export function VoiceCloneStudioPage({
   language = "km",
   notify = console.log,
   onOpenModelsManager,
+  requireModel,
 }) {
   // Navigation View: "tts" (Main Studio & Library) | "train" | "stt"
   const [activeTab, setActiveTab] = useState(
@@ -604,6 +605,18 @@ export function VoiceCloneStudioPage({
     if (!activeVoice && resolvedEngine !== "mms") {
       notify("សូមជ្រើសរើស ឬបង្កើតសំឡេង (Add Voice) ជាមុនសិន!", "warning");
       return;
+    }
+
+    if (typeof requireModel === "function") {
+      let reqModel = null;
+      if (resolvedEngine === "mms") reqModel = "mms-tts-khm";
+      else if (resolvedEngine === "clone" || resolvedEngine === "voxcpm2") reqModel = "voxcpm2-clone";
+      if (reqModel) {
+        const ok = await requireModel(reqModel, () => {
+          handleGenerateVoice();
+        });
+        if (!ok) return;
+      }
     }
 
     setIsGenerating(true);
@@ -1165,6 +1178,12 @@ export function VoiceCloneStudioPage({
       notify("សូមជ្រើសរើសឯកសារសំឡេងជាមុនសិន!", "warning");
       return;
     }
+    if (typeof requireModel === "function") {
+      const ok = await requireModel("whisper-khmer", () => {
+        handleAutoTranscribeHelper(audioFile, onResult, setBusyState);
+      });
+      if (!ok) return;
+    }
     setBusyState(true);
     try {
       const formData = new FormData();
@@ -1243,6 +1262,13 @@ export function VoiceCloneStudioPage({
     if (!sttFile) {
       notify("សូមជ្រើសរើស ឬថតសំឡេងជាមុនសិន!", "warning");
       return;
+    }
+    if (typeof requireModel === "function") {
+      const targetModel = (sttLang === "km" || sttLang === "auto") ? "whisper-khmer" : "whisper-multilingual";
+      const ok = await requireModel(targetModel, () => {
+        handleTranscribeSubmit();
+      });
+      if (!ok) return;
     }
     setSttBusy(true);
     setSttResult(null);

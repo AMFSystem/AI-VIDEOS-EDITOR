@@ -17,7 +17,7 @@ import {
 import "./AIModelsManagerModal.css";
 
 // Comprehensive Catalog of ALL AI Models used across the application
-const DEFAULT_MODELS = [
+export const DEFAULT_MODELS = [
   // --- 1. SPEECH TO TEXT (STT & CAPTIONS) ---
   {
     id: "whisper-khmer",
