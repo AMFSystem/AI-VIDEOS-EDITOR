@@ -8,6 +8,9 @@
     "start": "electron .",
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
+    "build:mac:arm64": "electron-builder --mac --arm64",
+    "build:mac:x64": "electron-builder --mac --x64",
+    "build:mac:universal": "electron-builder --mac --universal",
     "build:win": "electron-builder --win",
     "build:all": "electron-builder -mw"
   },
@@ -66,9 +69,20 @@
       "icon": "build/icon.icns",
       "category": "public.app-category.video",
       "target": [
-        "dmg",
-        "zip",
-        "dir"
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
