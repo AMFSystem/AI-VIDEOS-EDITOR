@@ -661,8 +661,11 @@ export const aiController = {
   async streamModelProgress(req, res) {
     const { id } = req.params;
     res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
     if (typeof res.flushHeaders === "function") res.flushHeaders();
 
     // Send current initial state

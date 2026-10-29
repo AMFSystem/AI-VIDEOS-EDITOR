@@ -5,8 +5,18 @@ export class SocketService {
     this.handlers = new Map();
   }
 
-  connect(url = "ws://127.0.0.1:3001/ws") {
+  connect(customUrl) {
     if (typeof window === "undefined") return;
+    let url = customUrl;
+    if (!url) {
+      if (window.location.protocol === "file:") {
+        url = "ws://127.0.0.1:3001/ws";
+      } else {
+        const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host = window.location.port === "5173" ? "127.0.0.1:3001" : (window.location.host || "127.0.0.1:3001");
+        url = `${proto}//${host}/ws`;
+      }
+    }
     try {
       this.ws = new WebSocket(url);
 

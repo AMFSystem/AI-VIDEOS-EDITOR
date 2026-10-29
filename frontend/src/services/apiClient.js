@@ -1,8 +1,8 @@
 // Central API client communicating with backend (Port 3001)
 export const BACKEND_URL =
-  typeof window !== "undefined" && window.desktopAPI?.getBackendUrl
-    ? window.desktopAPI.getBackendUrl()
-    : "http://127.0.0.1:3001";
+  typeof window !== "undefined" && window.location.protocol === "file:"
+    ? ((window.desktopAPI?.getBackendUrl && window.desktopAPI.getBackendUrl()) || "http://127.0.0.1:3001")
+    : "";
 
 export async function apiRequest(endpoint, options = {}) {
   const url = `${BACKEND_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;

@@ -18,10 +18,13 @@ export const app = express();
 await fileManager.init();
 
 app.use(cors(corsConfig));
-app.use((_req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  // Only apply strict COOP/COEP isolation to HTML web views that require SharedArrayBuffer, not API/SSE responses
+  if (!req.path.startsWith("/api") && !req.path.startsWith("/storage")) {
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+  }
   next();
 });
 

@@ -10,12 +10,12 @@ import "./styles.css";
 if (typeof window !== "undefined" && typeof window.fetch === "function") {
   const originalFetch = window.fetch;
   window.fetch = function (input, init) {
-    const isDesktop = Boolean(window.desktopAPI?.isDesktop || window.location.protocol === "file:");
+    const isFileProtocol = typeof window !== "undefined" && window.location.protocol === "file:";
     const backendBase =
       (window.desktopAPI?.getBackendUrl && window.desktopAPI.getBackendUrl()) ||
       "http://127.0.0.1:3001";
 
-    if (isDesktop) {
+    if (isFileProtocol) {
       if (typeof input === "string") {
         if (input.startsWith("/api") || input.startsWith("/storage")) {
           input = `${backendBase}${input.startsWith("/") ? "" : "/"}${input}`;
@@ -25,7 +25,7 @@ if (typeof window !== "undefined" && typeof window.fetch === "function") {
         if (
           url.startsWith("/api") ||
           url.startsWith("/storage") ||
-          (window.location.protocol === "file:" && !url.startsWith("http"))
+          (!url.startsWith("http:") && !url.startsWith("https:"))
         ) {
           input = new Request(`${backendBase}${url.startsWith("/") ? "" : "/"}${url}`, input);
         }

@@ -176,12 +176,12 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
     (window.desktopAPI?.getBackendUrl && window.desktopAPI.getBackendUrl()) || "http://127.0.0.1:3001";
 
   const resolveApiUrl = (endpoint) => {
-    const isDesktop = Boolean(window.desktopAPI?.isDesktop || window.location.protocol === "file:");
-    const base = getBackendBase();
-    if (isDesktop) {
-      return `${base}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+    const clean = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    if (typeof window !== "undefined" && window.location.protocol === "file:") {
+      const base = getBackendBase();
+      return `${base}${clean}`;
     }
-    return endpoint;
+    return clean;
   };
 
   const fetchStatus = async () => {
@@ -220,12 +220,51 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
     };
   }, [isOpen]);
 
+  // Polling fallback when models are actively downloading:
+  // Guarantees UI updates even if EventSource is blocked by proxy or disconnected!
+  useEffect(() => {
+    const activeIds = Object.keys(downloadingModels).filter(
+      (id) => downloadingModels[id]?.status === "downloading"
+    );
+    if (activeIds.length === 0) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(resolveApiUrl("/api/ai/models"));
+        if (!res.ok) return;
+        const json = await res.json();
+        setData(json);
+
+        setDownloadingModels((prev) => {
+          const next = { ...prev };
+          let changed = false;
+
+          json.models?.forEach((m) => {
+            if (next[m.id]) {
+              if (m.installed || m.status === "ready") {
+                delete next[m.id];
+                changed = true;
+                notify(`Model ${m.name} បានទាញយករួចរាល់ និងរក្សាទុកក្នុង Local Computer!`, "success");
+              } else if (m.downloading || m.progress > 0) {
+                next[m.id] = { percent: m.progress, status: "downloading" };
+                changed = true;
+              }
+            }
+          });
+          return changed ? next : prev;
+        });
+      } catch {}
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [downloadingModels]);
+
   const listenProgress = (modelId) => {
     if (eventSourcesRef.current[modelId]) return;
 
     try {
       const progressUrl = resolveApiUrl(`/api/ai/models/progress/${modelId}`);
-      const es = new EventSource(progressUrl);
+      const es = new EventSource(progressUrl, { withCredentials: true });
       eventSourcesRef.current[modelId] = es;
 
       es.onmessage = (event) => {
@@ -268,7 +307,10 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
       listenProgress(modelId);
 
       const res = await fetch(resolveApiUrl(`/api/ai/models/download/${modelId}`), {
-        method: "POST"
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        }
       });
 
       if (!res.ok) {
