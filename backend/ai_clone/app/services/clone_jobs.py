@@ -31,7 +31,7 @@ from redis import Redis
 logger = logging.getLogger(__name__)
 
 JobStatus = Literal["queued", "running", "done", "failed"]
-RefTextSource = Literal["provided", "transcribed", "saved_voice"]
+RefTextSource = Literal["provided", "transcribed", "saved_voice", "trained_voice"]
 
 QUEUE_KEY = "clone:queue"
 PROCESSING_KEY = "clone:processing"
@@ -134,9 +134,24 @@ class CloneJobQueue:
         except Exception:
             pass
 
+    def prune_stale_processing(self) -> None:
+        """Clean up finished, failed, or ghost entries from PROCESSING_KEY."""
+        try:
+            processing_ids = self._redis.lrange(PROCESSING_KEY, 0, -1)
+            for jid in processing_ids:
+                data = self._redis.hgetall(job_key(jid))
+                if not data or data.get("status") in ("done", "failed"):
+                    self._redis.lrem(PROCESSING_KEY, 1, jid)
+        except Exception:
+            pass
+
     def submit(self, job: CloneJob) -> CloneJob:
+        self.prune_stale_processing()
         if self.pending_count() >= self._max_pending:
-            raise QueueFull("The voice-cloning queue is full. Please try again shortly.")
+            # Emergency secondary prune if queue still reports full
+            self.prune_stale_processing()
+            if self.pending_count() >= self._max_pending:
+                raise QueueFull("The voice-cloning queue is full. Please try again shortly.")
         with self._redis.pipeline(transaction=True) as pipe:
             pipe.hset(job_key(job.id), mapping=job.to_redis())
             pipe.expire(job_key(job.id), PENDING_TTL_S)
@@ -149,6 +164,7 @@ class CloneJobQueue:
         return CloneJob.from_redis(data) if data else None
 
     def pending_count(self) -> int:
+        self.prune_stale_processing()
         return self._redis.llen(QUEUE_KEY) + self._redis.llen(PROCESSING_KEY)
 
     def position(self, job: CloneJob) -> int | None:
@@ -193,8 +209,10 @@ class CloneJobQueue:
                 job_id = self._redis.blmove(QUEUE_KEY, PROCESSING_KEY, 1, "RIGHT", "LEFT")
                 if job_id is None:
                     continue
-                self._process(job_id)
-                self._redis.lrem(PROCESSING_KEY, 1, job_id)
+                try:
+                    self._process(job_id)
+                finally:
+                    self._redis.lrem(PROCESSING_KEY, 1, job_id)
             except Exception:
                 logger.exception("Clone worker error; retrying")
                 self._stop.wait(1)

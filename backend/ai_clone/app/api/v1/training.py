@@ -7,10 +7,12 @@ Provides endpoints to:
 4. Lists all permanently trained models.
 """
 
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
@@ -150,4 +152,28 @@ async def delete_trained_model(
     if not deleted:
         raise HTTPException(status_code=404, detail="Trained model not found")
     return {"status": "success", "deleted": True, "id": model_id}
+
+
+@router.get("/models/{model_id}/audio", response_class=FileResponse)
+async def get_trained_model_audio(
+    model_id: str,
+    settings: Settings = Depends(get_settings),
+) -> FileResponse:
+    """Returns the authentic reference audio of a trained voice model."""
+    trained_dir = settings.model_dir / "trained_voices"
+    if trained_dir.exists():
+        for td in trained_dir.iterdir():
+            if td.is_dir():
+                mf = td / "model_manifest.json"
+                if mf.exists():
+                    try:
+                        with open(mf, "r", encoding="utf-8") as f:
+                            mdata = json.load(f)
+                            if mdata.get("id") == model_id or td.name == model_id or model_id in td.name:
+                                ref_path = td / "reference_speaker.wav"
+                                if ref_path.exists():
+                                    return FileResponse(ref_path, media_type="audio/wav", filename=f"{mdata.get('name', 'voice')}.wav")
+                    except Exception:
+                        pass
+    raise HTTPException(status_code=404, detail=f"Trained model audio not found for ID: {model_id}")
 

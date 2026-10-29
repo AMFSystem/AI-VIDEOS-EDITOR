@@ -1738,60 +1738,6 @@ export function VoicePanel({
 
       {isVoiceContext ? (
         <>
-          {onOpenVoiceStudio && (
-            <div style={{ marginBottom: 10 }}>
-              <button
-                type="button"
-                className="ghost-action"
-                onClick={() => onOpenVoiceStudio?.("tts")}
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(168, 85, 247, 0.45)",
-                  background: "linear-gradient(135deg, rgba(168, 85, 247, 0.16) 0%, rgba(56, 189, 248, 0.16) 100%)",
-                  color: "#e2e8f0",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  fontSize: "12.5px",
-                  fontWeight: "600",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                }}
-              >
-                <span>🎙️</span>
-                <span>{t("openFullVoiceStudio", "បើកស្ទូឌីយោ Clone សំឡេង (Open AI Voice Studio)")}</span>
-              </button>
-              <button
-                type="button"
-                className="ghost-action"
-                onClick={() => onOpenVoiceStudio?.("voice_fl")}
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(255, 112, 67, 0.45)",
-                  background: "linear-gradient(135deg, rgba(255, 112, 67, 0.16) 0%, rgba(0, 229, 255, 0.12) 100%)",
-                  color: "#ffedd5",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  fontSize: "12.5px",
-                  fontWeight: "700",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  marginTop: "6px",
-                  boxShadow: "0 2px 8px rgba(255, 112, 67, 0.18)",
-                }}
-              >
-                <span>🎛️</span>
-                <span>Voice FL Studio (កាត់ Noise & Mastering)</span>
-              </button>
-            </div>
-          )}
           <div className="tabs compact">
           {[
             ["synthesis", t("voiceSynthesis")],

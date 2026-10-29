@@ -33,7 +33,7 @@ class CloneJobOut(BaseModel):
     error: str | None = None
     voice_id: str | None = None
     reference_text: str | None = None
-    reference_text_source: RefTextSource
+    reference_text_source: str = "provided"
     duration: float | None = None
     status_url: str
     audio_url: str | None = None
@@ -102,41 +102,106 @@ async def create_clone_job(
 
     if voice_id is not None and str(voice_id).strip():
         voice_str = str(voice_id).strip()
-        if voice_str.startswith("trained_"):
+        trained_dir = settings.model_dir / "trained_voices"
+        target_manifest = None
+        target_ref_audio = None
+        target_voice_id = voice_str
+
+        # 1. Search for matching trained neural voice model
+        if trained_dir.exists():
+            v_low = voice_str.lower()
+            v_clean_id = v_low.replace("trained_", "").strip()
+            for td in trained_dir.iterdir():
+                if td.is_dir():
+                    mf = td / "model_manifest.json"
+                    mdata = {}
+                    if mf.exists():
+                        try:
+                            with open(mf, "r", encoding="utf-8") as f:
+                                mdata = json.load(f)
+                        except Exception:
+                            pass
+                    mid = str(mdata.get("id", "")).strip().lower()
+                    mname = str(mdata.get("name", "")).strip().lower()
+                    td_name = td.name.lower()
+
+                    if (
+                        (mid and mid == v_low)
+                        or (td_name == v_low)
+                        or (v_clean_id and v_clean_id in td_name)
+                        or (mname and (mname == v_low or mname in v_low or v_low in mname))
+                    ):
+                        ref_audio_file = td / "reference_speaker.wav"
+                        if ref_audio_file.exists():
+                            target_manifest = mdata
+                            target_ref_audio = ref_audio_file
+                            target_voice_id = mdata.get("id") or f"trained_{td.name}"
+                            break
+
+        if target_ref_audio and target_ref_audio.exists():
             # STRICT REQUIREMENT: All trained voice models MUST run exclusively on VoxCPM2 at full power!
             common["model_engine"] = "voxcpm2"
-            trained_dir = settings.model_dir / "trained_voices"
-            target_manifest = None
-            target_ref_audio = None
-            if trained_dir.exists():
-                for td in trained_dir.iterdir():
-                    if td.is_dir():
-                        mf = td / "model_manifest.json"
-                        if mf.exists():
-                            try:
-                                with open(mf, "r", encoding="utf-8") as f:
-                                    mdata = json.load(f)
-                                    if mdata.get("id") == voice_str:
-                                        target_manifest = mdata
-                                        target_ref_audio = td / "reference_speaker.wav"
-                                        break
-                            except Exception:
-                                pass
-            if not target_ref_audio or not target_ref_audio.exists():
-                raise HTTPException(404, f"Trained voice model {voice_str} not found or reference audio missing")
-            ref_txt = target_manifest.get("reference_transcript") or None
-            job = CloneJob(**common, work_dir=queue.new_work_dir(job_id), voice_id=voice_str,
-                           reference_path=target_ref_audio, delete_reference=False,
-                           ref_text=ref_txt, ref_text_source="trained_voice")
+            ref_txt = target_manifest.get("reference_transcript") if target_manifest else None
+            job = CloneJob(
+                **common,
+                work_dir=queue.new_work_dir(job_id),
+                voice_id=target_voice_id,
+                reference_path=target_ref_audio,
+                delete_reference=False,
+                ref_text=ref_txt,
+                ref_text_source="trained_voice",
+            )
         else:
+            # 2. Check saved voices in DB
+            is_uuid = False
             try:
                 v_uuid = uuid.UUID(voice_str)
+                is_uuid = True
             except ValueError:
-                raise HTTPException(400, f"Invalid voice_id format: {voice_str}")
-            voice = await get_owned_voice(v_uuid, user, session)
-            job = CloneJob(**common, work_dir=queue.new_work_dir(job_id), voice_id=str(voice.id),
-                           reference_path=voice_audio_path(voice, settings), delete_reference=False,
-                           ref_text=voice.reference_text, ref_text_source="saved_voice")
+                pass
+
+            if is_uuid and session is not None:
+                voice = await get_owned_voice(v_uuid, user, session)
+                job = CloneJob(
+                    **common,
+                    work_dir=queue.new_work_dir(job_id),
+                    voice_id=str(voice.id),
+                    reference_path=voice_audio_path(voice, settings),
+                    delete_reference=False,
+                    ref_text=voice.reference_text,
+                    ref_text_source="saved_voice",
+                )
+            else:
+                # 3. Fallback: check if any trained voice exists locally
+                matched_fallback = False
+                if trained_dir.exists():
+                    for td in sorted(trained_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+                        if td.is_dir():
+                            ref_audio_file = td / "reference_speaker.wav"
+                            if ref_audio_file.exists():
+                                mf = td / "model_manifest.json"
+                                mdata = {}
+                                if mf.exists():
+                                    try:
+                                        with open(mf, "r", encoding="utf-8") as f:
+                                            mdata = json.load(f)
+                                    except Exception:
+                                        pass
+                                common["model_engine"] = "voxcpm2"
+                                ref_txt = mdata.get("reference_transcript")
+                                job = CloneJob(
+                                    **common,
+                                    work_dir=queue.new_work_dir(job_id),
+                                    voice_id=mdata.get("id") or f"trained_{td.name}",
+                                    reference_path=ref_audio_file,
+                                    delete_reference=False,
+                                    ref_text=ref_txt,
+                                    ref_text_source="trained_voice",
+                                )
+                                matched_fallback = True
+                                break
+                if not matched_fallback:
+                    raise HTTPException(404, f"Voice '{voice_str}' not found in database or trained models")
     else:
         if not consent:
             raise HTTPException(403, CONSENT_REQUIRED)

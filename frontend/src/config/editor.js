@@ -1,5 +1,6 @@
 import {
   ClosedCaptioning,
+  Faders,
   FilmSlate,
   ImageSquare,
   Intersect,
@@ -230,6 +231,7 @@ export const TOOL_RAIL = [
   { id: "transitions", label: "Transitions", icon: Intersect },
   { id: "dubber", label: "Dubber", icon: FilmSlate },
   { id: "effects", label: "Effects", icon: MagicWand },
+  { id: "filters", label: "Filters", icon: Faders },
   { id: "plugins", label: "Plugins", icon: PlugsConnected },
   { id: "stickers", label: "Stickers", icon: Sticker },
 ];

@@ -124,7 +124,7 @@ export function VoiceCloneStudioPage({
   const [showAdvancedModal, setShowAdvancedModal] = useState(false);
   const [ttsSpeed, setTtsSpeed] = useState(1.0);
   const [ttsPitch, setTtsPitch] = useState(1.0);
-  const [ttsModelEngine, setTtsModelEngine] = useState("voxcpm2"); // "voxcpm2" | "gemini"
+  const [ttsModelEngine, setTtsModelEngine] = useState("voxcpm2"); // "voxcpm2" | "omnivoice" | "gemini"
 
   // Text Area Input
   const [ttsText, setTtsText] = useState(
@@ -386,6 +386,7 @@ export function VoiceCloneStudioPage({
       return "voxcpm2";
     }
     if (ttsModelEngine === "gemini") return "gemini";
+    if (ttsModelEngine === "omnivoice") return "omnivoice";
     return "voxcpm2";
   }, [activeVoice, ttsModelEngine]);
 
@@ -488,28 +489,40 @@ export function VoiceCloneStudioPage({
       previewAudioRef.current.pause();
     }
 
-    // Check if voice is in backend saved voices
+    // Check if voice is a trained model or in backend saved voices
+    const isTrained = String(voice.id).startsWith("trained_") || Boolean(voice.isTrainedModel);
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(voice.id));
-    const isBackendVoice = isUuid || apiVoices.some((v) => v.id === voice.id) || voice.isBackendSaved;
+    const isBackendVoice = isTrained || isUuid || apiVoices.some((v) => v.id === voice.id) || voice.isBackendSaved;
 
     if (isBackendVoice) {
       try {
         setPreviewPlayingId(voice.id);
-        const res = await fetch(`/api/v1/voices/${voice.id}/audio`, {
-          headers: { Authorization: `Bearer ${BONDETH_AUTH_TOKEN}` }
-        });
-        if (res.ok) {
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const audio = new Audio(url);
-          previewAudioRef.current = audio;
-          audio.onended = () => setPreviewPlayingId(null);
-          audio.onerror = () => setPreviewPlayingId(null);
-          await audio.play();
-          return;
+        const endpoints = isTrained
+          ? [`/api/v1/training/models/${voice.id}/audio`, `/api/v1/voices/${voice.id}/audio`]
+          : [`/api/v1/voices/${voice.id}/audio`];
+
+        for (const ep of endpoints) {
+          const res = await fetch(ep, {
+            headers: { Authorization: `Bearer ${BONDETH_AUTH_TOKEN}` }
+          });
+          if (res.ok) {
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            previewAudioRef.current = audio;
+            audio.onended = () => setPreviewPlayingId(null);
+            audio.onerror = () => setPreviewPlayingId(null);
+            await audio.play();
+            return;
+          }
         }
       } catch (err) {
         console.warn("Backend audio preview failed:", err);
+      }
+      if (isTrained) {
+        setPreviewPlayingId(null);
+        notify("មិនអាចទាញយកសំឡេងគំរូនៃ Trained Model បានទេ", "warning");
+        return;
       }
     }
 
@@ -604,6 +617,8 @@ export function VoiceCloneStudioPage({
 
     const baseEngineName = resolvedEngine === "voxcpm2"
       ? "✨ VoxCPM2 48kHz Studio Quality (OpenBMB - ពេញកម្លាំង Full Power)"
+      : resolvedEngine === "omnivoice"
+      ? "⚡ OmniVoice + AI Gemini (F5-TTS 36-Step - Full Power)"
       : resolvedEngine === "gemini"
       ? "🌐 Google Gemini 2.5 Flash Native Voice (Cloud Real-Time HD)"
       : "✨ VoxCPM2 48kHz Neural Studio";
@@ -724,33 +739,157 @@ export function VoiceCloneStudioPage({
         .trim();
 
       if (resolvedEngine === "gemini") {
-        // --- 1. DIRECT GOOGLE GEMINI 2.5 FLASH NATIVE AUDIO (Cloud Real-Time HD) ---
+        // --- 1. GOOGLE GEMINI 2.5 FLASH + NEURAL VOICE CLONE PIPELINE ---
         setPipelineStageIndex(1);
-        targetProgress = 30;
-        setGenerationStatusText("Google Gemini 2.5 Flash កំពុងរៀបចំសំយោគសំឡេង...");
-        setGenerationStage("Executing Google Gemini Flash Native Audio (24kHz HD)...");
+        targetProgress = 25;
+        setGenerationStatusText("Google Gemini 2.5 Flash: កំពុងវិភាគ និងកែលម្អសូរសំនៀងខ្មែរ...");
+        setGenerationStage("🎬 Gemini AI Director: Analyzing Cambodian Prosody & Rhythm...");
 
-        let refBlob = null;
-        if (activeVoice?.audioBlob) {
-          refBlob = activeVoice.audioBlob;
-        } else if (activeVoice?.audioUrl) {
-          refBlob = await fetch(activeVoice.audioUrl, { signal: abortCtrl.signal }).then((r) => r.blob()).catch(() => null);
+        let scriptForClone = cleanScriptForLocalEngine;
+        if (geminiApiKey) {
+          try {
+            const dirResult = await directVoiceoverWithGemini({
+              apiKey: geminiApiKey,
+              text: cleanScriptForLocalEngine,
+              targetLanguage: selectedLang,
+              voiceName: activeVoice?.name || "Khmer AI Voice",
+              currentStyle: selectedStyle,
+              currentEmotion: selectedEmotion,
+              currentSpeed: ttsSpeed,
+              currentPitch: ttsPitch,
+              engine: "voxcpm2",
+            });
+            if (dirResult?.directedScript) {
+              scriptForClone = dirResult.directedScript;
+            }
+          } catch (dirErr) {
+            console.warn("Gemini Directing pre-pass:", dirErr);
+          }
         }
 
-        setPipelineStageIndex(2);
-        targetProgress = 45;
+        // Check if an authentic cloned voice is selected
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(activeVoice?.id));
+        const isTrained = String(activeVoice?.id).startsWith("trained_");
+        const isSavedBackendVoice = isUuid || isTrained || apiVoices.some((v) => v.id === activeVoice?.id);
 
-        blob = await synthesizeWithGemini({
-          apiKey: geminiApiKey,
-          text: cleanScriptForLocalEngine,
-          voiceName: "Aoede",
-          referenceAudioBlob: refBlob,
-          vocalStyle: selectedStyle,
-          onProgress: (pct) => {
-            targetProgress = Math.max(targetProgress, pct);
-            if (pct >= 85) setPipelineStageIndex(3);
-          },
-        });
+        if (activeVoice) {
+          // STRICT NEURAL CLONING ON BACKEND: Synthesize with the user's selected cloned voice!
+          setPipelineStageIndex(2);
+          targetProgress = 40;
+          setGenerationStatusText("កំពុងសំយោគសំឡេង Clone លើ Backend (VoxCPM2 48kHz Studio Quality)...");
+          setGenerationStage("Executing Neural Voice Cloning with Gemini Director Synergy...");
+
+          const formData = new FormData();
+          formData.append("text", scriptForClone);
+          formData.append("consent", "true");
+          formData.append("lang", selectedLang);
+          formData.append("speed", String(Math.max(0.5, Math.min(2.0, ttsSpeed))));
+          formData.append("model", "voxcpm2"); // Execute on VoxCPM2 48kHz Full Power
+
+          if (isSavedBackendVoice) {
+            formData.append("voice_id", activeVoice.id);
+          } else {
+            let refBlob = null;
+            if (activeVoice?.audioBlob) {
+              refBlob = activeVoice.audioBlob;
+            } else if (activeVoice?.audioUrl) {
+              refBlob = await fetch(activeVoice.audioUrl, { signal: abortCtrl.signal }).then((r) => r.blob()).catch(() => null);
+            }
+            if (!refBlob) {
+              refBlob = await fetch("/assets/voice-samples/km_KH-mms-medium.mp3", { signal: abortCtrl.signal }).then((r) => r.blob()).catch(() => null);
+            }
+            if (refBlob) {
+              formData.append("reference_audio", refBlob, "reference.wav");
+              formData.append("reference_text", activeVoice?.sampleText || "សំឡេងគំរូភាសាខ្មែរ");
+            } else {
+              throw new Error("មិនមានសំឡេងគំរូ (Reference Audio) សម្រាប់ធ្វើការ Clone ទេ។ សូម Add Voice ឬជ្រើសរើស Meta MMS-TTS!");
+            }
+          }
+
+          const cloneRes = await fetch("/api/v1/clone", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${BONDETH_AUTH_TOKEN}` },
+            body: formData,
+            signal: abortCtrl.signal,
+          });
+
+          if (!cloneRes.ok) {
+            const errData = await cloneRes.json().catch(() => ({}));
+            throw new Error(errData.detail || `បរាជ័យក្នុងការចាប់ផ្ដើម ${displayEngineLabel} (HTTP ${cloneRes.status})`);
+          }
+
+          let job = await cloneRes.json();
+          currentJobStatus = job.status;
+          if (job.queue_position) currentQueuePosition = job.queue_position;
+          setGenerationStatusText(`ស្ថានភាព ${displayEngineLabel}: ${job.status}...`);
+
+          setPipelineStageIndex(2);
+          targetProgress = 48;
+
+          let attempts = 0;
+          const maxAttempts = 360;
+          while (job.status === "queued" || job.status === "running") {
+            await new Promise((r) => setTimeout(r, 1000));
+            if (abortCtrl.signal.aborted) throw new Error("ការផលិតសំឡេងត្រូវបានបោះបង់");
+            attempts++;
+            if (attempts > maxAttempts) throw new Error(`${displayEngineLabel} ប្រើពេលយូរហួសកំណត់`);
+
+            const pollRes = await fetch(`/api/v1/clone/jobs/${job.job_id}`, {
+              headers: { Authorization: `Bearer ${BONDETH_AUTH_TOKEN}` },
+              signal: abortCtrl.signal,
+            });
+            if (pollRes.ok) {
+              job = await pollRes.json();
+              currentJobStatus = job.status;
+              if (job.queue_position) currentQueuePosition = job.queue_position;
+              if (job.progress && job.progress > 0) {
+                targetProgress = Math.max(targetProgress, job.progress);
+                if (job.progress >= 85) {
+                  setPipelineStageIndex(3);
+                } else if (job.progress >= 30) {
+                  setPipelineStageIndex(2);
+                }
+              }
+              if (job.stage) {
+                setGenerationStage(job.stage);
+              }
+              setGenerationStatusText(
+                job.status === "running"
+                  ? `${displayEngineLabel}: ${job.stage || "កំពុងសំយោគសំឡេង..."}`
+                  : `ស្ថិតក្នុងជួររង់ចាំ (Queue #${job.queue_position || 1})...`
+              );
+            }
+          }
+
+          if (job.status === "failed") {
+            throw new Error(job.error || `${displayEngineLabel} បានបរាជ័យក្នុងការសំយោគសំឡេង`);
+          }
+
+          currentJobStatus = "done";
+          setPipelineStageIndex(3);
+          targetProgress = 94;
+          setGenerationStage("Finalizing Waveform Output...");
+          setGenerationStatusText(`កំពុងទាញយកសំឡេងដែលបានផលិតដោយ ${displayEngineLabel}...`);
+          const audioRes = await fetch(`/api/v1/clone/jobs/${job.job_id}/audio`, {
+            headers: { Authorization: `Bearer ${BONDETH_AUTH_TOKEN}` },
+            signal: abortCtrl.signal,
+          });
+          if (!audioRes.ok) throw new Error(`មិនអាចទាញយកសំឡេងដែលបានផលិតពី ${displayEngineLabel} បានទេ`);
+          blob = await audioRes.blob();
+        } else {
+          // Fallback to direct Gemini speech if no voice profile exists
+          blob = await synthesizeWithGemini({
+            apiKey: geminiApiKey,
+            text: cleanScriptForLocalEngine,
+            voiceName: "Aoede",
+            referenceAudioBlob: null,
+            vocalStyle: selectedStyle,
+            onProgress: (pct) => {
+              targetProgress = Math.max(targetProgress, pct);
+              if (pct >= 85) setPipelineStageIndex(3);
+            },
+          });
+        }
       } else if (resolvedEngine === "mms") {
         // --- 2. STRICT LOCAL EXECUTION: META MMS-TTS KHMER (Offline 16kHz - Full Power) ---
         setPipelineStageIndex(1);
@@ -807,7 +946,7 @@ export function VoiceCloneStudioPage({
         formData.append("consent", "true");
         formData.append("lang", selectedLang);
         formData.append("speed", String(Math.max(0.5, Math.min(2.0, ttsSpeed))));
-        formData.append("model", "voxcpm2"); // Strictly execute on VoxCPM2 at full power
+        formData.append("model", resolvedEngine || "voxcpm2"); // Auto-detected or strictly chosen model
 
         if (isSavedBackendVoice) {
           formData.append("voice_id", activeVoice.id);
@@ -1411,6 +1550,7 @@ export function VoiceCloneStudioPage({
   };
 
   const handleSelectTrainedVoiceAndGoToStudio = (modelId) => {
+    loadVoices();
     if (modelId) {
       setSelectedVoiceId(modelId);
     }
@@ -1713,6 +1853,7 @@ export function VoiceCloneStudioPage({
                   onChange={(e) => setTtsModelEngine(e.target.value)}
                 >
                   <option value="voxcpm2">✨ VoxCPM2 48kHz Neural Studio (OpenBMB - ពេញកម្លាំង Full Power)</option>
+                  <option value="omnivoice">⚡ OmniVoice + AI Gemini (F5-TTS 36-Step Flow-Matching - Full Power)</option>
                   <option value="gemini">🌐 Google Gemini 2.5 Flash Native Voice (Cloud Real-Time HD)</option>
                 </select>
               </div>
@@ -2221,6 +2362,8 @@ export function VoiceCloneStudioPage({
                   <span className="vs-director-val">
                     {activeResolvedEngine === "gemini"
                       ? "🌐 Google Gemini 2.5 Flash Native Voice"
+                      : activeResolvedEngine === "omnivoice"
+                      ? "⚡ OmniVoice + AI Gemini (F5-TTS Full Power)"
                       : "✨ VoxCPM2 48kHz Studio Quality (ពេញកម្លាំង Full Power)"}
                   </span>
                 </div>

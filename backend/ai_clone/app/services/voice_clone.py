@@ -60,12 +60,21 @@ class OmniVoiceEngine:
         self.device = _resolve_device(device)
         # float16 crashes while loading on Apple MPS; use it only on CUDA.
         dtype = torch.float16 if self.device.startswith("cuda") else torch.float32
-        try:
-            path = snapshot_download(repo, revision=revision, cache_dir=str(cache_dir), local_files_only=True)
-            logger.info("OmniVoice: Using local cached snapshot %s", path)
-        except Exception:
-            logger.info("OmniVoice: Local snapshot missing, downloading %s...", repo)
-            path = snapshot_download(repo, revision=revision, cache_dir=str(cache_dir))
+
+        # Check for direct local directory downloaded via UI ModelManager
+        clean_repo_name = f"models--{repo.replace('/', '--')}"
+        direct_candidate = Path(cache_dir) / clean_repo_name
+        path = None
+        if (direct_candidate / "model.safetensors").exists() or (direct_candidate / "config.json").exists():
+            path = str(direct_candidate)
+            logger.info("OmniVoice: Using UI-downloaded local model folder %s [FULL LOCAL POWER]", path)
+        else:
+            try:
+                path = snapshot_download(repo, revision=revision, cache_dir=str(cache_dir), local_files_only=True)
+                logger.info("OmniVoice: Using local cached snapshot %s", path)
+            except Exception:
+                logger.info("OmniVoice: Local snapshot missing, downloading %s...", repo)
+                path = snapshot_download(repo, revision=revision, cache_dir=str(cache_dir))
         logger.info("Loading voice-clone model %s on %s (%s) [FULL POWER]", repo, self.device, dtype)
         self._model = OmniVoice.from_pretrained(path, device_map=self.device, dtype=dtype)
 

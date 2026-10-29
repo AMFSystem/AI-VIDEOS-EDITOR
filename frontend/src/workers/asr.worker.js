@@ -181,6 +181,9 @@ async function getTranscriber(requestId) {
 async function detectWhisperLanguage(transcriber, audio, preferredLanguage, requestId) {
   const generationConfig = transcriber?.model?.generation_config;
   const fallbackLanguage = getPreferredWhisperLanguage(preferredLanguage);
+  if (preferredLanguage && preferredLanguage !== "auto") {
+    return { language: fallbackLanguage, detected: false };
+  }
   if (!isMultilingualWhisper(transcriber)) {
     return { language: "en", detected: false };
   }
@@ -231,14 +234,22 @@ function serializeTimestamp(timestamp) {
 }
 
 function serializeOutput(output) {
+  const isAudioTag = (t) => /^[\(\[\{].*?(?:music|singing|applause|cheering|sound).*?[\)\]\}]$/i.test(String(t).trim());
+  const rawChunks = Array.isArray(output?.chunks) ? output.chunks : [];
+  const filteredChunks = rawChunks
+    .filter((chunk) => !isAudioTag(chunk?.text ?? ""))
+    .map((chunk) => ({
+      text: String(chunk?.text ?? "").replace(/[\(\[\{].*?(?:music|singing|applause|cheering|sound).*?[\)\]\}]/gi, "").trim(),
+      timestamp: serializeTimestamp(chunk?.timestamp),
+    }))
+    .filter((chunk) => chunk.text);
+
   return {
-    text: String(output?.text ?? ""),
-    chunks: Array.isArray(output?.chunks)
-      ? output.chunks.map((chunk) => ({
-          text: String(chunk?.text ?? ""),
-          timestamp: serializeTimestamp(chunk?.timestamp),
-        }))
-      : [],
+    text: String(output?.text ?? "")
+      .replace(/[\(\[\{].*?(?:music|singing|applause|cheering|sound).*?[\)\]\}]/gi, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+    chunks: filteredChunks,
   };
 }
 

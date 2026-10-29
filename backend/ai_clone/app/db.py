@@ -73,7 +73,19 @@ def create_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]
     return async_sessionmaker(engine, expire_on_commit=False)
 
 
-async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
-    """FastAPI dependency: one session per request, from the app's engine."""
-    async with request.app.state.sessionmaker() as session:
+async def get_db(request: Request) -> AsyncIterator[AsyncSession | None]:
+    """FastAPI dependency: one session per request, safe against offline database."""
+    sessionmaker = getattr(request.app.state, "sessionmaker", None)
+    if sessionmaker is None:
+        yield None
+        return
+    try:
+        session_ctx = sessionmaker()
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Database session creation failed: %s; falling back to stateless mode.", exc)
+        yield None
+        return
+
+    async with session_ctx as session:
         yield session

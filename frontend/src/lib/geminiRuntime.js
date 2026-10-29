@@ -488,7 +488,6 @@ export async function synthesizeWithGemini({
   onProgress(25);
   const candidateModels = [
     "gemini-2.0-flash",
-    "gemini-2.5-flash",
     "gemini-2.0-flash-exp",
   ];
 

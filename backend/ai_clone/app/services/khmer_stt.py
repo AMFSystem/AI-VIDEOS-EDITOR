@@ -6,13 +6,14 @@ past <|endoftext|> as a control token and drops it, so this engine runs the
 model through CTranslate2 directly and strips control tokens by name instead.
 
 The model emits khmercut-style output: words separated by spaces and phrase
-groups separated by ";". We turn that into normal Khmer text (no spaces
-inside a phrase) plus a word-segmented version.
+groups separated by ";". We turn that into clean, natural Khmer subtitle cards
+with optimal duration, word segmentation for sync, and natural pause spacing.
 """
 
 import json
 import os
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,7 +29,8 @@ _KHMER_GAP_RE = re.compile(r"(?<=[ក-៿])\s+(?=[ក-៿])")
 # Common Khmer connectors and conjunctions that naturally carry a leading space in text
 _KHMER_CONNECTORS = {
     "និង", "ឬ", "ប៉ុន្តែ", "ហើយ", "ដែល", "ក្នុង", "លើ", "ពី", "នៅ",
-    "ព្រោះ", "ដើម្បី", "គឺ", "ជា", "ដូច្នេះ", "ប្រសិនបើ", "ដូចជា"
+    "ព្រោះ", "ដើម្បី", "គឺ", "ជា", "ដូច្នេះ", "ប្រសិនបើ", "ដូចជា",
+    "ថា", "ក៏", "កាល", "ពេល", "លុះ", "ទើប", "ឯ"
 }
 
 
@@ -41,73 +43,142 @@ class KhmerChunk:
 
 
 def clean_khmer_output(raw: str) -> tuple[str, str]:
-    """'សួស ; ស្តី ; ខ្ញុំ ; ឈ្មោះ' -> ('សួស្តី ខ្ញុំឈ្មោះ', 'សួស ស្តី ខ្ញុំ ឈ្មោះ')"""
-    words = [w.strip() for w in raw.split(";") if w.strip()]
-    if not words:
+    """'ការ ដើម ឡើយ ; នៅ ភាគ ខាងកើត' -> ('ការដើមឡើយ នៅភាគខាងកើត', 'ការ ដើម ឡើយ នៅ ភាគ ខាងកើត')"""
+    raw = unicodedata.normalize("NFC", raw).replace("\ufffd", "")
+    groups = [g.strip() for g in raw.split(";") if g.strip()]
+    if not groups:
         return "", ""
 
-    segmented = " ".join(words)
-    res = ""
-    for w in words:
-        if not res:
-            res = w
-        elif w in _KHMER_CONNECTORS or len(res.split()[-1]) > 14:
-            res += " " + w
-        elif any(c.isascii() and c.isalnum() for c in w) or any(c.isascii() and c.isalnum() for c in res[-1]):
-            res += " " + w
-        else:
-            res += w
-    return res.strip(), segmented
+    # Filter out non-speech audio event annotations like [Music], (singing), etc.
+    filtered_groups = []
+    for g in groups:
+        words = [w.strip() for w in g.split() if w.strip()]
+        words = [w for w in words if not re.fullmatch(r"[\(\[\{].*?(?:music|singing|applause|cheering|sound|instrumental).*?[\)\]\}]", w, re.I)]
+        # Deduplicate consecutive repetitive tokens (e.g. បាន បាន បាន)
+        deduped = []
+        prev_w = None
+        rep_count = 0
+        for w in words:
+            if w == prev_w:
+                rep_count += 1
+                if rep_count < 2:
+                    deduped.append(w)
+            else:
+                prev_w = w
+                rep_count = 0
+                deduped.append(w)
+        if deduped:
+            filtered_groups.append(" ".join(deduped))
+
+    if not filtered_groups:
+        return "", ""
+
+    segmented = " ".join(filtered_groups)
+    cleaned_phrases = [_KHMER_GAP_RE.sub("", g) for g in filtered_groups]
+    res = " ".join(cleaned_phrases).strip()
+    return res, segmented
 
 
 def make_khmer_subtitles(words: list[str], start_s: float, end_s: float, max_words_per_sub: int = 5) -> list[KhmerChunk]:
     """Break a list of recognized words within a time span into natural subtitle cards."""
     if not words:
         return []
+    raw_stream = ";".join(words)
+    return make_khmer_subtitles_from_decoded(raw_stream, start_s, end_s, max_words_per_sub)
+
+
+def make_khmer_subtitles_from_decoded(
+    raw_decoded: str,
+    start_s: float,
+    end_s: float,
+    max_words_per_sub: int = 5,
+) -> list[KhmerChunk]:
+    """Break raw decoded Khmer text stream into natural, readable subtitle cards."""
+    cleaned = re.sub(r"[\(\[\{].*?(?:music|singing|applause|cheering|sound|instrumental).*?[\)\]\}]", "", raw_decoded, flags=re.I)
+    cleaned = unicodedata.normalize("NFC", cleaned).replace("\ufffd", "").strip()
+    if not cleaned:
+        return []
+
+    raw_groups = [g.strip() for g in cleaned.split(";") if g.strip()]
+    if not raw_groups:
+        return []
+
+    tokens: list[tuple[str, bool]] = []
+    for g_idx, group in enumerate(raw_groups):
+        words = [w.strip() for w in group.split() if w.strip()]
+        for w_idx, w in enumerate(words):
+            is_phrase_end = (w_idx == len(words) - 1 and g_idx < len(raw_groups) - 1)
+            tokens.append((w, is_phrase_end))
+
+    # Deduplicate repetitive consecutive tokens (halting loops like បាន បាន បាន)
+    deduped_tokens: list[tuple[str, bool]] = []
+    prev_w = None
+    rep_count = 0
+    for w, is_end in tokens:
+        if w == prev_w:
+            rep_count += 1
+            if rep_count < 2:  # allow natural double words (e.g. តិចៗ)
+                deduped_tokens.append((w, is_end))
+        else:
+            prev_w = w
+            rep_count = 0
+            deduped_tokens.append((w, is_end))
+
+    total_tokens = len(deduped_tokens)
+    if total_tokens == 0:
+        return []
 
     total_dur = max(0.1, end_s - start_s)
-    total_words = len(words)
 
-    # Short spans (<= 3.5s) or few words (<= 5) stay as a single subtitle card
-    if total_dur <= 3.5 or total_words <= 5:
-        text, seg = clean_khmer_output(";".join(words))
+    # Short span (<= 3.0s) or few words (<= 4) stay as a single subtitle card
+    if total_dur <= 3.0 or total_tokens <= 4:
+        card_words = [t[0] for t in deduped_tokens]
+        text, seg = clean_khmer_output(";".join(card_words))
         if text:
             return [KhmerChunk(start=round(start_s, 2), end=round(end_s, 2), text=text, segmented=seg)]
         return []
 
-    # Target 3-5 words per subtitle card for optimal video reading
-    target_size = min(max_words_per_sub, max(3, (total_words + 1) // max(2, int(total_dur / 2.5))))
-    phrases = []
-    current = []
+    # Dynamic target words per card: 3 to 6 words for optimal reading speed (~2.5s per card)
+    target_words = min(max_words_per_sub, max(3, int(total_tokens / max(1, total_dur / 2.5))))
+    cards: list[list[str]] = []
+    cur_card: list[str] = []
 
-    split_triggers = {"និង", "ឬ", "ប៉ុន្តែ", "ហើយ", "ដែល", "ព្រោះ", "ដើម្បី", "ដូច្នេះ", "។", "!", "?"}
+    for i, (w, is_phrase_end) in enumerate(deduped_tokens):
+        cur_card.append(w)
+        is_last = (i == total_tokens - 1)
+        next_w = deduped_tokens[i + 1][0] if not is_last else ""
 
-    for i, w in enumerate(words):
-        current.append(w)
-        is_last = (i == total_words - 1)
         if is_last:
-            phrases.append(current)
-            current = []
-        elif len(current) >= target_size:
-            phrases.append(current)
-            current = []
-        elif len(current) >= 3 and i + 1 < total_words and words[i + 1] in split_triggers:
-            phrases.append(current)
-            current = []
+            cards.append(cur_card)
+            cur_card = []
+        elif is_phrase_end:
+            cards.append(cur_card)
+            cur_card = []
+        elif len(cur_card) >= target_words:
+            cards.append(cur_card)
+            cur_card = []
+        elif len(cur_card) >= 3 and next_w in _KHMER_CONNECTORS:
+            cards.append(cur_card)
+            cur_card = []
 
-    if current:
-        if phrases:
-            phrases[-1].extend(current)
+    if cur_card:
+        if cards:
+            cards[-1].extend(cur_card)
         else:
-            phrases.append(current)
+            cards.append(cur_card)
 
-    subtitles = []
+    # Merge very small trailing cards (<= 1 word) with previous card to prevent 0.4s flicker
+    if len(cards) > 1 and len(cards[-1]) <= 1:
+        tail = cards.pop()
+        cards[-1].extend(tail)
+
+    subtitles: list[KhmerChunk] = []
     cur_start = start_s
     words_acc = 0
-    for p in phrases:
-        words_acc += len(p)
-        cur_end = min(end_s, start_s + (words_acc / total_words) * total_dur)
-        t, s = clean_khmer_output(";".join(p))
+    for card_words in cards:
+        words_acc += len(card_words)
+        cur_end = min(end_s, start_s + (words_acc / total_tokens) * total_dur)
+        t, s = clean_khmer_output(";".join(card_words))
         if t:
             subtitles.append(KhmerChunk(
                 start=round(cur_start, 2),
@@ -116,6 +187,7 @@ def make_khmer_subtitles(words: list[str], start_s: float, end_s: float, max_wor
                 segmented=s,
             ))
         cur_start = cur_end
+
     return subtitles
 
 
@@ -150,42 +222,84 @@ class KhmerWhisperEngine:
     def transcribe(self, audio: np.ndarray) -> list[KhmerChunk]:
         from faster_whisper.vad import VadOptions, get_speech_timestamps
 
-        # Split on silence into <30 s pieces so long recordings fit Whisper's window.
-        spans = get_speech_timestamps(
-            audio, VadOptions(max_speech_duration_s=MAX_CHUNK_S, min_silence_duration_ms=400))
+        total_len = len(audio)
+        if total_len < SAMPLE_RATE * 0.2:
+            return []
 
-        # Robust VAD Fallback: If VAD detected no pauses (quiet audio or music), chunk by time
-        if not spans:
-            total_len = len(audio)
-            chunk_samples = int(MAX_CHUNK_S * SAMPLE_RATE)
-            spans = [
-                {"start": i, "end": min(i + chunk_samples, total_len)}
-                for i in range(0, total_len, chunk_samples)
-            ]
+        # Tuned VAD: sensitive enough for singing over music, soft dialogue and normal speech
+        try:
+            spans = get_speech_timestamps(
+                audio,
+                VadOptions(
+                    threshold=0.22,
+                    min_speech_duration_ms=200,
+                    min_silence_duration_ms=300,
+                    speech_pad_ms=250,
+                    max_speech_duration_s=25.0,
+                ),
+            )
+        except Exception:
+            spans = []
+
+        total_speech_len = sum(s["end"] - s["start"] for s in spans) if spans else 0
+        vad_coverage = total_speech_len / max(1, total_len)
+
+        # Robust Music / Song / Low-VAD Fallback:
+        # In songs or noisy dialogue with background music, VAD might detect very few chunks (< 35% coverage).
+        # We divide audio into contiguous chunks (18s window, 1.5s step-back) so no singing/vocals are missed!
+        if not spans or vad_coverage < 0.35:
+            chunk_samples = int(18.0 * SAMPLE_RATE)
+            step_samples = int(16.5 * SAMPLE_RATE)
+            spans = []
+            for i in range(0, total_len, step_samples):
+                end = min(i + chunk_samples, total_len)
+                if end - i > SAMPLE_RATE * 0.4:
+                    spans.append({"start": i, "end": end})
+
+        # Skip chunks that are pure silence (RMS < 0.003) to prevent silence hallucination
+        active_spans = []
+        for s in spans:
+            clip = audio[s["start"]:s["end"]]
+            if len(clip) > 0:
+                rms = float(np.sqrt(np.mean(clip ** 2)))
+                if rms >= 0.003:
+                    active_spans.append(s)
+
+        if not active_spans:
+            return []
 
         chunks: list[KhmerChunk] = []
-        for i in range(0, len(spans), self._batch_size):
-            batch = spans[i:i + self._batch_size]
+        for i in range(0, len(active_spans), self._batch_size):
+            batch = active_spans[i:i + self._batch_size]
             feats = np.stack([self._mel(audio[s["start"]:s["end"]]) for s in batch])
             results = self._model.generate(
                 self._ct2.StorageView.from_array(feats),
                 [self._prompt] * len(batch),
                 beam_size=self._beam_size,
+                patience=1.0,
+                suppress_blank=True,
+                repetition_penalty=1.18,
+                no_repeat_ngram_size=4,
                 max_length=448,
             )
             for span, res in zip(batch, results):
                 ids = [t for t in res.sequences_ids[0] if t not in self._special_ids]
                 raw_decoded = self._tokenizer.decode(ids)
-                words = [w.strip() for w in raw_decoded.split(";") if w.strip()]
                 start_s = span["start"] / SAMPLE_RATE
                 end_s = span["end"] / SAMPLE_RATE
 
-                subtitles = make_khmer_subtitles(words, start_s, end_s)
+                subtitles = make_khmer_subtitles_from_decoded(raw_decoded, start_s, end_s)
                 chunks.extend(subtitles)
 
         return chunks
 
     def _mel(self, audio: np.ndarray) -> np.ndarray:
+        # Pre-process audio: remove DC offset and peak-normalize for clear vocal formants
+        if len(audio) > 0:
+            audio = audio - np.mean(audio)
+            peak = float(np.max(np.abs(audio)))
+            if peak > 1e-4:
+                audio = (audio / peak) * 0.95
         mel = self._features(audio)[:, :N_FRAMES]
         if mel.shape[1] < N_FRAMES:
             mel = np.pad(mel, ((0, 0), (0, N_FRAMES - mel.shape[1])))

@@ -270,7 +270,7 @@ export function buildSmartFrameRecord({
       crop: solveSmartFrameCrop(sourceSize, targetSize, currentSubject, { ...settings, leadX }),
     };
   });
-  if (!prepared.length) throw new Error("没有可用于智能构图的主体轨迹");
+  if (!prepared.length) throw new Error("No subject trajectory available for Smart Frame");
 
   const forward = smoothPass(prepared, motionConfig.smoothing, false);
   const smoothed = smoothPass(forward, Math.min(0.7, motionConfig.smoothing * 1.35), true);

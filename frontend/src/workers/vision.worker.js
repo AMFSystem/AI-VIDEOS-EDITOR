@@ -63,7 +63,7 @@ function createModelLoadProgressCallback(requestId, { start, end, label }) {
     }
 
     lastReported = nextProgress;
-    postProgress(requestId, nextProgress, `下载或读取 ${label} ONNX`);
+    postProgress(requestId, nextProgress, `Loading ${label} ONNX`);
   };
 }
 
@@ -95,21 +95,21 @@ async function getDetector(requestId) {
         });
       if (self.navigator?.gpu) {
         try {
-          postProgress(requestId, 5, `正在初始化 ${YOLOS_TINY_MODEL_LABEL} WebGPU`);
+          postProgress(requestId, 5, `Initializing ${YOLOS_TINY_MODEL_LABEL} WebGPU`);
           const detector = await createPipeline("webgpu", "fp16");
           detectorBackend = "webgpu";
           detectorFallbackReason = "";
-          postProgress(requestId, 48, `${YOLOS_TINY_MODEL_LABEL} WebGPU 已就绪`);
+          postProgress(requestId, 48, `${YOLOS_TINY_MODEL_LABEL} WebGPU ready`);
           return detector;
         } catch (error) {
           detectorFallbackReason = error?.message || String(error);
-          console.warn(`${YOLOS_TINY_MODEL_LABEL} WebGPU 初始化失败，切换到 WASM。`, error);
-          postProgress(requestId, 6, `${YOLOS_TINY_MODEL_LABEL} WebGPU 不可用，切换到 WASM`);
+          console.warn(`${YOLOS_TINY_MODEL_LABEL} WebGPU initialization failed, switching to WASM.`, error);
+          postProgress(requestId, 6, `${YOLOS_TINY_MODEL_LABEL} WebGPU unavailable, switching to WASM`);
         }
       }
       const detector = await createPipeline("wasm", "q8");
       detectorBackend = "wasm";
-      postProgress(requestId, 48, `${YOLOS_TINY_MODEL_LABEL} WASM 已就绪`);
+      postProgress(requestId, 48, `${YOLOS_TINY_MODEL_LABEL} WASM ready`);
       return detector;
     })().catch((error) => {
       detectorPromise = null;
@@ -117,7 +117,7 @@ async function getDetector(requestId) {
       throw error;
     });
   } else {
-    postProgress(requestId, 48, `${YOLOS_TINY_MODEL_LABEL} 已就绪`);
+    postProgress(requestId, 48, `${YOLOS_TINY_MODEL_LABEL} ready`);
   }
 
   return detectorPromise;
@@ -146,7 +146,7 @@ async function getBackgroundRemover(requestId) {
       throw error;
     });
   } else {
-    postProgress(requestId, 88, `${MODNET_MODEL_LABEL} 已就绪`);
+    postProgress(requestId, 88, `${MODNET_MODEL_LABEL} ready`);
   }
 
   return backgroundRemoverPromise;
@@ -156,7 +156,7 @@ function getErrorMessage(error) {
   if (error instanceof Error && error.message) {
     return error.message;
   }
-  return "视觉主体分析失败";
+  return "Visual subject analysis failed";
 }
 
 function getMatteSubject(cutoutImage, sourceSize) {
@@ -265,10 +265,10 @@ async function analyzeVisual(message) {
   } = message;
 
   if (!(imageBlob instanceof Blob) || imageBlob.size <= 0) {
-    throw new Error("没有可分析的图片数据。");
+    throw new Error("No image data available for analysis.");
   }
 
-  postProgress(requestId, 3, "解码视觉素材");
+  postProgress(requestId, 3, "Decoding visual media");
   const { RawImage } = await getTransformers();
   const image = await RawImage.read(imageBlob);
   const sourceSize = {
@@ -283,7 +283,7 @@ async function analyzeVisual(message) {
   let detections = [];
   if (!skipDetection || !targetBox) {
     const detector = await getDetector(requestId);
-    postProgress(requestId, 52, `使用 ${YOLOS_TINY_MODEL_LABEL} 识别主体`);
+    postProgress(requestId, 52, `Detecting subject with ${YOLOS_TINY_MODEL_LABEL}`);
     const rawDetections = await detector(image, {
       threshold: Math.max(0.01, Math.min(0.99, Number(threshold) || 0.35)),
       percentage: false,
@@ -301,7 +301,7 @@ async function analyzeVisual(message) {
       }))
       .sort((left, right) => right.score - left.score);
   } else {
-    postProgress(requestId, 52, "复用已锁定人物区域");
+    postProgress(requestId, 52, "Reusing locked subject area");
   }
   const rankedSubject = skipDetection && targetBox
     ? {
@@ -336,7 +336,7 @@ async function analyzeVisual(message) {
   postProgress(
     requestId,
     removeBackground ? 60 : 96,
-    subject ? `已识别主体：${subject.label}` : "未识别到高置信度主体",
+    subject ? `Subject identified: ${subject.label}` : "No high-confidence subject detected",
   );
 
   if (isCanceled(requestId)) {
@@ -347,12 +347,12 @@ async function analyzeVisual(message) {
   let matteSubject = null;
   if (removeBackground) {
     const backgroundRemover = await getBackgroundRemover(requestId);
-    postProgress(requestId, 90, `使用 ${MODNET_MODEL_LABEL} 生成透明抠图`);
+    postProgress(requestId, 90, `Generating cutout with ${MODNET_MODEL_LABEL}`);
     const cutoutImages = await backgroundRemover(image);
     const rawCutoutImage = Array.isArray(cutoutImages) ? cutoutImages[0] : cutoutImages;
     const cutoutImage = restrictCutoutToSubject(rawCutoutImage, subject);
     if (!cutoutImage) {
-      throw new Error(`${MODNET_MODEL_LABEL} 没有返回有效抠图。`);
+      throw new Error(`${MODNET_MODEL_LABEL} did not return a valid cutout.`);
     }
     matteSubject = getMatteSubject(cutoutImage, sourceSize);
     subject = mergePortraitSubject(subject, matteSubject);
@@ -361,16 +361,16 @@ async function analyzeVisual(message) {
     }
     cutoutBlob = await cutoutImage.toBlob("image/png");
     if (!(cutoutBlob instanceof Blob) || cutoutBlob.size <= 0) {
-      throw new Error(`${MODNET_MODEL_LABEL} 透明 PNG 生成失败。`);
+      throw new Error(`${MODNET_MODEL_LABEL} PNG generation failed.`);
     }
-    postProgress(requestId, 97, "透明抠图已生成");
+    postProgress(requestId, 97, "Cutout generated");
   }
 
   if (isCanceled(requestId)) {
     return;
   }
 
-  postProgress(requestId, 100, "视觉主体分析完成");
+  postProgress(requestId, 100, "Visual subject analysis complete");
   self.postMessage({
     type: "result",
     requestId,
@@ -403,13 +403,13 @@ async function warmVisualModels(message) {
     includeDetector = true,
     includeMatting = true,
   } = message;
-  postProgress(requestId, 1, "并行准备人物识别模型");
+  postProgress(requestId, 1, "Preparing visual models in parallel");
   const jobs = [];
   if (includeDetector) jobs.push(getDetector(requestId));
   if (includeMatting) jobs.push(getBackgroundRemover(requestId));
   await Promise.all(jobs);
   if (isCanceled(requestId)) return;
-  postProgress(requestId, 100, "人物识别模型已就绪");
+  postProgress(requestId, 100, "Visual models ready");
   self.postMessage({
     type: "result",
     requestId,

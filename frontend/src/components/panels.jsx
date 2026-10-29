@@ -33,6 +33,7 @@ import {
   Scan,
   Scissors,
   Sparkle,
+  Translate,
   Trash,
   Waveform,
   X,
@@ -1242,6 +1243,7 @@ export function ToolPanel(props) {
   const [selectedCapCutTemplateId, setSelectedCapCutTemplateId] = useState("tiktok-viral");
   const [selectedAudioSourceType, setSelectedAudioSourceType] = useState("timeline");
   const [captionStudioTab, setCaptionStudioTab] = useState("auto");
+  const [isTranslatingCaptions, setIsTranslatingCaptions] = useState(false);
 
   const captionFontOptions = useMemo(
     () => getCaptionFontsForLanguage(uiLanguage),
@@ -1545,6 +1547,42 @@ export function ToolPanel(props) {
       });
     };
 
+    const handleTranslateCaptionsToKhmer = async () => {
+      if (!captionSegments || captionSegments.length === 0) {
+        notify?.("មិនមាន Subtitles នៅលើ Timeline សម្រាប់បកប្រែទេ");
+        return;
+      }
+      setIsTranslatingCaptions(true);
+      notify?.("🌐 កំពុងបកប្រែ Subtitles ទៅជាភាសាខ្មែរ...");
+      try {
+        const texts = captionSegments.map((s) => s.text || "");
+        const res = await fetch("/api/ai/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ texts, sourceLang: "auto", targetLang: "km" }),
+        });
+        if (!res.ok) throw new Error(`Translate API error: ${res.status}`);
+        const data = await res.json();
+        const lines = Array.isArray(data.lines) ? data.lines : [];
+        if (lines.length > 0) {
+          setCaptionSegments((prev) =>
+            prev.map((seg, idx) => ({
+              ...seg,
+              text: lines[idx] || seg.text,
+            }))
+          );
+          notify?.(`🎉 បានបកប្រែ Subtitles ចំនួន ${lines.length} ទៅជាភាសាខ្មែរត្រឹមត្រូវរួចរាល់!`);
+        } else {
+          notify?.("មិនអាចបកប្រែបានទេ សូមសាកល្បងម្តងទៀត");
+        }
+      } catch (err) {
+        console.error(err);
+        notify?.("ការបកប្រែបរាជ័យ៖ " + (err.message || "Unknown error"));
+      } finally {
+        setIsTranslatingCaptions(false);
+      }
+    };
+
     return (
       <div className="tool-panel caption-tool-panel">
         <div className="caption-tool-heading">
@@ -1714,18 +1752,42 @@ export function ToolPanel(props) {
               <div className="auto-caption-segments-box">
                 <div className="auto-caption-segments-header">
                   <span>🎬 Subtitles នៅលើ Timeline ({captionSegments.length})</span>
-                  <button
-                    type="button"
-                    style={{ background: "none", border: "none", color: "#ef5350", fontSize: "10.5px", cursor: "pointer", fontWeight: "700" }}
-                    onClick={() => {
-                      if (window.confirm("តើអ្នកពិតជាចង់លុប Subtitles ទាំងអស់ពី Timeline មែនទេ?")) {
-                        setCaptionSegments([]);
-                        notify?.("🗑️ បានលុប Subtitles ពី Timeline រួចរាល់");
-                      }
-                    }}
-                  >
-                    លុបទាំងអស់
-                  </button>
+                  <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      disabled={isTranslatingCaptions}
+                      style={{
+                        background: "rgba(53, 234, 217, 0.12)",
+                        border: "1px solid rgba(53, 234, 217, 0.4)",
+                        borderRadius: "5px",
+                        color: "#35ead9",
+                        fontSize: "11px",
+                        fontWeight: "700",
+                        padding: "3px 8px",
+                        cursor: isTranslatingCaptions ? "wait" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                      onClick={handleTranslateCaptionsToKhmer}
+                      title="បកប្រែ Subtitles ទាំងអស់លើ Timeline ទៅជាភាសាខ្មែរ"
+                    >
+                      <Translate size={13} weight="bold" />
+                      <span>{isTranslatingCaptions ? "កំពុងបកប្រែ..." : "🌐 បកប្រែជាភាសាខ្មែរ"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      style={{ background: "none", border: "none", color: "#ef5350", fontSize: "10.5px", cursor: "pointer", fontWeight: "700" }}
+                      onClick={() => {
+                        if (window.confirm("តើអ្នកពិតជាចង់លុប Subtitles ទាំងអស់ពី Timeline មែនទេ?")) {
+                          setCaptionSegments([]);
+                          notify?.("🗑️ បានលុប Subtitles ពី Timeline រួចរាល់");
+                        }
+                      }}
+                    >
+                      លុបទាំងអស់
+                    </button>
+                  </div>
                 </div>
                 <div style={{ maxHeight: "200px", overflowY: "auto", display: "grid", gap: "5px" }}>
                   {captionSegments.slice(0, 15).map((seg, idx) => (
@@ -2363,6 +2425,31 @@ export function ToolPanel(props) {
         photoParallaxProgress={photoParallaxDepth?.job?.progress}
         onRemove={removeSelectedSubjectEffect}
       />
+    );
+  }
+
+  if (activeTool === "filters") {
+    const activeSegment = selectedVisualSegment || segments?.[0];
+    const previewSrc = getSegmentFilterPreview(activeSegment) || SAMPLE_IMAGE;
+    return (
+      <div className="tool-panel filters-tool-panel mobile-panel-scroll-body">
+        <VisualChoicePanel
+          title={t("filters", "Filters")}
+          kind="filter"
+          options={FILTER_OPTIONS}
+          previewImage={previewSrc}
+          selectedId={selectedVisualSegment?.filterId ?? selectedFilterId}
+          trOption={trOption}
+          onSelect={(id) => {
+            setSelectedFilterId(id);
+            if (!selectedVisualSegment?.id && segments?.length > 0) {
+              setSelectedSegmentId?.(segments[0].id);
+            }
+            updateSelectedVisualEffects?.({ filterId: id });
+            notify(t("filterApplied", "បានអនុវត្ត Filter រួចរាល់!"));
+          }}
+        />
+      </div>
     );
   }
 

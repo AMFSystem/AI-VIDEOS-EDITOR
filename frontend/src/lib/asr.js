@@ -112,8 +112,16 @@ function normalizeChineseAsrText(text) {
   );
 }
 
+function stripAudioEventAnnotations(text) {
+  return String(text ?? "")
+    .replace(/[\(\[\{].*?(?:music|singing|applause|cheering|sound|instrumental).*?[\)\]\}]/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function normalizeAsrText(text, language) {
-  const normalized = normalizeAsrWhitespace(text, language);
+  const stripped = stripAudioEventAnnotations(text);
+  const normalized = normalizeAsrWhitespace(stripped, language);
   return language === "zh" ? normalizeChineseAsrText(normalized) : normalized;
 }
 
@@ -203,6 +211,9 @@ function createModelLoadProgressCallback(onProgress) {
 async function detectWhisperLanguage(transcriber, audio, preferredLanguage, onProgress) {
   const generationConfig = transcriber?.model?.generation_config;
   const fallbackLanguage = getPreferredWhisperLanguage(preferredLanguage);
+  if (preferredLanguage && preferredLanguage !== "auto") {
+    return { language: fallbackLanguage, detected: false };
+  }
   if (!isMultilingualWhisper(transcriber)) {
     return { language: "en", detected: false };
   }
@@ -430,7 +441,10 @@ function isSuspiciousChineseTranscript(output) {
 }
 
 function isSuspiciousTranscript(output, language, preferredLanguage) {
+  const text = getTranscriptText(output) || "";
+  if (/singing in foreign language|\[music\]|\(music\)|\(upbeat music\)/i.test(text)) return true;
   const expectedLanguage = language || getPreferredWhisperLanguage(preferredLanguage);
+  if (expectedLanguage === "km" && !/[\u1780-\u17ff]/.test(text) && text.trim().length > 0) return true;
   return expectedLanguage === "zh" && isSuspiciousChineseTranscript(output);
 }
 
@@ -521,11 +535,53 @@ async function runTranscription(
   };
 }
 
+async function prepareAudioBlobForStt(blob) {
+  try {
+    const { audio, duration } = await decodeAudioForAsr(blob);
+    if (!audio?.length || !duration) return blob;
+    const pcmBytes = new Int16Array(audio.length);
+    for (let i = 0; i < audio.length; i++) {
+      const s = Math.max(-1, Math.min(1, audio[i]));
+      pcmBytes[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    const numChannels = 1;
+    const sampleRate = 16000;
+    const byteRate = sampleRate * numChannels * 2;
+    const blockAlign = numChannels * 2;
+    const buffer = new ArrayBuffer(44 + pcmBytes.byteLength);
+    const view = new DataView(buffer);
+
+    view.setUint32(0, 0x52494646, false); // "RIFF"
+    view.setUint32(4, 36 + pcmBytes.byteLength, true);
+    view.setUint32(8, 0x57415645, false); // "WAVE"
+    view.setUint32(12, 0x666d7420, false); // "fmt "
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true);
+    view.setUint32(36, 0x64617461, false); // "data"
+    view.setUint32(40, pcmBytes.byteLength, true);
+
+    new Uint8Array(buffer, 44).set(new Uint8Array(pcmBytes.buffer));
+    return new Blob([buffer], { type: "audio/wav" });
+  } catch (err) {
+    console.warn("Audio pre-encoding for STT fallback to original blob:", err);
+    return blob;
+  }
+}
+
 async function tryLocalAiBackendStt(blob, { preferredLanguage = "auto", timelineOffset = 0, onProgress, signal } = {}) {
   throwIfAborted(signal);
-  onProgress?.({ progress: 12, phase: "កំពុងភ្ជាប់ទៅកាន់ Local AI STT Service..." });
+  onProgress?.({ progress: 10, phase: "កំពុងរៀបចំ និងបង្ហាប់សំឡេងសម្រាប់ AI Analysis..." });
+  const uploadBlob = await prepareAudioBlobForStt(blob);
+  throwIfAborted(signal);
+
+  onProgress?.({ progress: 18, phase: "កំពុងភ្ជាប់ទៅកាន់ Local AI STT Service..." });
   const formData = new FormData();
-  formData.append("file", blob, "timeline_audio.wav");
+  formData.append("file", uploadBlob, "timeline_audio.wav");
   formData.append("language", preferredLanguage || "auto");
 
   const isKhmer = preferredLanguage === "km" || preferredLanguage === "auto";
@@ -555,7 +611,7 @@ async function tryLocalAiBackendStt(blob, { preferredLanguage = "auto", timeline
   let response;
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s safe timeout
+    const timeoutId = setTimeout(() => controller.abort(), 180000); // 180s safe timeout
     const onAbort = () => controller.abort();
     if (signal) {
       signal.addEventListener("abort", onAbort, { once: true });
@@ -628,12 +684,15 @@ async function tryLocalAiBackendStt(blob, { preferredLanguage = "auto", timeline
   }
 
   onProgress?.({ progress: 95, phase: "កំពុងបញ្ចូល Subtitles ទៅក្នុង Timeline..." });
-  const segments = rawSegments.map((s) => ({
-    id: makeId("caption"),
-    start: Number((timelineOffset + (s.start || 0)).toFixed(2)),
-    end: Number((timelineOffset + (s.end || (s.start + 2))).toFixed(2)),
-    text: normalizeAsrText(s.text?.trim() || "", data.detected_language || preferredLanguage),
-  })).filter((s) => s.text);
+  const isAudioTag = (t) => /^[\(\[\{].*?(?:music|singing|applause|cheering|sound).*?[\)\]\}]$/i.test(String(t).trim());
+  const segments = rawSegments
+    .filter((s) => !isAudioTag(s.text || ""))
+    .map((s) => ({
+      id: makeId("caption"),
+      start: Number((timelineOffset + (s.start || 0)).toFixed(2)),
+      end: Number((timelineOffset + (s.end || (s.start + 2))).toFixed(2)),
+      text: normalizeAsrText(s.text?.trim() || "", data.detected_language || preferredLanguage),
+    })).filter((s) => s.text);
 
   return {
     segments,

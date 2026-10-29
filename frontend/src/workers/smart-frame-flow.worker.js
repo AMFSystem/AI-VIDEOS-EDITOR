@@ -1,6 +1,6 @@
 /* global cv */
 
-self.postMessage({ type: "status", phase: "正在读取光流运行时" });
+self.postMessage({ type: "status", phase: "Loading optical flow runtime" });
 importScripts("/vendor/opencv.js");
 
 let runtime = null;
@@ -115,7 +115,7 @@ self.addEventListener("message", (event) => {
       return;
     }
     if (message.type === "step") {
-      if (!previousGray) throw new Error("光流尚未初始化");
+      if (!previousGray) throw new Error("Optical flow not initialized");
       const currentGray = rgbaToGray(message.rgba);
       const result = estimate(currentGray, message.box);
       previousGray.delete();
@@ -128,7 +128,7 @@ self.addEventListener("message", (event) => {
       self.postMessage({ requestId: message.requestId, type: "result", result: {} });
       return;
     }
-    throw new Error(`未知光流指令：${message.type}`);
+    throw new Error(`Unknown optical flow command: ${message.type}`);
   } catch (error) {
     self.postMessage({ requestId: message.requestId, type: "error", error: error?.message || String(error) });
   }
@@ -146,7 +146,7 @@ self.addEventListener("message", (event) => {
         };
       });
     }
-    if (!runtime?.Mat || !runtime?.calcOpticalFlowFarneback) throw new Error("当前 OpenCV.js 不支持 Farneback 光流");
+    if (!runtime?.Mat || !runtime?.calcOpticalFlowFarneback) throw new Error("Current OpenCV.js does not support Farneback optical flow");
     self.postMessage({ type: "ready", version: runtime.getVersionString?.() || "4.x" });
   } catch (error) {
     self.postMessage({ type: "fatal", error: error?.message || String(error) });

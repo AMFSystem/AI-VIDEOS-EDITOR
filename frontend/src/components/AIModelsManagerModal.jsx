@@ -21,7 +21,7 @@ const DEFAULT_MODELS = [
   // --- 1. SPEECH TO TEXT (STT & CAPTIONS) ---
   {
     id: "whisper-khmer",
-    name: "Whisper Turbo Khmer v9 (CT2)",
+    name: "Whisper Turbo Khmer",
     category: "stt",
     badge: "Khmer STT",
     description: "ម៉ូដែលបម្លែងសំឡេងនិយាយភាសាខ្មែរទៅជាអក្សរស្វ័យប្រវត្ត (CTranslate2 Int8 Optimized)",
@@ -29,7 +29,7 @@ const DEFAULT_MODELS = [
   },
   {
     id: "whisper-small-captions",
-    name: "Whisper Small Word-Timestamped",
+    name: "Whisper Word-Sync",
     category: "stt",
     badge: "Word Sync STT",
     description: "ម៉ូដែលបំបែកពាក្យ និងកំណត់ពេលវេលាអក្សររត់ស្វ័យប្រវត្តកម្រិត Word-Level Timestamps",
@@ -37,7 +37,7 @@ const DEFAULT_MODELS = [
   },
   {
     id: "whisper-multilingual",
-    name: "Faster-Whisper Large v3 Turbo",
+    name: "Whisper Large v3",
     category: "stt",
     badge: "Universal STT",
     description: "ម៉ូដែលបម្លែងសំឡេងគ្រប់ភាសាលើពិភពលោក (English, Chinese, Thai, Vietnamese, etc.)",
@@ -45,7 +45,7 @@ const DEFAULT_MODELS = [
   },
   {
     id: "silero-vad",
-    name: "Silero Voice Activity Detection v5",
+    name: "Silero VAD v5",
     category: "stt",
     badge: "Audio VAD",
     description: "ម៉ូដែលចាប់យកសំឡេងមនុស្សនិយាយ និងកាត់ចន្លោះស្ងាត់ (Silence Cut) ដោយស្វ័យប្រវត្ត",
@@ -55,7 +55,7 @@ const DEFAULT_MODELS = [
   // --- 2. TEXT TO SPEECH (TTS) ---
   {
     id: "mms-tts-khm",
-    name: "Meta MMS-TTS Khmer Voice",
+    name: "Meta MMS Khmer",
     category: "tts",
     badge: "Khmer Voice",
     description: "ម៉ូដែលសំឡេងនិយាយភាសាខ្មែរ Offline (Meta VITS MMS)",
@@ -63,7 +63,7 @@ const DEFAULT_MODELS = [
   },
   {
     id: "mms-tts-eng",
-    name: "Meta MMS-TTS English Voice",
+    name: "Meta MMS English",
     category: "tts",
     badge: "English Voice",
     description: "ម៉ូដែលសំឡេងនិយាយភាសាអង់គ្លេស Offline (Meta VITS MMS)",
@@ -71,7 +71,7 @@ const DEFAULT_MODELS = [
   },
   {
     id: "kokoro-82m",
-    name: "Kokoro-82M Multilingual Voice",
+    name: "Kokoro-82M TTS",
     category: "tts",
     badge: "Kokoro TTS",
     description: "ម៉ូដែលសំឡេងអានបែបធម្មជាតិកម្រិតខ្ពស់ 82M parameters គាំទ្រភាសាអង់គ្លេស និងភាសាផ្សេងៗ",
@@ -79,7 +79,7 @@ const DEFAULT_MODELS = [
   },
   {
     id: "piper-khmer",
-    name: "Piper TTS Khmer Natural Voice",
+    name: "Piper TTS Khmer",
     category: "tts",
     badge: "Piper Offline",
     description: "ម៉ូដែលសំឡេងនិយាយខ្មែរដារ៉ា ល្បឿនលឿនខ្លាំង ស៊ីធនធាន CPU តិចតួចបំផុត",
@@ -88,8 +88,16 @@ const DEFAULT_MODELS = [
 
   // --- 3. VOICE CLONING ---
   {
+    id: "voxcpm2-clone",
+    name: "VoxCPM2 48kHz",
+    category: "clone",
+    badge: "VoxCPM2 Studio",
+    description: "ម៉ូដែលចម្លងសំឡេងកម្រិតស្ទូឌីយោ 48kHz Foundation Model ដោយ OpenBMB (Full Power)",
+    sizeFormatted: "2.4 GB",
+  },
+  {
     id: "omnivoice-clone",
-    name: "OmniVoice F5 Voice Clone",
+    name: "OmniVoice F5",
     category: "clone",
     badge: "AI Clone",
     description: "ម៉ូដែលក្លូនសំឡេងតួអង្គ និងសំឡេងមនុស្សផ្ទាល់ខ្លួន (F5-TTS Instant Voice Cloning)",
@@ -99,7 +107,7 @@ const DEFAULT_MODELS = [
   // --- 4. AUDIO & MUSIC ---
   {
     id: "vocal-remover",
-    name: "AI Vocal & Instrumental Stem Separator",
+    name: "Vocal Stem Separator",
     category: "audio",
     badge: "Stem Separator",
     description: "បំបែកសំឡេងច្រៀង ចម្រៀងភ្លេង និងកាត់បន្ថយសំឡេងរំខានចេញពីវីដេអូ ឬ Audio",
@@ -107,7 +115,7 @@ const DEFAULT_MODELS = [
   },
   {
     id: "ai-music-generator",
-    name: "Stable Audio Music & Beat Generator",
+    name: "AI Music Generator",
     category: "audio",
     badge: "Music Generator",
     description: "បង្កើតភ្លេងកំដរវីដេអូ Background Music និងចង្វាក់ Beat ស្វ័យប្រវត្ត",
@@ -117,7 +125,7 @@ const DEFAULT_MODELS = [
   // --- 5. VIDEO & VISION AI ---
   {
     id: "nanovsr-4x",
-    name: "NanoVSR 4x HD Video Upscaler",
+    name: "NanoVSR 4x HD",
     category: "vision",
     badge: "HD Restoration",
     description: "បង្កើនគុណភាពវីដេអូ និងរូបភាពឱ្យច្បាស់គុណនឹង 4x (Super Resolution Upscaling)",
@@ -125,7 +133,7 @@ const DEFAULT_MODELS = [
   },
   {
     id: "migan-repair",
-    name: "MiGAN Video Repair & Inpainting",
+    name: "MiGAN Video Inpaint",
     category: "vision",
     badge: "Object Remover",
     description: "លុប Logo, Watermark, និងវត្ថុដែលមិនចង់បានចេញពីវីដេអូដោយប្រើ AI Generative Fill",
@@ -133,7 +141,7 @@ const DEFAULT_MODELS = [
   },
   {
     id: "slimsam-cutout",
-    name: "SlimSAM AI Background Cutout",
+    name: "SlimSAM Cutout",
     category: "vision",
     badge: "Green Screen",
     description: "កាត់ផ្ទៃខាងក្រោយវីដេអូ (Instant Green Screen Cutout) ដោយមិនបាច់ប្រើក្រណាត់បៃតង",
@@ -141,7 +149,7 @@ const DEFAULT_MODELS = [
   },
   {
     id: "depth-anything",
-    name: "Depth-Anything v2 3D Parallax",
+    name: "Depth-Anything v2",
     category: "vision",
     badge: "3D Parallax",
     description: "បង្កើតជម្រៅរូបភាព Depth Map, កាមេរ៉ា 3D Parallax, និងព្រិលផ្ទៃក្រោយបែប Cinematic Blur",
@@ -149,7 +157,7 @@ const DEFAULT_MODELS = [
   },
   {
     id: "liveportrait-talking",
-    name: "LivePortrait Talking Face & Lip-Sync",
+    name: "LivePortrait Lip-Sync",
     category: "vision",
     badge: "Talking Avatar",
     description: "ធ្វើឱ្យរូបភាពមនុស្សមានចលនា និយាយ និងកាច់ក្បាលតាមចង្វាក់សំឡេងនិយាយ",
@@ -538,13 +546,8 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
                       </div>
                     )}
 
-                    {/* Bottom Line: Model ID + Action Buttons */}
+                    {/* Bottom Line: Action Buttons */}
                     <div className="model-row-actions-line">
-                      <div className="model-row-meta-id">
-                        <span className="model-badge-tag">{m.badge}</span>
-                        <span className="model-code-id">{m.id}</span>
-                      </div>
-
                       <div className="model-row-btn-group">
                         {m.installed ? (
                           <button

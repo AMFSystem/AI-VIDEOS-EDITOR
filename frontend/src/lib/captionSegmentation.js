@@ -28,6 +28,7 @@ export function captionSegmentsFromWords(chunks, duration, {
     const end = group.at(-1).end;
     if (end <= start) return; // Keep zero-length tokens with the next timed word.
     const text = normalizeText(rawText);
+    if (!text.trim()) return;
     segments.push({
       id: makeId("caption"), text, start: offset + start, end: offset + end,
       hidden: false, source: "asr", timingSource: "asr-word",

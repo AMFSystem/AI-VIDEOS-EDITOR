@@ -4,6 +4,7 @@ Audio lives under data_dir/voices/{user_id}/{voice_id}.wav; the database row
 stores that path relative to data_dir so the data folder can be moved.
 """
 
+import json
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -145,11 +146,33 @@ async def delete_voice(voice_id: uuid.UUID, user: User = Depends(get_current_use
 
 
 @router.get("/{voice_id}/audio", response_class=FileResponse, responses={200: {"content": {"audio/wav": {}}}})
-async def voice_audio(voice_id: uuid.UUID, user: User = Depends(get_current_user),
+async def voice_audio(voice_id: str, user: User = Depends(get_current_user),
                       session: AsyncSession = Depends(get_db),
                       settings: Settings = Depends(get_settings)) -> FileResponse:
-    """Play back the stored voice sample."""
-    voice = await get_owned_voice(voice_id, user, session)
+    """Play back the stored voice sample or trained model reference speaker audio."""
+    if voice_id.startswith("trained_"):
+        trained_dir = settings.model_dir / "trained_voices"
+        if trained_dir.exists():
+            for td in trained_dir.iterdir():
+                if td.is_dir():
+                    mf = td / "model_manifest.json"
+                    if mf.exists():
+                        try:
+                            with open(mf, "r", encoding="utf-8") as f:
+                                mdata = json.load(f)
+                                if mdata.get("id") == voice_id or td.name == voice_id or voice_id in td.name:
+                                    ref_path = td / "reference_speaker.wav"
+                                    if ref_path.exists():
+                                        return FileResponse(ref_path, media_type="audio/wav", filename=f"{mdata.get('name', 'voice')}.wav")
+                        except Exception:
+                            pass
+        raise HTTPException(404, "Trained voice audio is missing")
+
+    try:
+        v_uuid = uuid.UUID(voice_id)
+    except ValueError:
+        raise HTTPException(400, f"Invalid voice_id format: {voice_id}")
+    voice = await get_owned_voice(v_uuid, user, session)
     path = voice_audio_path(voice, settings)
     if not path.exists():
         raise HTTPException(404, "Voice audio is missing")

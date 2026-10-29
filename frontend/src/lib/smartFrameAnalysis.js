@@ -9,8 +9,8 @@ let nativeFaceDetector;
 
 function createAbortError() {
   const error = typeof DOMException !== "undefined"
-    ? new DOMException("智能构图分析已取消", "AbortError")
-    : new Error("智能构图分析已取消");
+    ? new DOMException("Smart Frame analysis canceled", "AbortError")
+    : new Error("Smart Frame analysis canceled");
   error.name = "AbortError";
   return error;
 }
@@ -35,12 +35,12 @@ function resetFlowWorker(error = null) {
 
 function getFlowWorker() {
   if (flowWorker && flowReadyPromise) return { worker: flowWorker, ready: flowReadyPromise };
-  if (typeof Worker === "undefined") throw new Error("当前浏览器不支持光流 Worker");
+  if (typeof Worker === "undefined") throw new Error("Browser does not support optical flow Worker");
   flowWorker = new Worker(new URL("../workers/smart-frame-flow.worker.js", import.meta.url));
   flowReadyPromise = new Promise((resolve, reject) => {
     const onMessage = (event) => {
       if (event.data?.type === "ready") resolve(event.data);
-      if (event.data?.type === "fatal") reject(new Error(event.data.error || "光流初始化失败"));
+      if (event.data?.type === "fatal") reject(new Error(event.data.error || "Optical flow initialization failed"));
     };
     flowWorker.addEventListener("message", onMessage);
   });
@@ -51,9 +51,9 @@ function getFlowWorker() {
     pendingFlowRequests.delete(message.requestId);
     pending.signal?.removeEventListener("abort", pending.onAbort);
     if (message.type === "result") pending.resolve(message.result || {});
-    else pending.reject(new Error(message.error || "光流跟踪失败"));
+    else pending.reject(new Error(message.error || "Optical flow tracking failed"));
   });
-  flowWorker.addEventListener("error", (event) => resetFlowWorker(new Error(event.message || "光流 Worker 运行失败")));
+  flowWorker.addEventListener("error", (event) => resetFlowWorker(new Error(event.message || "Optical flow Worker failed")));
   return { worker: flowWorker, ready: flowReadyPromise };
 }
 
@@ -86,7 +86,7 @@ function waitForEvent(target, eventName, errorName, signal) {
       signal?.removeEventListener("abort", onAbort);
     };
     const onSuccess = () => { cleanup(); resolve(); };
-    const onError = () => { cleanup(); reject(new Error("无法读取当前视频片段")); };
+    const onError = () => { cleanup(); reject(new Error("Unable to read current video clip")); };
     const onAbort = () => { cleanup(); reject(createAbortError()); };
     target.addEventListener(eventName, onSuccess, { once: true });
     target.addEventListener(errorName, onError, { once: true });
@@ -107,7 +107,7 @@ async function seekVideo(video, time, signal) {
 function canvasToBlob(canvas, type = "image/jpeg", quality = 0.86) {
   return new Promise((resolve, reject) => canvas.toBlob((blob) => {
     if (blob) resolve(blob);
-    else reject(new Error("无法编码视觉分析帧"));
+    else reject(new Error("Unable to encode visual analysis frame"));
   }, type, quality));
 }
 
@@ -187,7 +187,7 @@ async function detectAnchor(blob, targetBox, signal, onProgress) {
 }
 
 async function analyzeImage(segment, signal, onProgress) {
-  onProgress?.({ stage: "setup", progress: 2, phase: "准备主体检测模型" });
+  onProgress?.({ stage: "setup", progress: 2, phase: "Preparing subject detection model" });
   const source = segment?.blob || segment?.src;
   const blob = await captureVisualFrame({ src: source, type: "image", maxDimension: 1024, signal });
   const bitmap = typeof createImageBitmap === "function" ? await createImageBitmap(blob) : null;
@@ -198,10 +198,10 @@ async function analyzeImage(segment, signal, onProgress) {
   const subject = await detectAnchor(blob, null, signal, ({ progress, phase }) => {
     onProgress?.({ stage: "setup", progress, phase });
   });
-  if (!subject?.box) throw new Error("没有识别到可用于构图的主体");
+  if (!subject?.box) throw new Error("No subject detected for framing");
   const face = await detectNativeFace(bitmap, bitmap?.width, bitmap?.height, subject.box);
   bitmap?.close?.();
-  onProgress?.({ stage: "analysis", progress: 100, phase: "当前图片构图轨迹已生成" });
+  onProgress?.({ stage: "analysis", progress: 100, phase: "Framing path generated for image" });
   return {
     sourceSize,
     modelRevision: YOLOS_TINY_MODEL_REVISION,
@@ -212,7 +212,7 @@ async function analyzeImage(segment, signal, onProgress) {
 
 async function analyzeVideo(segment, signal, onProgress, onSample) {
   const requestedSource = segment?.blob || segment?.src;
-  if (!requestedSource) throw new Error("当前片段缺少视频源");
+  if (!requestedSource) throw new Error("Selected clip is missing video source");
   const objectUrl = requestedSource instanceof Blob ? URL.createObjectURL(requestedSource) : "";
   const video = document.createElement("video");
   video.muted = true;
@@ -222,7 +222,7 @@ async function analyzeVideo(segment, signal, onProgress, onSample) {
   try {
     await seekVideo(video, Math.max(0, Number(segment.sourceStart) || 0), signal);
     const sourceSize = { width: video.videoWidth, height: video.videoHeight };
-    if (!sourceSize.width || !sourceSize.height) throw new Error("视频尺寸无效");
+    if (!sourceSize.width || !sourceSize.height) throw new Error("Invalid video dimensions");
     const maxDimension = 360;
     const scale = Math.min(1, maxDimension / Math.max(sourceSize.width, sourceSize.height));
     const width = Math.max(8, Math.round(sourceSize.width * scale));
@@ -231,7 +231,7 @@ async function analyzeVideo(segment, signal, onProgress, onSample) {
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
-    if (!context) throw new Error("无法创建 Smart Frame 分析画布");
+    if (!context) throw new Error("Unable to create Smart Frame analysis canvas");
 
     const playbackRate = normalizeVisualPlaybackRate(segment.playbackRate);
     const sourceStart = Math.max(0, Number(segment.sourceStart) || 0);
@@ -275,7 +275,7 @@ async function analyzeVideo(segment, signal, onProgress, onSample) {
           onProgress?.({
             stage: setup ? "setup" : "analysis",
             progress: setup ? progress : ((index + progress / 100) / times.length) * 100,
-            phase: setup ? phase : `稀疏检测 ${Math.floor(index / anchorEvery) + 1} · ${phase}`,
+            phase: setup ? phase : `Sparse detection ${Math.floor(index / anchorEvery) + 1} · ${phase}`,
           });
         });
         if (detected?.box) {
@@ -305,11 +305,11 @@ async function analyzeVideo(segment, signal, onProgress, onSample) {
         stage: "analysis",
         progress: ((index + 1) / times.length) * 100,
         phase: trackedSubject?.box
-          ? `${source === "detector" ? "稀疏检测" : "光流跟踪"} ${index + 1}/${times.length}`
-          : `主体丢失 ${index + 1}/${times.length}`,
+          ? `${source === "detector" ? "Sparse detection" : "Optical flow tracking"} ${index + 1}/${times.length}`
+          : `Subject lost ${index + 1}/${times.length}`,
       });
     }
-    if (!samples.some((sample) => sample.subject?.box)) throw new Error("没有识别到稳定主体");
+    if (!samples.some((sample) => sample.subject?.box)) throw new Error("No stable subject detected");
     return {
       samples,
       sourceSize,
@@ -325,11 +325,11 @@ async function analyzeVideo(segment, signal, onProgress, onSample) {
 }
 
 export async function analyzeSmartFrameClip({ segment, signal, onProgress, onSample }) {
-  if (!segment?.src && !segment?.blob) throw new Error("请先选择当前图片或视频片段");
+  if (!segment?.src && !segment?.blob) throw new Error("Please select an image or video clip first");
   if (segment.type === "video") return analyzeVideo(segment, signal, onProgress, onSample);
   return analyzeImage(segment, signal, onProgress);
 }
 
 export function disposeSmartFrameAnalysis() {
-  resetFlowWorker(new Error("Smart Frame 光流已释放"));
+  resetFlowWorker(new Error("Smart Frame optical flow released"));
 }

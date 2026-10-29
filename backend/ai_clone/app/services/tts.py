@@ -35,6 +35,7 @@ class NothingToSpeak(ValueError):
 class _Voice:
     def __init__(self, repo: str, cache_dir: str):
         import os
+        from pathlib import Path
         import torch
         from transformers import AutoTokenizer, VitsModel
 
@@ -44,14 +45,31 @@ class _Voice:
         except Exception:
             pass
 
+        # Detect optimal acceleration device (CUDA -> Apple MPS -> CPU)
+        if torch.cuda.is_available():
+            self.device = "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            self.device = "mps"
+        else:
+            self.device = "cpu"
+
+        # Check for direct local directory downloaded via UI ModelManager
+        clean_name = f"models--{repo.replace('/', '--')}"
+        direct_candidate = Path(cache_dir) / clean_name
+        model_source = (
+            str(direct_candidate)
+            if (direct_candidate / "pytorch_model.bin").exists() or (direct_candidate / "config.json").exists()
+            else repo
+        )
+
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained(repo, cache_dir=cache_dir, local_files_only=True)
-            self.model = VitsModel.from_pretrained(repo, cache_dir=cache_dir, local_files_only=True).eval()
-            logger.info("TTS: Loaded %s strictly from local cache", repo)
+            self.tokenizer = AutoTokenizer.from_pretrained(model_source, cache_dir=cache_dir, local_files_only=True)
+            self.model = VitsModel.from_pretrained(model_source, cache_dir=cache_dir, local_files_only=True).to(self.device).eval()
+            logger.info("TTS: Loaded %s strictly from local cache on %s [FULL POWER]", repo, self.device)
         except Exception:
             logger.info("TTS: Local model missing, downloading %s...", repo)
             self.tokenizer = AutoTokenizer.from_pretrained(repo, cache_dir=cache_dir)
-            self.model = VitsModel.from_pretrained(repo, cache_dir=cache_dir).eval()
+            self.model = VitsModel.from_pretrained(repo, cache_dir=cache_dir).to(self.device).eval()
         # speaking_rate is model state, so one request at a time per voice.
         self.lock = threading.Lock()
 
@@ -61,6 +79,7 @@ class _Voice:
         inputs = self.tokenizer(text, return_tensors="pt")
         if inputs.input_ids.shape[-1] == 0:
             return None  # nothing this voice can pronounce
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
         with self.lock, torch.no_grad():
             self.model.speaking_rate = speed
             wave = self.model(**inputs).waveform

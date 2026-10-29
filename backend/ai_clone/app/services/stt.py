@@ -15,6 +15,7 @@ blocking, so callers must run `transcribe` in a worker thread.
 """
 
 import logging
+import re
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -71,9 +72,14 @@ class SttService:
                     s = self._settings
                     logger.info("Loading STT model %s on %s (%s) with %d threads", s.stt_model, s.stt_device, s.stt_compute_type, cpu_threads)
                     download_root = str(s.model_dir / "whisper")
+
+                    # Check for direct folder downloaded via UI ModelManager
+                    direct_whisper = s.model_dir / "whisper" / f"models--mobiuslabsgmbh--faster-whisper-{s.stt_model}"
+                    whisper_target = str(direct_whisper) if (direct_whisper / "model.bin").exists() else s.stt_model
+
                     try:
                         self._whisper = WhisperModel(
-                            s.stt_model,
+                            whisper_target,
                             device=s.stt_device,
                             compute_type=s.stt_compute_type,
                             download_root=download_root,
@@ -81,11 +87,11 @@ class SttService:
                             cpu_threads=cpu_threads,
                             num_workers=2,
                         )
-                        logger.info("Whisper STT: Loaded strictly from local offline cache")
+                        logger.info("Whisper STT: Loaded strictly from local offline cache (%s)", whisper_target)
                     except Exception:
                         logger.info("Whisper STT: Local model missing, downloading %s...", s.stt_model)
                         self._whisper = WhisperModel(
-                            s.stt_model,
+                            whisper_target,
                             device=s.stt_device,
                             compute_type=s.stt_compute_type,
                             download_root=download_root,
@@ -104,25 +110,52 @@ class SttService:
 
                     s = self._settings
                     logger.info("Loading Khmer STT model %s@%s", s.stt_km_model, s.stt_km_model_revision[:7])
-                    try:
-                        path = snapshot_download(
-                            s.stt_km_model,
-                            revision=s.stt_km_model_revision,
-                            cache_dir=str(s.model_dir / "hf" / "hub"),
-                            local_files_only=True,
-                        )
-                        logger.info("Khmer STT: Using strictly local cached snapshot %s", path)
-                    except Exception:
-                        logger.info("Khmer STT: Local snapshot missing, downloading %s...", s.stt_km_model)
-                        path = snapshot_download(
-                            s.stt_km_model,
-                            revision=s.stt_km_model_revision,
-                            cache_dir=str(s.model_dir / "hf" / "hub"),
-                        )
+
+                    # 1. Direct Check: Instantly load models downloaded via UI / ModelManager
+                    clean_repo_name = f"models--{s.stt_km_model.replace('/', '--')}"
+                    direct_candidate = s.model_dir / "hf" / "hub" / clean_repo_name
+                    snapshot_candidate = direct_candidate / "snapshots" / s.stt_km_model_revision
+                    path = None
+
+                    if (snapshot_candidate / "model.bin").exists() and (snapshot_candidate / "vocabulary.json").exists():
+                        path = str(snapshot_candidate)
+                        logger.info("Khmer STT: Found directly in local UI snapshot folder %s [FULL LOCAL POWER]", path)
+                    elif (direct_candidate / "model.bin").exists() and (direct_candidate / "vocabulary.json").exists():
+                        path = str(direct_candidate)
+                        logger.info("Khmer STT: Found directly in local UI download folder %s [FULL LOCAL POWER]", path)
+                    else:
+                        try:
+                            path = snapshot_download(
+                                s.stt_km_model,
+                                revision=s.stt_km_model_revision,
+                                cache_dir=str(s.model_dir / "hf" / "hub"),
+                                local_files_only=True,
+                            )
+                            logger.info("Khmer STT: Using strictly local cached snapshot %s", path)
+                        except Exception:
+                            logger.info("Khmer STT: Local snapshot missing, downloading %s...", s.stt_km_model)
+                            path = snapshot_download(
+                                s.stt_km_model,
+                                revision=s.stt_km_model_revision,
+                                cache_dir=str(s.model_dir / "hf" / "hub"),
+                            )
+
+                    # Hardware Acceleration Engine (CUDA -> Apple MPS/CPU AVX2/NEON)
+                    stt_device = s.stt_device
+                    compute_type = s.stt_km_compute_type
+                    if stt_device in ("auto", "cpu"):
+                        import torch
+                        if torch.cuda.is_available():
+                            stt_device = "cuda"
+                            compute_type = "float16"
+                        else:
+                            stt_device = "cpu"
+                            compute_type = "int8"
+
                     self._khmer = KhmerWhisperEngine(
                         Path(path),
-                        device=s.stt_device,
-                        compute_type=s.stt_km_compute_type,
+                        device=stt_device,
+                        compute_type=compute_type,
                         beam_size=s.stt_beam_size,
                         batch_size=s.stt_km_batch_size,
                     )
@@ -148,9 +181,37 @@ class SttService:
                 text = " ".join(c.text for c in chunks)
                 segmented = " ".join(c.segmented for c in chunks)
             else:
-                segments = self._transcribe_whisper(audio, target_lang)
-                text = " ".join(s.text for s in segments)
-                segmented = text
+                raw_segments = self._transcribe_whisper(audio, target_lang)
+                # Check for music hallucinations like (singing in foreign language) or [Music]
+                has_foreign_singing = any("singing in foreign language" in s.text.lower() for s in raw_segments)
+                has_only_music_tags = all(
+                    bool(re.fullmatch(r"[\(\[\{].*?(?:music|singing|applause|cheering|sound).*?[\)\]\}]", s.text.strip(), re.I))
+                    for s in raw_segments
+                ) if raw_segments else False
+
+                if has_foreign_singing or has_only_music_tags or not raw_segments:
+                    logger.info("Whisper returned foreign singing or pure music tags. Rerouting to Khmer STT engine...")
+                    chunks = self._load_khmer().transcribe(audio)
+                    if chunks:
+                        target_lang = "km"
+                        segments = [Segment(c.start, c.end, c.text) for c in chunks]
+                        text = " ".join(c.text for c in chunks)
+                        segmented = " ".join(c.segmented for c in chunks)
+                    else:
+                        segments = [
+                            s for s in raw_segments
+                            if not re.fullmatch(r"[\(\[\{].*?(?:music|singing|applause|cheering|sound).*?[\)\]\}]", s.text.strip(), re.I)
+                        ]
+                        text = " ".join(s.text for s in segments)
+                        segmented = text
+                else:
+                    # Clean out bracketed audio event tags from output segments
+                    segments = [
+                        s for s in raw_segments
+                        if not re.fullmatch(r"[\(\[\{].*?(?:music|singing|applause|cheering|sound).*?[\)\]\}]", s.text.strip(), re.I)
+                    ]
+                    text = " ".join(s.text for s in segments)
+                    segmented = text
 
         return Transcription(
             language=target_lang,

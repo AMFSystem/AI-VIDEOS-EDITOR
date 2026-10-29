@@ -188,6 +188,59 @@ export const aiController = {
       return res.status(400).json({ error: "អត្ថបទត្រូវនិយាយគឺចាំបាច់" });
     }
 
+    // If reference audio is provided, bridge to neural cloning (VoxCPM2) for authentic cloned voice output
+    if (audioBase64) {
+      try {
+        const cleanB64 = audioBase64.replace(/^data:[^;]+;base64,/, "");
+        const audioBuf = Buffer.from(cleanB64, "base64");
+        const form = new FormData();
+        form.append("text", text.trim());
+        form.append("consent", "true");
+        form.append("lang", "km");
+        form.append("speed", "1.0");
+        form.append("model", "voxcpm2");
+        form.append("reference_audio", new Blob([audioBuf], { type: referenceMimeType || "audio/wav" }), "reference.wav");
+
+        const cRes = await fetch("http://127.0.0.1:8000/api/v1/clone", {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer Ca3Zxsn26DM6Myiw35v_4MoZ6h_3nRy7kahd3tfI_yc",
+          },
+          body: form,
+        });
+
+        if (cRes.ok) {
+          const job = await cRes.json();
+          let pollAttempts = 0;
+          while (pollAttempts < 60) {
+            await new Promise((r) => setTimeout(r, 1000));
+            pollAttempts++;
+            const sRes = await fetch(`http://127.0.0.1:8000/api/v1/clone/jobs/${job.job_id}`, {
+              headers: { Authorization: "Bearer Ca3Zxsn26DM6Myiw35v_4MoZ6h_3nRy7kahd3tfI_yc" },
+            });
+            if (sRes.ok) {
+              const sData = await sRes.json();
+              if (sData.status === "done") {
+                const aRes = await fetch(`http://127.0.0.1:8000/api/v1/clone/jobs/${job.job_id}/audio`, {
+                  headers: { Authorization: "Bearer Ca3Zxsn26DM6Myiw35v_4MoZ6h_3nRy7kahd3tfI_yc" },
+                });
+                if (aRes.ok) {
+                  const outBuf = Buffer.from(await aRes.arrayBuffer());
+                  res.setHeader("Content-Type", "audio/wav");
+                  res.setHeader("Access-Control-Allow-Origin", "*");
+                  return res.send(outBuf);
+                }
+              } else if (sData.status === "failed") {
+                break;
+              }
+            }
+          }
+        }
+      } catch (cloneBridgeErr) {
+        // Fall back to direct Gemini speech
+      }
+    }
+
     try {
       const { buffer, mimeType } = await synthesizeGeminiSpeech({
         apiKey,
@@ -498,7 +551,7 @@ export const aiController = {
   },
 
   async translateText(req, res) {
-    const { text, texts, sourceLang = "zh-cn", targetLang = "km" } = req.body;
+    const { text, texts, sourceLang = "auto", targetLang = "km" } = req.body;
     let inputLines = texts;
     if (!inputLines || !Array.isArray(inputLines)) {
       inputLines = text ? String(text).split("\n") : [];
@@ -507,8 +560,17 @@ export const aiController = {
       return res.status(400).json({ error: "Text is required" });
     }
 
-    const sl = sourceLang === "auto" ? "auto" : (sourceLang.toLowerCase().includes("zh") ? "zh-CN" : sourceLang);
+    const sl = !sourceLang || sourceLang === "auto" ? "auto" : (sourceLang.toLowerCase().includes("zh") ? "zh-CN" : sourceLang);
     const tl = targetLang || "km";
+    const msFrom = sl === "auto" ? "" : (sl.toLowerCase().includes("zh") ? "zh-Hans" : sl);
+
+    // Clean Khmer text formatting helper
+    const formatKhmerTranslation = (str) => {
+      if (tl !== "km" || !str) return str;
+      return str
+        .replace(/([.!?])\s*$/g, "។") // replace ending Latin periods with Khmer Khan
+        .trim();
+    };
 
     // 1. First attempt: Google Translate API (Batch query)
     try {
@@ -526,15 +588,15 @@ export const aiController = {
         if (data && data[0] && Array.isArray(data[0])) {
           const translatedStr = data[0].map((item) => item[0]).join("");
           const lines = translatedStr.split("\n");
-          const finalLines = inputLines.map((orig, i) => lines[i] || orig);
-          return res.json({ translatedText: translatedStr, lines: finalLines });
+          const finalLines = inputLines.map((orig, i) => formatKhmerTranslation(lines[i] || orig));
+          return res.json({ translatedText: finalLines.join("\n"), lines: finalLines });
         }
       }
     } catch {}
 
     // 2. Second attempt: Microsoft Translate API
     try {
-      const msUrl = `https://edge.microsoft.com/translate/translatetext?from=zh-Hans&to=${tl}&isEnterpriseClient=false`;
+      const msUrl = `https://edge.microsoft.com/translate/translatetext?from=${encodeURIComponent(msFrom)}&to=${encodeURIComponent(tl)}&isEnterpriseClient=false`;
       const msRes = await fetch(msUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "User-Agent": "Mozilla/5.0" },
@@ -546,7 +608,7 @@ export const aiController = {
         const msData = await msRes.json();
         if (Array.isArray(msData)) {
           const lines = msData.map((item) => item?.translations?.[0]?.text || "");
-          const finalLines = inputLines.map((orig, i) => lines[i] || orig);
+          const finalLines = inputLines.map((orig, i) => formatKhmerTranslation(lines[i] || orig));
           return res.json({ translatedText: finalLines.join("\n"), lines: finalLines });
         }
       }
@@ -562,7 +624,7 @@ export const aiController = {
             const sRes = await fetch(singleUrl, { signal: AbortSignal.timeout(4000) });
             if (sRes.ok) {
               const sData = await sRes.json();
-              return sData?.[0]?.[0]?.[0] || line;
+              return formatKhmerTranslation(sData?.[0]?.[0]?.[0] || line);
             }
           } catch {}
           return line;

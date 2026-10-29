@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     model_dir: Path = _PACKAGE_DIR / "models"
     tmp_dir: Path = _PACKAGE_DIR / "tmp"
     data_dir: Path = _PACKAGE_DIR / "data"  # persistent files: saved voices, clone job audio
-    max_upload_mb: int = 25
+    max_upload_mb: int = 300
 
     # Infrastructure (see docker-compose.yml)
     database_url: str = "postgresql+asyncpg://bondeth:bondeth@localhost:5432/bondeth"
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     clone_max_chars: int = 5000
     clone_ref_min_s: float = 3.0
     clone_ref_max_s: float = 30.0
-    clone_max_queue: int = 10  # pending jobs before new requests get 503
+    clone_max_queue: int = 50  # pending jobs before new requests get 503
     clone_result_ttl_s: int = 3600  # finished jobs and their audio are deleted after this
     clone_preload: bool = False
     clone_worker_enabled: bool = True  # disable on API-only replicas that shouldn't load the model

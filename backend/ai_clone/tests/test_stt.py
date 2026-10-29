@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.deps import get_stt_service
 from app.main import app
 from app.services.stt import Segment, Transcription
-from app.services.khmer_stt import clean_khmer_output
+from app.services.khmer_stt import clean_khmer_output, make_khmer_subtitles_from_decoded
 from app.services.stt import SttService
 
 
@@ -52,6 +52,26 @@ def test_clean_khmer_output_keeps_spaces_around_latin_and_drops_empty_groups():
     text, segmented = clean_khmer_output(" ; ភ្នំ vinson massif ; 4892 ; ម៉ែត្រ ;")
     assert text == "ភ្នំ vinson massif 4892 ម៉ែត្រ"
     assert segmented == "ភ្នំ vinson massif 4892 ម៉ែត្រ"
+
+
+def test_make_khmer_subtitles_splits_long_speech_into_readable_cards():
+    raw = "ខ្ញុំ មិន ដឹង ថា គេ នឹក យើង ទេ ; ហើយ យើង ក៏ មិន បាន ទៅ ជួប គេ ដែរ"
+    chunks = make_khmer_subtitles_from_decoded(raw, start_s=0.0, end_s=8.0)
+    assert len(chunks) >= 2
+    assert chunks[0].start == 0.0
+    assert chunks[-1].end == 8.0
+    assert "ខ្ញុំ" in chunks[0].text
+    assert "ជួប" in chunks[-1].text
+
+
+def test_make_khmer_subtitles_handles_unpunctuated_words():
+    raw = "ដឹង ថា គេ នឹក ចង់ ជួប មុខ ខ្លាំង ណាស់ តែ មិន អាច ទៅ រក បាន"
+    chunks = make_khmer_subtitles_from_decoded(raw, start_s=10.0, end_s=20.0)
+    assert len(chunks) >= 2
+    for c in chunks:
+        assert c.start >= 10.0
+        assert c.end <= 20.0
+        assert len(c.text) > 0
 
 
 class _FakeWhisper:

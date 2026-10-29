@@ -21,42 +21,53 @@ def get_redis(request: Request) -> Redis:
     return request.app.state.redis
 
 
-async def _user_from_token(token: str, session: AsyncSession, settings: Settings) -> User:
+_DEV_USER = User(
+    id=uuid.UUID("9c7da3ef-100a-47f2-877a-53d3a450bdfb"),
+    email="dev@bondeth.ai",
+    password_hash="",
+    full_name="Bondeth Dev Admin",
+)
+
+
+async def _user_from_token(token: str, session: AsyncSession | None, settings: Settings) -> User:
+    if settings.env == "development":
+        try:
+            claims = decode_token(token, "access", settings)
+            user_id = uuid.UUID(claims["sub"])
+            if session is not None:
+                user = await session.get(User, user_id)
+                if user is not None:
+                    return user
+        except Exception:
+            pass
+        return _DEV_USER
+
     try:
         claims = decode_token(token, "access", settings)
         user_id = uuid.UUID(claims["sub"])
     except (InvalidToken, ValueError) as exc:
-        if settings.env == "development":
-            from sqlalchemy import select
-            res = await session.execute(select(User).limit(1))
-            dev_user = res.scalar_one_or_none()
-            if dev_user:
-                return dev_user
         raise HTTPException(401, "Invalid or expired token", headers=_UNAUTHORIZED) from exc
+
+    if session is None:
+        raise HTTPException(503, "Database unavailable", headers=_UNAUTHORIZED)
+
     user = await session.get(User, user_id)
     if user is None:
-        if settings.env == "development":
-            from sqlalchemy import select
-            res = await session.execute(select(User).limit(1))
-            dev_user = res.scalar_one_or_none()
-            if dev_user:
-                return dev_user
         raise HTTPException(401, "Account no longer exists", headers=_UNAUTHORIZED)
     return user
 
 
 async def get_current_user(
     token: str | None = Depends(oauth2_scheme),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession | None = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> User:
+    if settings.env == "development":
+        if not token:
+            return _DEV_USER
+        return await _user_from_token(token, session, settings)
+
     if not token:
-        if settings.env == "development":
-            from sqlalchemy import select
-            res = await session.execute(select(User).limit(1))
-            dev_user = res.scalar_one_or_none()
-            if dev_user:
-                return dev_user
         raise HTTPException(401, "Not authenticated", headers=_UNAUTHORIZED)
     return await _user_from_token(token, session, settings)
 

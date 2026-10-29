@@ -458,6 +458,9 @@ export function App() {
           if (change.resetTransform) {
             return { ...item, keyframes: [], baseTransform: normalizeVisualTransform({ x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 }) };
           }
+          if (typeof change.filterId === "string") {
+            return { ...item, filterId: change.filterId };
+          }
           return item;
         })
       );
