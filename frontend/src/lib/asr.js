@@ -442,9 +442,16 @@ function isSuspiciousChineseTranscript(output) {
 
 function isSuspiciousTranscript(output, language, preferredLanguage) {
   const text = getTranscriptText(output) || "";
-  if (/singing in foreign language|\[music\]|\(music\)|\(upbeat music\)/i.test(text)) return true;
+  if (/singing in foreign language|\[music\]|\(music\)|\(upbeat music\)|\[เสียง|\[sound\]/i.test(text)) return true;
   const expectedLanguage = language || getPreferredWhisperLanguage(preferredLanguage);
-  if (expectedLanguage === "km" && !/[\u1780-\u17ff]/.test(text) && text.trim().length > 0) return true;
+  if (expectedLanguage === "km" && text.trim().length > 0) {
+    if (!/[\u1780-\u17ff]/.test(text)) return true;
+    // Reject Whisper hallucinations (Thai, Hindi/Devanagari, or corrupted Latin instead of Khmer)
+    if (/[\u0E00-\u0E7F]/.test(text) || /[\u0900-\u097F]/.test(text)) return true;
+    const khmerCount = (text.match(/[\u1780-\u17ff]/g) || []).length;
+    const foreignCount = (text.match(/[A-Za-z\u0E00-\u0E7F\u0900-\u097F]/g) || []).length;
+    if (foreignCount > khmerCount) return true;
+  }
   return expectedLanguage === "zh" && isSuspiciousChineseTranscript(output);
 }
 

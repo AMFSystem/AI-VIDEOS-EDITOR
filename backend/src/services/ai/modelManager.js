@@ -72,10 +72,10 @@ export const MODELS_REGISTRY = [
     sizeBytes: 2 * 1024 * 1024,
     sizeFormatted: "2.4 MB",
     relDir: path.join("hf", "hub", "models--silero-vad-v5"),
-    repo: "haixin/timeline-studio-onnx-models",
-    keyFiles: ["silero_vad.onnx"],
+    repo: "onnx-community/silero-vad",
+    keyFiles: ["model.onnx"],
     downloadUrls: [
-      "https://huggingface.co/haixin/timeline-studio-onnx-models/resolve/main/silero_vad.onnx"
+      "https://huggingface.co/onnx-community/silero-vad/resolve/main/onnx/model.onnx"
     ]
   },
 
@@ -131,19 +131,19 @@ export const MODELS_REGISTRY = [
     ]
   },
   {
-    id: "piper-khmer",
-    name: "Piper TTS Khmer",
+    id: "piper-tts",
+    name: "Piper Fast TTS",
     category: "tts",
     badge: "Piper Offline",
-    description: "ម៉ូដែលសំឡេងនិយាយខ្មែរដារ៉ា ល្បឿនលឿនខ្លាំង ស៊ីធនធាន CPU តិចតួចបំផុត",
+    description: "ម៉ូដែលសំឡេងនិយាយល្បឿនលឿនខ្លាំង ស៊ីធនធាន CPU តិចតួចបំផុត (Natural Neural Voice)",
     sizeBytes: 65 * 1024 * 1024,
     sizeFormatted: "65 MB",
-    relDir: path.join("hf", "hub", "models--rhasspy--piper-voices-km"),
+    relDir: path.join("hf", "hub", "models--rhasspy--piper-voices"),
     repo: "rhasspy/piper-voices",
-    keyFiles: ["km_KH-dara-medium.onnx", "km_KH-dara-medium.onnx.json"],
+    keyFiles: ["zh_CN-xiao_ya-medium.onnx", "zh_CN-xiao_ya-medium.onnx.json"],
     downloadUrls: [
-      "https://huggingface.co/rhasspy/piper-voices/resolve/main/km/km_KH/dara/medium/km_KH-dara-medium.onnx",
-      "https://huggingface.co/rhasspy/piper-voices/resolve/main/km/km_KH/dara/medium/km_KH-dara-medium.onnx.json"
+      "https://huggingface.co/rhasspy/piper-voices/resolve/main/zh/zh_CN/xiao_ya/medium/zh_CN-xiao_ya-medium.onnx",
+      "https://huggingface.co/rhasspy/piper-voices/resolve/main/zh/zh_CN/xiao_ya/medium/zh_CN-xiao_ya-medium.onnx.json"
     ]
   },
 
@@ -253,10 +253,11 @@ export const MODELS_REGISTRY = [
     sizeFormatted: "38 MB",
     relDir: path.join("hf", "hub", "models--Xenova--slimsam-77-uniform"),
     repo: "Xenova/slimsam-77-uniform",
-    keyFiles: ["config.json"],
+    keyFiles: ["config.json", "onnx/vision_encoder_quantized.onnx", "onnx/prompt_encoder_mask_decoder_quantized.onnx"],
     downloadUrls: [
       "https://huggingface.co/Xenova/slimsam-77-uniform/resolve/main/config.json",
-      "https://huggingface.co/Xenova/slimsam-77-uniform/resolve/main/onnx/decoder_model.onnx"
+      "https://huggingface.co/Xenova/slimsam-77-uniform/resolve/main/onnx/vision_encoder_quantized.onnx",
+      "https://huggingface.co/Xenova/slimsam-77-uniform/resolve/main/onnx/prompt_encoder_mask_decoder_quantized.onnx"
     ]
   },
   {
@@ -268,10 +269,11 @@ export const MODELS_REGISTRY = [
     sizeBytes: 98 * 1024 * 1024,
     sizeFormatted: "98 MB",
     relDir: path.join("hf", "hub", "models--depth-anything-v2"),
-    repo: "haixin/timeline-studio-onnx-models",
-    keyFiles: ["model.onnx"],
+    repo: "onnx-community/Depth-Anything-V2-Small-ONNX",
+    keyFiles: ["config.json", "onnx/model.onnx"],
     downloadUrls: [
-      "https://huggingface.co/haixin/timeline-studio-onnx-models/resolve/main/depth-anything-v2-small/model.onnx"
+      "https://huggingface.co/onnx-community/Depth-Anything-V2-Small-ONNX/resolve/main/config.json",
+      "https://huggingface.co/onnx-community/Depth-Anything-V2-Small-ONNX/resolve/main/onnx/model.onnx"
     ]
   },
   {
@@ -283,10 +285,10 @@ export const MODELS_REGISTRY = [
     sizeBytes: 140 * 1024 * 1024,
     sizeFormatted: "140 MB",
     relDir: path.join("hf", "hub", "models--liveportrait"),
-    repo: "haixin/timeline-studio-onnx-models",
-    keyFiles: ["appearance_feature_extractor.onnx"],
+    repo: "KwaiVGI/LivePortrait",
+    keyFiles: ["appearance_feature_extractor.pth"],
     downloadUrls: [
-      "https://huggingface.co/haixin/timeline-studio-onnx-models/resolve/main/liveportrait-webgpu/appearance_feature_extractor.onnx"
+      "https://huggingface.co/KwaiVGI/LivePortrait/resolve/main/liveportrait/base_models/appearance_feature_extractor.pth"
     ]
   }
 ];
@@ -410,44 +412,53 @@ export class ModelManagerService {
         }
 
         const client = currentUrl.startsWith("https") ? https : http;
-        const req = client.get(currentUrl, (res) => {
-          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-            try {
-              const nextUrl = new URL(res.headers.location, currentUrl).href;
-              return followRedirects(nextUrl, redirectCount + 1);
-            } catch (err) {
-              return reject(new Error(`Invalid redirect URL: ${res.headers.location}`));
+        const req = client.get(
+          currentUrl,
+          {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              Accept: "*/*",
+            },
+          },
+          (res) => {
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+              try {
+                const nextUrl = new URL(res.headers.location, currentUrl).href;
+                return followRedirects(nextUrl, redirectCount + 1);
+              } catch (err) {
+                return reject(new Error(`Invalid redirect URL: ${res.headers.location}`));
+              }
             }
-          }
 
-          if (res.statusCode !== 200) {
-            return reject(new Error(`Download failed with HTTP ${res.statusCode}`));
-          }
-
-          const total = parseInt(res.headers["content-length"] || "0", 10);
-          let downloaded = 0;
-
-          fs.mkdirSync(path.dirname(destPath), { recursive: true });
-          const fileStream = fs.createWriteStream(destPath);
-
-          res.on("data", (chunk) => {
-            downloaded += chunk.length;
-            if (total && onProgress) {
-              onProgress(downloaded, total);
+            if (res.statusCode !== 200) {
+              return reject(new Error(`Download failed with HTTP ${res.statusCode} for ${currentUrl}`));
             }
-          });
 
-          res.pipe(fileStream);
+            const total = parseInt(res.headers["content-length"] || "0", 10);
+            let downloaded = 0;
 
-          fileStream.on("finish", () => {
-            fileStream.close(() => resolve());
-          });
+            fs.mkdirSync(path.dirname(destPath), { recursive: true });
+            const fileStream = fs.createWriteStream(destPath);
 
-          fileStream.on("error", (err) => {
-            fs.unlink(destPath, () => {});
-            reject(err);
-          });
-        });
+            res.on("data", (chunk) => {
+              downloaded += chunk.length;
+              if (total && onProgress) {
+                onProgress(downloaded, total);
+              }
+            });
+
+            res.pipe(fileStream);
+
+            fileStream.on("finish", () => {
+              fileStream.close(() => resolve());
+            });
+
+            fileStream.on("error", (err) => {
+              fs.unlink(destPath, () => {});
+              reject(err);
+            });
+          }
+        );
 
         req.on("error", (err) => {
           fs.unlink(destPath, () => {});
@@ -502,8 +513,12 @@ export class ModelManagerService {
 
         for (let i = 0; i < totalFiles; i++) {
           const url = modelDef.downloadUrls[i];
-          const fileName = path.basename(new URL(url).pathname);
-          const dest = path.join(targetDir, fileName);
+          const urlObj = new URL(url);
+          // Preserve subfolder structure (e.g. onnx/model.onnx)
+          const parts = urlObj.pathname.split("/resolve/main/");
+          const relativeName = parts.length > 1 ? parts[1] : path.basename(urlObj.pathname);
+          const dest = path.join(targetDir, relativeName);
+          fs.mkdirSync(path.dirname(dest), { recursive: true });
 
           await this.downloadFile(url, dest, (fileDownloaded, fileTotal) => {
             const overallPercent = Math.min(

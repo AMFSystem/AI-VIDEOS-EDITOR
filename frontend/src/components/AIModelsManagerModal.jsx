@@ -78,11 +78,11 @@ const DEFAULT_MODELS = [
     sizeFormatted: "340 MB",
   },
   {
-    id: "piper-khmer",
-    name: "Piper TTS Khmer",
+    id: "piper-tts",
+    name: "Piper Fast TTS",
     category: "tts",
     badge: "Piper Offline",
-    description: "ម៉ូដែលសំឡេងនិយាយខ្មែរដារ៉ា ល្បឿនលឿនខ្លាំង ស៊ីធនធាន CPU តិចតួចបំផុត",
+    description: "ម៉ូដែលសំឡេងនិយាយល្បឿនលឿនខ្លាំង ស៊ីធនធាន CPU តិចតួចបំផុត (Natural Neural Voice)",
     sizeFormatted: "65 MB",
   },
 
@@ -172,10 +172,22 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
   const [downloadingModels, setDownloadingModels] = useState({}); // modelId -> { percent, status, error }
   const eventSourcesRef = useRef({});
 
+  const getBackendBase = () =>
+    (window.desktopAPI?.getBackendUrl && window.desktopAPI.getBackendUrl()) || "http://127.0.0.1:3001";
+
+  const resolveApiUrl = (endpoint) => {
+    const isDesktop = Boolean(window.desktopAPI?.isDesktop || window.location.protocol === "file:");
+    const base = getBackendBase();
+    if (isDesktop) {
+      return `${base}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+    }
+    return endpoint;
+  };
+
   const fetchStatus = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/ai/models");
+      const res = await fetch(resolveApiUrl("/api/ai/models"));
       if (res.ok) {
         const json = await res.json();
         setData(json);
@@ -212,7 +224,8 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
     if (eventSourcesRef.current[modelId]) return;
 
     try {
-      const es = new EventSource(`/api/ai/models/progress/${modelId}`);
+      const progressUrl = resolveApiUrl(`/api/ai/models/progress/${modelId}`);
+      const es = new EventSource(progressUrl);
       eventSourcesRef.current[modelId] = es;
 
       es.onmessage = (event) => {
@@ -254,7 +267,7 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
       }));
       listenProgress(modelId);
 
-      const res = await fetch(`/api/ai/models/download/${modelId}`, {
+      const res = await fetch(resolveApiUrl(`/api/ai/models/download/${modelId}`), {
         method: "POST"
       });
 
@@ -281,7 +294,7 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
     if (!ok) return;
 
     try {
-      const res = await fetch(`/api/ai/models/${model.id}`, {
+      const res = await fetch(resolveApiUrl(`/api/ai/models/${model.id}`), {
         method: "DELETE"
       });
       if (res.ok) {

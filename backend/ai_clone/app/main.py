@@ -8,8 +8,9 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import auth, clone, health, stt, text, training, transcriptions, tts, voices
+from app.auth import _DEV_USER
 from app.config import get_settings
-from app.db import create_engine, create_sessionmaker
+from app.db import Base, User, create_engine, create_sessionmaker
 from app.deps import get_clone_service, get_stt_service, get_tts_service
 from app.services.clone_jobs import CloneJobQueue
 from app.services.in_memory_redis import AsyncInMemoryRedis, InMemoryRedis
@@ -40,7 +41,23 @@ async def lifespan(app: FastAPI):
 
     try:
         engine = create_engine(settings.database_url)
-        app.state.sessionmaker = create_sessionmaker(engine)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        sessionmaker = create_sessionmaker(engine)
+        app.state.sessionmaker = sessionmaker
+        try:
+            async with sessionmaker() as session:
+                existing_dev = await session.get(User, _DEV_USER.id)
+                if existing_dev is None:
+                    session.add(User(
+                        id=_DEV_USER.id,
+                        email=_DEV_USER.email,
+                        password_hash="dev_mode_local",
+                        full_name=_DEV_USER.full_name,
+                    ))
+                    await session.commit()
+        except Exception as seed_err:
+            logging.warning("Dev user seed note: %s", seed_err)
     except Exception as exc:
         logging.warning("Database initialization failed (%s); operating in stateless/local mode.", exc)
         app.state.sessionmaker = None

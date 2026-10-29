@@ -38,7 +38,7 @@ export default defineConfig({
     headers: isolationHeaders,
     proxy: {
       "/api/v1": {
-        target: "http://127.0.0.1:8000",
+        target: "http://127.0.0.1:3001",
         changeOrigin: true,
       },
       "/api": {
@@ -58,7 +58,7 @@ export default defineConfig({
     headers: isolationHeaders,
     proxy: {
       "/api/v1": {
-        target: "http://127.0.0.1:8000",
+        target: "http://127.0.0.1:3001",
         changeOrigin: true,
       },
       "/api": {

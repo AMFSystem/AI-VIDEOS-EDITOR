@@ -1,10 +1,20 @@
-import { puter } from "@heyputer/puter.js";
 import {
   extensionForImageMime,
   normalizeImageBlob,
   readMediaBlob,
   waitForVideoMetadata,
 } from "../../host.js";
+
+let cachedPuter = null;
+async function getPuter() {
+  if (cachedPuter) return cachedPuter;
+  if (typeof window !== "undefined" && window.location.protocol === "file:") {
+    throw new Error("Puter.js មិនគាំទ្រ file:/// protocol ទេ។ សូមដំណើរការតាមរយៈ Local Server http://127.0.0.1:3001");
+  }
+  const mod = await import("@heyputer/puter.js");
+  cachedPuter = mod.puter;
+  return cachedPuter;
+}
 
 const AUTH_TIMEOUT_MS = 45_000;
 const VIDEO_SOURCE_KEYS = ["src", "currentSrc", "url", "asset_url", "assetUrl", "href", "download_url", "downloadUrl"];
@@ -84,21 +94,21 @@ async function normalizeVideoResult(result) {
 
 export function createPuterAdapter() {
   return {
-    connect({ signal }) {
+    async connect({ signal }) {
+      const puter = await getPuter();
       let authPromise;
       try {
         authPromise = puter.auth.isSignedIn() ? Promise.resolve() : puter.auth.signIn({ request_auth: true });
       } catch (error) {
         authPromise = Promise.reject(error);
       }
-      return (async () => {
-        await waitForAuth(authPromise, signal);
-        return { state: "connected", user: await puter.auth.getUser(), endpoint: "" };
-      })();
+      await waitForAuth(authPromise, signal);
+      return { state: "connected", user: await puter.auth.getUser(), endpoint: "" };
     },
 
     async disconnect() {
       try {
+        const puter = await getPuter();
         if (puter.auth.isSignedIn()) await puter.auth.signOut();
       } catch {
         // Clearing the editor state must not depend on remote sign-out.
@@ -106,6 +116,7 @@ export function createPuterAdapter() {
     },
 
     async generate({ request }) {
+      const puter = await getPuter();
       const prompt = String(request.prompt || "").trim();
       if (request.mode === "text-to-image") {
         const isXai = String(request.model).startsWith("grok-");

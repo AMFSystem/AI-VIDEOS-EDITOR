@@ -7,6 +7,7 @@ const { spawn } = require("node:child_process");
 let mainWindow = null;
 let backendProcess = null;
 let pythonProcess = null;
+let devServerProcess = null;
 
 function checkPortOpen(port, host = "127.0.0.1") {
   return new Promise((resolve) => {
@@ -149,6 +150,7 @@ async function ensureFastApiServer(modelsDir, storageDir) {
   const pyEnv = {
     ...process.env,
     DESKTOP_MODE: "1",
+    PYTHONPATH: pythonCwd,
     BONDETH_DATABASE_URL: `sqlite+aiosqlite:///${path.join(modelsDir, "bondeth.db")}`,
     BONDETH_MODEL_DIR: modelsDir,
     BONDETH_TMP_DIR: path.join(storageDir, "tmp"),
@@ -235,9 +237,9 @@ async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegCo
   const logStream = fs.createWriteStream(logFile, { flags: "a" });
 
   let launched = false;
-  // 1. In packaged apps, prefer Electron's native utilityProcess.fork (no external node required)
+  // 1. Prefer Electron's native utilityProcess.fork (no external node required)
   const { utilityProcess } = require("electron");
-  if (isPackaged && utilityProcess && typeof utilityProcess.fork === "function") {
+  if (utilityProcess && typeof utilityProcess.fork === "function") {
     try {
       console.log("[Desktop] Launching backend via Electron utilityProcess.fork:", backendScript);
       backendProcess = utilityProcess.fork(backendScript, [], {
@@ -406,7 +408,33 @@ async function createWindow() {
   });
 
   if (!isPackaged) {
-    const isDevRunning = await checkPortOpen(5173);
+    let isDevRunning = await checkPortOpen(5173);
+    if (!isDevRunning) {
+      console.log("[Desktop] Vite dev server offline on port 5173. Auto-starting local Vite dev server...");
+      const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+      const frontendDir = path.resolve(__dirname, "../frontend");
+      try {
+        devServerProcess = spawn(npmCmd, ["run", "dev"], {
+          cwd: frontendDir,
+          stdio: "inherit",
+          shell: process.platform === "win32",
+        });
+        devServerProcess.on("exit", (code) => {
+          if (code !== 0 && code !== null) console.warn(`[Desktop] Vite server exited with code ${code}`);
+          devServerProcess = null;
+        });
+      } catch (devErr) {
+        console.warn("[Desktop] Could not auto-spawn Vite server:", devErr.message);
+      }
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => setTimeout(r, 250));
+        if (await checkPortOpen(5173)) {
+          isDevRunning = true;
+          console.log("[Desktop] Local Vite dev server successfully online on port 5173");
+          break;
+        }
+      }
+    }
     if (isDevRunning) {
       mainWindow.loadURL("http://localhost:5173");
       mainWindow.on("closed", () => {
@@ -416,7 +444,16 @@ async function createWindow() {
     }
   }
 
-  const isBackendRunning = await checkPortOpen(3001);
+  // Packaged app or fallback: connect to local server on port 3001
+  let isBackendRunning = false;
+  for (let i = 0; i < 25; i++) {
+    if (await checkPortOpen(3001)) {
+      isBackendRunning = true;
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+
   if (isBackendRunning) {
     console.log("[Desktop] Connecting to local server on http://127.0.0.1:3001");
     mainWindow.loadURL("http://127.0.0.1:3001").catch((err) => {
@@ -434,6 +471,10 @@ async function createWindow() {
 }
 
 function terminateChildren() {
+  if (devServerProcess) {
+    try { devServerProcess.kill(); } catch {}
+    devServerProcess = null;
+  }
   if (backendProcess) {
     try { backendProcess.kill(); } catch {}
     backendProcess = null;
