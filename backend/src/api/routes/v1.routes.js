@@ -191,3 +191,4 @@ v1Router.use(async (req, res, next) => {
     detail: "FastAPI on port 8000 is not yet reachable. Please ensure the AI service is started.",
   });
 });
+
