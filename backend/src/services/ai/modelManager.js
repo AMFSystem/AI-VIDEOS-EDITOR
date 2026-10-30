@@ -1,9 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import https from "node:https";
 import http from "node:http";
 import { EventEmitter } from "node:events";
+import { fileURLToPath } from "node:url";
 import { config } from "../../config/index.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const modelEvents = new EventEmitter();
 
@@ -304,20 +308,24 @@ function formatSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function getDirSize(dirPath, visitedInodes = new Set()) {
+function getDirSize(dirPath, visitedPaths = new Set()) {
   let size = 0;
-  if (!fs.existsSync(dirPath)) return 0;
+  if (!dirPath || !fs.existsSync(dirPath)) return 0;
   try {
+    let canonical = dirPath;
+    try {
+      canonical = fs.realpathSync(dirPath);
+    } catch {}
+    if (visitedPaths.has(canonical)) return 0;
+    visitedPaths.add(canonical);
+
     const entries = fs.readdirSync(dirPath);
     for (const name of entries) {
       const full = path.join(dirPath, name);
       try {
-        const stat = fs.statSync(full); // Resolves and follows symlinks to real blob files
-        if (visitedInodes.has(stat.ino)) continue;
-        visitedInodes.add(stat.ino);
-
+        const stat = fs.statSync(full);
         if (stat.isDirectory()) {
-          size += getDirSize(full, visitedInodes);
+          size += getDirSize(full, visitedPaths);
         } else if (stat.isFile()) {
           size += stat.size;
         }
@@ -327,9 +335,44 @@ function getDirSize(dirPath, visitedInodes = new Set()) {
   return size;
 }
 
+/**
+ * Checks recursively if any model weight files exist in directory or its subdirectories
+ */
+function hasValidModelWeights(dirPath, maxDepth = 4, currentDepth = 0) {
+  if (!dirPath || !fs.existsSync(dirPath) || currentDepth > maxDepth) return false;
+  try {
+    const entries = fs.readdirSync(dirPath);
+    for (const name of entries) {
+      const full = path.join(dirPath, name);
+      try {
+        const stat = fs.statSync(full);
+        if (stat.isFile()) {
+          const lower = name.toLowerCase();
+          // Model weight extensions
+          if (
+            lower.endsWith(".safetensors") ||
+            lower.endsWith(".onnx") ||
+            lower.endsWith(".bin") ||
+            lower.endsWith(".pth") ||
+            lower.endsWith(".pt") ||
+            lower.endsWith(".gguf")
+          ) {
+            // Must have non-trivial size (> 500 KB) to ensure not an empty/corrupted file
+            if (stat.size > 500 * 1024) return true;
+          }
+        } else if (stat.isDirectory()) {
+          if (hasValidModelWeights(full, maxDepth, currentDepth + 1)) return true;
+        }
+      } catch {}
+    }
+  } catch {}
+  return false;
+}
+
 export class ModelManagerService {
   constructor() {
     this.baseModelsDir = config.modelsDir;
+    this.installedRegistryFile = path.join(this.baseModelsDir, "installed_models.json");
     try {
       if (!fs.existsSync(this.baseModelsDir)) {
         fs.mkdirSync(this.baseModelsDir, { recursive: true });
@@ -339,37 +382,148 @@ export class ModelManagerService {
     }
   }
 
+  getPersistedInstalledMap() {
+    try {
+      if (fs.existsSync(this.installedRegistryFile)) {
+        const content = fs.readFileSync(this.installedRegistryFile, "utf-8");
+        return JSON.parse(content) || {};
+      }
+    } catch {}
+    return {};
+  }
+
+  markModelInstalled(modelId, isInstalled = true) {
+    try {
+      const map = this.getPersistedInstalledMap();
+      if (isInstalled) {
+        map[modelId] = { installedAt: Date.now(), verified: true };
+      } else {
+        delete map[modelId];
+      }
+      fs.writeFileSync(this.installedRegistryFile, JSON.stringify(map, null, 2), "utf-8");
+    } catch (err) {
+      console.warn("[ModelManager] Could not update installed registry:", err.message);
+    }
+  }
+
   getModelPath(modelDef) {
     return path.join(this.baseModelsDir, modelDef.relDir);
   }
 
+  /**
+   * Exhaustively collects all possible locations where this model could be stored:
+   * 1. baseModelsDir / relDir
+   * 2. baseModelsDir / hub / basename
+   * 3. baseModelsDir / basename
+   * 4. baseModelsDir / id
+   * 5. HuggingFace default cache (~/.cache/huggingface/hub/...)
+   * 6. Windows User Profile cache (AppData/Local, %USERPROFILE%/.cache/...)
+   * 7. Bundled ai_clone/models directory
+   */
+  getCandidateModelDirs(modelDef) {
+    const candidates = [];
+    const baseDir = this.baseModelsDir;
+    const relBase = path.basename(modelDef.relDir);
+
+    // Primary paths in baseModelsDir
+    candidates.push(path.join(baseDir, modelDef.relDir));
+    candidates.push(path.join(baseDir, "hf", "hub", relBase));
+    candidates.push(path.join(baseDir, "hub", relBase));
+    candidates.push(path.join(baseDir, relBase));
+    candidates.push(path.join(baseDir, modelDef.id));
+
+    // Bundled / workspace ai_clone models
+    try {
+      candidates.push(path.resolve(__dirname, "../../ai_clone/models", modelDef.relDir));
+      candidates.push(path.resolve(__dirname, "../../ai_clone/models/hf/hub", relBase));
+      candidates.push(path.resolve(process.cwd(), "backend/ai_clone/models", modelDef.relDir));
+      candidates.push(path.resolve(process.cwd(), "backend/ai_clone/models/hf/hub", relBase));
+    } catch {}
+
+    // HuggingFace system cache (Linux/macOS)
+    try {
+      const home = os.homedir();
+      candidates.push(path.join(home, ".cache", "huggingface", "hub", relBase));
+      candidates.push(path.join(home, ".cache", "huggingface", "hub", `models--${modelDef.repo.replace(/\//g, "--")}`));
+    } catch {}
+
+    // Windows paths
+    if (process.env.USERPROFILE) {
+      candidates.push(path.join(process.env.USERPROFILE, ".cache", "huggingface", "hub", relBase));
+      candidates.push(path.join(process.env.USERPROFILE, ".cache", "huggingface", "hub", `models--${modelDef.repo.replace(/\//g, "--")}`));
+    }
+    if (process.env.LOCALAPPDATA) {
+      candidates.push(path.join(process.env.LOCALAPPDATA, "huggingface", "hub", relBase));
+    }
+    if (process.env.HF_HOME) {
+      candidates.push(path.join(process.env.HF_HOME, "hub", relBase));
+    }
+
+    // Deduplicate
+    return [...new Set(candidates.filter(Boolean))];
+  }
+
+  /**
+   * Returns true if the model has already been downloaded and verified on disk.
+   * Under NO circumstances returns false if model files exist.
+   */
   isModelInstalled(modelDef) {
-    const targetDir = this.getModelPath(modelDef);
-    if (!fs.existsSync(targetDir)) return false;
+    const candidateDirs = this.getCandidateModelDirs(modelDef);
 
-    // Check resolved size across all snapshots, keyFiles and blobs
-    const dirSize = getDirSize(targetDir);
-    const minThreshold = (modelDef.sizeBytes && modelDef.sizeBytes < 10 * 1024 * 1024)
-      ? 1 * 1024 * 1024
-      : 10 * 1024 * 1024;
+    for (const targetDir of candidateDirs) {
+      if (!fs.existsSync(targetDir)) continue;
 
-    if (dirSize >= minThreshold) return true;
+      // 1. Check if model weight files exist directly or in snapshots
+      if (hasValidModelWeights(targetDir)) {
+        return true;
+      }
 
-    // Also check snapshots directory if symlinks point outside
-    const snapshotsDir = path.join(targetDir, "snapshots");
-    if (fs.existsSync(snapshotsDir)) {
-      const snapSize = getDirSize(snapshotsDir);
-      if (snapSize >= minThreshold) return true;
+      // 2. Check total directory size
+      const dirSize = getDirSize(targetDir);
+      const minThreshold = (modelDef.sizeBytes && modelDef.sizeBytes < 10 * 1024 * 1024)
+        ? 500 * 1024
+        : 10 * 1024 * 1024;
+
+      if (dirSize >= minThreshold) return true;
+
+      // 3. Check snapshots directory explicitly
+      const snapshotsDir = path.join(targetDir, "snapshots");
+      if (fs.existsSync(snapshotsDir)) {
+        if (hasValidModelWeights(snapshotsDir)) return true;
+        const snapSize = getDirSize(snapshotsDir);
+        if (snapSize >= minThreshold) return true;
+      }
+    }
+
+    // 4. Check persistent install map
+    const persisted = this.getPersistedInstalledMap();
+    if (persisted[modelDef.id]) {
+      // Re-verify that at least one candidate folder exists
+      if (candidateDirs.some((d) => fs.existsSync(d))) {
+        return true;
+      }
     }
 
     return false;
   }
 
+  resolveInstalledPath(modelDef) {
+    const candidateDirs = this.getCandidateModelDirs(modelDef);
+    for (const d of candidateDirs) {
+      if (fs.existsSync(d)) {
+        if (hasValidModelWeights(d) || getDirSize(d) > 500 * 1024) {
+          return d;
+        }
+      }
+    }
+    return this.getModelPath(modelDef);
+  }
+
   getStatus() {
     let totalInstalledBytes = 0;
     const models = MODELS_REGISTRY.map((m) => {
-      const modelPath = this.getModelPath(m);
       const isInstalled = this.isModelInstalled(m);
+      const modelPath = isInstalled ? this.resolveInstalledPath(m) : this.getModelPath(m);
       const currentSize = isInstalled ? getDirSize(modelPath) : 0;
       if (isInstalled) totalInstalledBytes += currentSize;
 
@@ -534,6 +688,7 @@ export class ModelManagerService {
 
         state.percent = 100;
         state.status = "ready";
+        this.markModelInstalled(modelId, true);
         modelEvents.emit(`progress:${modelId}`, state);
       } catch (err) {
         console.error(`[ModelManager] Download failed for ${modelId}:`, err);
@@ -557,6 +712,7 @@ export class ModelManagerService {
     }
 
     const targetDir = this.getModelPath(modelDef);
+    this.markModelInstalled(modelId, false);
     if (fs.existsSync(targetDir)) {
       fs.rmSync(targetDir, { recursive: true, force: true });
       return { success: true, message: `Model ${modelDef.name} deleted successfully` };

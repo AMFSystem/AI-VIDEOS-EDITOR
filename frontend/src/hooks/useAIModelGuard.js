@@ -13,8 +13,25 @@ const resolveApiUrl = (endpoint) => {
   return clean;
 };
 
+const LOCAL_STORAGE_KEY = "installed_ai_models";
+
+function getCachedInstalledModels() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function setCachedInstalledModels(map) {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(map));
+  } catch {}
+}
+
 export function useAIModelGuard({ notify = console.log } = {}) {
-  const [installedMap, setInstalledMap] = useState({});
+  const [installedMap, setInstalledMap] = useState(() => getCachedInstalledModels());
   const [guideModalConfig, setGuideModalConfig] = useState({
     isOpen: false,
     modelId: null,
@@ -27,19 +44,20 @@ export function useAIModelGuard({ notify = console.log } = {}) {
       const res = await fetch(resolveApiUrl("/api/ai/models"));
       if (res.ok) {
         const json = await res.json();
-        const map = {};
+        const map = { ...getCachedInstalledModels() };
         json.models?.forEach((m) => {
           if (m.installed) {
             map[m.id] = true;
           }
         });
         setInstalledMap(map);
+        setCachedInstalledModels(map);
         return map;
       }
     } catch (err) {
       console.warn("useAIModelGuard: Could not fetch models status:", err);
     }
-    return {};
+    return getCachedInstalledModels();
   }, []);
 
   useEffect(() => {
@@ -48,7 +66,10 @@ export function useAIModelGuard({ notify = console.log } = {}) {
 
   const isModelInstalled = useCallback(
     (modelId) => {
-      return Boolean(installedMap[modelId]);
+      if (!modelId) return false;
+      if (installedMap[modelId]) return true;
+      const cached = getCachedInstalledModels();
+      return Boolean(cached[modelId]);
     },
     [installedMap]
   );
@@ -56,24 +77,29 @@ export function useAIModelGuard({ notify = console.log } = {}) {
   /**
    * Guards an action requiring a local AI model.
    * If the model is already installed in the local computer, immediately executes `onProceed()`.
-   * If the model is not installed yet, pops up the AIModelGuideModal to guide the user and download it!
+   * Under NO CIRCUMSTANCES pops up the modal if the model is installed!
    */
   const requireModel = useCallback(
     async (modelId, onProceed, customInfo = null) => {
-      // 1. Check current memory map
-      if (installedMap[modelId]) {
+      if (!modelId) {
         if (typeof onProceed === "function") onProceed();
         return true;
       }
 
-      // 2. Fetch fresh status from backend in case it was just installed
+      // 1. Instant check in memory or persistent cache
+      if (isModelInstalled(modelId)) {
+        if (typeof onProceed === "function") onProceed();
+        return true;
+      }
+
+      // 2. Fetch fresh status from backend to verify disk state
       const freshMap = await refreshStatus();
       if (freshMap[modelId]) {
         if (typeof onProceed === "function") onProceed();
         return true;
       }
 
-      // 3. Not installed -> Pop up guidance modal
+      // 3. ONLY if confirmed NOT on disk -> Pop up guidance modal
       const modelDef =
         customInfo ||
         DEFAULT_MODELS.find((m) => m.id === modelId) || {
@@ -89,7 +115,6 @@ export function useAIModelGuard({ notify = console.log } = {}) {
         modelId,
         modelInfo: modelDef,
         onProceed: () => {
-          // Refresh state and run callback
           refreshStatus().then(() => {
             if (typeof onProceed === "function") onProceed();
           });
@@ -98,7 +123,7 @@ export function useAIModelGuard({ notify = console.log } = {}) {
 
       return false;
     },
-    [installedMap, refreshStatus]
+    [isModelInstalled, refreshStatus]
   );
 
   const closeGuideModal = useCallback(() => {

@@ -51,13 +51,14 @@ export function AIModelGuideModal({
     name: "AI Local Model",
     category: "general",
     badge: "Local AI",
-    description: "ម៉ូដែល AI សម្រាប់ដំណើរការលើកុំព្យូទ័រផ្ទាល់",
-    sizeFormatted: "500 MB"
+    description: "ម៉ូដែលដំណើរការ Offline ក្នុងកុំព្យូទ័រ",
+    sizeFormatted: "Free Download"
   };
 
   // Check if model is already downloaded
+  // CRITICAL: If the model is ALREADY installed, NEVER keep the popup open! Immediately proceed and close!
   const checkStatus = async () => {
-    if (!modelId) return;
+    if (!modelId) return false;
     try {
       const res = await fetch(resolveApiUrl("/api/ai/models"));
       if (res.ok) {
@@ -67,17 +68,26 @@ export function AIModelGuideModal({
           setIsInstalled(true);
           setProgressPercent(100);
           setDownloading(false);
+          // If already downloaded, immediately proceed and close modal
+          if (typeof onProceed === "function") {
+            onProceed();
+          }
+          onClose();
+          return true;
         } else if (found?.downloading) {
           setDownloading(true);
           setProgressPercent(found.progress || 0);
           startListening(modelId);
+          return false;
         } else {
           setIsInstalled(false);
+          return false;
         }
       }
     } catch (err) {
       console.warn("Could not check model status:", err);
     }
+    return false;
   };
 
   const startListening = (mId) => {
@@ -98,6 +108,11 @@ export function AIModelGuideModal({
             es.close();
             eventSourceRef.current = null;
             notify(`ម៉ូដែល ${model.name} បានទាញយករួចរាល់ ១០០%!`, "success");
+            // Auto proceed on download complete
+            setTimeout(() => {
+              if (typeof onProceed === "function") onProceed();
+              onClose();
+            }, 600);
           } else if (state.status === "error") {
             setDownloading(false);
             setDownloadError(state.error || "បរាជ័យក្នុងការទាញយក");
@@ -141,6 +156,10 @@ export function AIModelGuideModal({
           setDownloading(false);
           setProgressPercent(100);
           notify(`ម៉ូដែល ${model.name} បានទាញយករួចរាល់ ១០០%!`, "success");
+          setTimeout(() => {
+            if (typeof onProceed === "function") onProceed();
+            onClose();
+          }, 600);
         } else if (found?.downloading || found?.progress > 0) {
           setProgressPercent(found.progress || 0);
         }
@@ -175,154 +194,166 @@ export function AIModelGuideModal({
 
   if (!isOpen) return null;
 
-  const renderCategoryIcon = (category) => {
+  const render3DIcon = (category) => {
     switch (category) {
       case "stt":
-        return <Microphone size={24} weight="duotone" color="#60a5fa" />;
+        return <Microphone size={32} weight="duotone" className="icon-3d-glow text-sky-400" />;
       case "tts":
-        return <SpeakerHigh size={24} weight="duotone" color="#34d399" />;
+        return <SpeakerHigh size={32} weight="duotone" className="icon-3d-glow text-emerald-400" />;
       case "clone":
-        return <Sparkle size={24} weight="duotone" color="#f472b6" />;
+        return <Sparkle size={32} weight="duotone" className="icon-3d-glow text-purple-400" />;
       case "audio":
-        return <Waveform size={24} weight="duotone" color="#fbbf24" />;
+        return <Waveform size={32} weight="duotone" className="icon-3d-glow text-amber-400" />;
       case "vision":
-        return <FilmStrip size={24} weight="duotone" color="#a78bfa" />;
+        return <FilmStrip size={32} weight="duotone" className="icon-3d-glow text-indigo-400" />;
       default:
-        return <Cpu size={24} weight="duotone" color="#38bdf8" />;
+        return <Cpu size={32} weight="duotone" className="icon-3d-glow text-cyan-400" />;
     }
   };
 
   return (
     <div className="model-guide-overlay" onClick={onClose}>
-      <div className="model-guide-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="model-guide-modal-3d" onClick={(e) => e.stopPropagation()}>
+        {/* Top Specular Edge Highlight */}
+        <div className="modal-top-highlight" />
+
         {/* Header */}
-        <div className="model-guide-header">
-          <div className="model-guide-badge">
-            <WarningCircle size={15} weight="fill" color="#f59e0b" />
-            <span>តម្រូវការ AI Model ក្នុងកុំព្យូទ័រ (Local AI Required)</span>
+        <div className="model-guide-header-3d">
+          <div className="model-guide-badge-3d">
+            <Lightning size={14} weight="fill" />
+            <span>ទាមទារ Local AI</span>
           </div>
-          <button className="model-guide-close-btn" onClick={onClose} title="បិទ">
-            <X size={18} weight="bold" />
+          <button className="model-guide-close-btn-3d" onClick={onClose} title="បិទ">
+            <X size={17} weight="bold" />
           </button>
         </div>
 
         {/* Body Content */}
-        <div className="model-guide-body">
-          <h2 className="model-guide-title">
-            ការណែនាំដំឡើង AI Model ក្នុងម៉ាស៊ីន
-          </h2>
-          <p className="model-guide-lead">
-            មុខងារនេះដំណើរការដោយប្រើប្រាស់ <strong>AI Model ក្នុងកុំព្យូទ័រផ្ទាល់</strong> ដើម្បីទទួលបានល្បឿនលឿន ភាពត្រឹមត្រូវខ្ពស់ និងដំណើរការ <strong>Offline ១០០%</strong> ដោយឥតគិតថ្លៃ។
-          </p>
-
-          {/* Model Card */}
-          <div className="model-guide-card">
-            <div className="model-guide-card-icon">
-              {renderCategoryIcon(model.category)}
-            </div>
-            <div className="model-guide-card-info">
-              <div className="model-guide-card-header">
-                <span className="model-guide-card-name">{model.name}</span>
-                <span className="model-guide-card-pill">{model.badge || "Local AI"}</span>
+        <div className="model-guide-body-3d">
+          {/* 3D Floating Icon & Titles */}
+          <div className="model-guide-hero-3d">
+            <div className="icon-3d-container">
+              <div className="icon-3d-badge">
+                {render3DIcon(model.category)}
               </div>
-              <p className="model-guide-card-desc">{model.description}</p>
-              <div className="model-guide-card-meta">
-                <span className="meta-item">
-                  <HardDrives size={13} weight="bold" />
-                  ទំហំ File: <strong>{model.sizeFormatted || "មិនកំណត់"}</strong>
-                </span>
-                <span className="meta-item">
-                  <Lightning size={13} weight="fill" color="#fbbf24" />
-                  ទាញយកតែម្ដងគត់ (Download Once)
-                </span>
+            </div>
+            <div className="hero-text-block">
+              <h2 className="model-guide-title-3d">
+                ដំឡើង {model.name}
+              </h2>
+              <p className="model-guide-subtitle-3d">
+                ទាមទារ AI Model ក្នុងកុំព្យូទ័រ ដើម្បីដំណើរការ Offline
+              </p>
+            </div>
+          </div>
+
+          {/* 3D Model Info Card */}
+          <div className="model-card-3d">
+            <div className="model-card-3d-top">
+              <span className="model-name-label">{model.name}</span>
+              <span className="model-pill-3d">{model.badge || "Local AI"}</span>
+            </div>
+
+            <p className="model-desc-short">
+              {model.description?.length > 80
+                ? model.description.slice(0, 78) + "..."
+                : model.description || "ម៉ូដែលដំណើរការលើកុំព្យូទ័រផ្ទាល់"}
+            </p>
+
+            <div className="model-card-meta-row">
+              <div className="meta-badge-3d">
+                <HardDrives size={13} weight="bold" />
+                <span>{model.sizeFormatted || "Free"}</span>
+              </div>
+              <div className="meta-badge-3d">
+                <Lightning size={13} weight="fill" className="text-amber-400" />
+                <span>ទាញយកតែម្ដងគត់</span>
               </div>
             </div>
           </div>
 
           {/* Download Progress Bar (When downloading or installed) */}
           {(downloading || isInstalled) && (
-            <div className="model-guide-progress-box">
+            <div className="progress-box-3d">
               <div className="progress-info-row">
                 <span className="progress-status-label">
                   {isInstalled ? (
-                    <span className="text-ready">
-                      <CheckCircle size={16} weight="fill" color="#10b981" />
-                      ទាញយករួចរាល់ ១០០% (Ready to Use)
+                    <span className="text-ready-3d">
+                      <CheckCircle size={15} weight="fill" />
+                      ទាញយករួចរាល់ ១០០%
                     </span>
                   ) : (
-                    <span className="text-downloading">
-                      <CircleNotch size={16} weight="bold" className="spin-icon" color="#60a5fa" />
-                      កំពុងទាញយកចូលក្នុងកុំព្យូទ័រ...
+                    <span className="text-downloading-3d">
+                      <CircleNotch size={15} weight="bold" className="spin-icon" />
+                      កំពុងទាញយក...
                     </span>
                   )}
                 </span>
                 <span className="progress-percent-label">{progressPercent}%</span>
               </div>
-              <div className="model-guide-progress-track">
+              <div className="progress-track-3d">
                 <div
-                  className={`model-guide-progress-fill ${isInstalled ? "is-complete" : ""}`}
-                  style={{ width: `${Math.max(progressPercent, 4)}%` }}
+                  className={`progress-fill-3d ${isInstalled ? "is-complete" : ""}`}
+                  style={{ width: `${Math.max(progressPercent, 5)}%` }}
                 />
               </div>
             </div>
           )}
 
-          {/* Download Error Alert */}
+          {/* Error Alert */}
           {downloadError && (
-            <div className="model-guide-error-alert">
-              <WarningCircle size={16} weight="fill" color="#ef4444" />
+            <div className="error-alert-3d">
+              <WarningCircle size={15} weight="fill" />
               <span>{downloadError}</span>
             </div>
           )}
 
-          {/* Notice Banner */}
-          <div className="model-guide-tip-banner">
-            <Sparkle size={16} weight="fill" color="#60a5fa" />
-            <div>
-              <strong>ចំណាំ៖</strong> នៅពេលទាញយកចប់ ១០០% ឯកសារ AI Model នឹងត្រូវបានរក្សាទុកក្នុង SSD/Hard Drive របស់អ្នកជារៀងរហូត។ លោកអ្នកអាចកាត់ត និងប្រើ AI នេះបានដោយមិនចាំបាច់មាន Internet ឡើយ។
-            </div>
+          {/* Short Note */}
+          <div className="tip-note-3d">
+            <Sparkle size={14} weight="fill" className="text-indigo-400" />
+            <span>ទាញយកម្តង ប្រើប្រាស់រហូត មិនបាច់ប្រើ Internet</span>
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="model-guide-footer">
+        <div className="model-guide-footer-3d">
           {isInstalled ? (
             <button
-              className="model-guide-btn-primary is-ready"
+              className="btn-3d-primary is-ready"
               onClick={() => {
                 onClose();
                 if (typeof onProceed === "function") onProceed();
               }}
             >
               <CheckCircle size={18} weight="bold" />
-              <span>ចាប់ផ្ដើមប្រើប្រាស់មុខងារនេះភ្លាម (Start Using Now)</span>
+              <span>ចាប់ផ្ដើមប្រើប្រាស់ភ្លាម</span>
             </button>
           ) : downloading ? (
-            <button className="model-guide-btn-primary is-downloading" disabled>
+            <button className="btn-3d-primary is-downloading" disabled>
               <CircleNotch size={18} weight="bold" className="spin-icon" />
               <span>កំពុងទាញយក ({progressPercent}%) ...</span>
             </button>
           ) : (
-            <button className="model-guide-btn-primary" onClick={handleStartDownload}>
+            <button className="btn-3d-primary" onClick={handleStartDownload}>
               <DownloadSimple size={18} weight="bold" />
-              <span>ទាញយក Model ឥឡូវនេះ ({model.sizeFormatted || "Free"})</span>
+              <span>ទាញយក Model ({model.sizeFormatted || "Free"})</span>
             </button>
           )}
 
-          <div className="model-guide-footer-secondary">
+          <div className="footer-links-3d">
             {typeof onOpenFullHub === "function" && (
               <button
-                className="model-guide-btn-secondary"
+                className="btn-3d-secondary"
                 onClick={() => {
                   onClose();
                   onOpenFullHub();
                 }}
               >
-                <Sliders size={15} weight="bold" />
-                <span>មើលផ្ទាំងគ្រប់គ្រង Models ទាំងអស់</span>
+                <Sliders size={14} weight="bold" />
+                <span>ផ្ទាំងគ្រប់គ្រង Models</span>
               </button>
             )}
-            <button className="model-guide-btn-ghost" onClick={onClose}>
+            <button className="btn-3d-ghost" onClick={onClose}>
               ទុកពេលក្រោយ
             </button>
           </div>
