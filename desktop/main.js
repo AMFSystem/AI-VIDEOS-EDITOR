@@ -1,17 +1,91 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, protocol, net: electronNet } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
-const net = require("node:net");
+const netSocket = require("node:net");
 const { spawn } = require("node:child_process");
+const { pathToFileURL } = require("node:url");
+
+// Register privileged custom scheme 'app' BEFORE app is ready
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "app",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+      allowServiceWorkers: true,
+    },
+  },
+]);
 
 let mainWindow = null;
 let backendProcess = null;
 let pythonProcess = null;
 let devServerProcess = null;
+let appPaths = null;
+
+function setupFileLogging() {
+  try {
+    const logFile = path.join(app.getPath("userData"), "app-debug.log");
+    const logStream = fs.createWriteStream(logFile, { flags: "a" });
+    const origLog = console.log;
+    const origWarn = console.warn;
+    const origErr = console.error;
+
+    console.log = (...args) => {
+      origLog(...args);
+      try { logStream.write(`[${new Date().toISOString()}] [INFO] ${args.join(" ")}\n`); } catch {}
+    };
+    console.warn = (...args) => {
+      origWarn(...args);
+      try { logStream.write(`[${new Date().toISOString()}] [WARN] ${args.join(" ")}\n`); } catch {}
+    };
+    console.error = (...args) => {
+      origErr(...args);
+      try { logStream.write(`[${new Date().toISOString()}] [ERR] ${args.join(" ")}\n`); } catch {}
+    };
+  } catch {}
+}
+
+function resolveAppPaths() {
+  if (appPaths) return appPaths;
+  const isPackaged = app.isPackaged;
+  const resourcesPath = isPackaged ? process.resourcesPath : path.resolve(__dirname, "..");
+  let frontendDist;
+  let storageDir;
+  let modelsDir;
+
+  if (isPackaged) {
+    const candidateDists = [
+      path.join(resourcesPath, "frontend", "dist"),
+      path.join(resourcesPath, "dist"),
+      path.join(__dirname, "dist"),
+    ];
+    frontendDist = candidateDists.find((d) => fs.existsSync(d)) || candidateDists[0];
+    modelsDir = path.join(app.getPath("userData"), "models");
+    storageDir = path.join(app.getPath("userData"), "storage");
+  } else {
+    frontendDist = path.resolve(__dirname, "../frontend/dist");
+    modelsDir = path.resolve(__dirname, "../backend/ai_clone/models");
+    storageDir = path.resolve(__dirname, "../backend/storage");
+  }
+
+  try {
+    if (!fs.existsSync(modelsDir)) fs.mkdirSync(modelsDir, { recursive: true });
+    if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
+  } catch (err) {
+    console.warn("[Desktop] Directory init error:", err);
+  }
+
+  appPaths = { isPackaged, resourcesPath, frontendDist, storageDir, modelsDir };
+  return appPaths;
+}
 
 function checkPortOpen(port, host = "127.0.0.1") {
   return new Promise((resolve) => {
-    const socket = new net.Socket();
+    const socket = new netSocket.Socket();
     socket.setTimeout(400);
     socket.on("connect", () => {
       socket.destroy();
@@ -194,7 +268,6 @@ async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegCo
   }
 
   const isPackaged = app.isPackaged;
-  const isWindows = process.platform === "win32";
   const resourcesPath = isPackaged ? process.resourcesPath : path.resolve(__dirname, "..");
 
   let backendScript;
@@ -236,7 +309,6 @@ async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegCo
   // Starts Express HTTP & WebSocket server directly inside Electron's Main process.
   // This guarantees port 3001 starts in <50ms without external child processes or permission friction.
   try {
-    const { pathToFileURL } = require("node:url");
     Object.assign(process.env, env);
     console.log("[Desktop] Launching Node backend in-process via dynamic import...");
     await import(pathToFileURL(backendScript).href);
@@ -285,36 +357,7 @@ async function ensureBackendServer(modelsDir, storageDir, frontendDist, ffmpegCo
 }
 
 async function createWindow() {
-  const isPackaged = app.isPackaged;
-  const resourcesPath = isPackaged ? process.resourcesPath : path.resolve(__dirname, "..");
-
-  let frontendDist;
-  let storageDir;
-  let modelsDir;
-
-  if (isPackaged) {
-    const candidateDists = [
-      path.join(resourcesPath, "frontend", "dist"),
-      path.join(resourcesPath, "dist"),
-      path.join(__dirname, "dist"),
-    ];
-    frontendDist = candidateDists.find((d) => fs.existsSync(d)) || candidateDists[0];
-    modelsDir = path.join(app.getPath("userData"), "models");
-    storageDir = path.join(app.getPath("userData"), "storage");
-  } else {
-    frontendDist = path.resolve(__dirname, "../frontend/dist");
-    modelsDir = path.resolve(__dirname, "../backend/ai_clone/models");
-    storageDir = path.resolve(__dirname, "../backend/storage");
-  }
-
-  // Ensure directories exist
-  try {
-    if (!fs.existsSync(modelsDir)) fs.mkdirSync(modelsDir, { recursive: true });
-    if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
-  } catch (err) {
-    console.warn("[Desktop] Directory init error:", err);
-  }
-
+  const { isPackaged, resourcesPath, frontendDist, storageDir, modelsDir } = resolveAppPaths();
   const ffmpegConfig = resolveBinaries(resourcesPath, isPackaged);
 
   // 1. Start FastAPI in background (non-blocking) so app startup is never delayed
@@ -347,15 +390,15 @@ async function createWindow() {
     mainWindow.show();
   });
 
-  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
-    console.warn(`[Desktop] Page failed to load: ${validatedURL} (${errorCode}: ${errorDescription})`);
-    if (validatedURL.includes("3001") || validatedURL.includes("5173")) {
-      setTimeout(() => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          console.log("[Desktop] Retrying loadURL:", validatedURL);
-          mainWindow.loadURL(validatedURL);
-        }
-      }, 500);
+  // DevTools Toggle Shortcut (F12 or Ctrl+Shift+I / Cmd+Option+I)
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    if (
+      input.key === "F12" ||
+      (input.control && input.shift && input.key.toLowerCase() === "i") ||
+      (input.meta && input.alt && input.key.toLowerCase() === "i")
+    ) {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
     }
   });
 
@@ -396,15 +439,30 @@ async function createWindow() {
     }
   }
 
-  // Packaged app: load local server on http://127.0.0.1:3001
-  console.log("[Desktop] Connecting to local server on http://127.0.0.1:3001");
-  mainWindow.loadURL("http://127.0.0.1:3001").catch((err) => {
-    console.warn("[Desktop] Initial loadURL failed, retrying in 500ms:", err);
-    setTimeout(() => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.loadURL("http://127.0.0.1:3001");
-      }
-    }, 500);
+  // Packaged mode: load local backend or app:// protocol
+  console.log("[Desktop] Determining best entry URL for packaged application...");
+  const isBackendOpen = await checkPortOpen(3001);
+  if (isBackendOpen) {
+    console.log("[Desktop] Connecting to local server on http://127.0.0.1:3001");
+    mainWindow.loadURL("http://127.0.0.1:3001").catch((err) => {
+      console.warn("[Desktop] Initial loadURL failed, falling back to app://localhost/index.html:", err);
+      mainWindow.loadURL("app://localhost/index.html");
+    });
+  } else {
+    console.log("[Desktop] Backend port 3001 not ready yet. Directly loading app://localhost/index.html!");
+    mainWindow.loadURL("app://localhost/index.html");
+  }
+
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.warn(`[Desktop] Page failed to load: ${validatedURL} (${errorCode}: ${errorDescription})`);
+    if (validatedURL.includes("3001")) {
+      console.log("[Desktop] Load failed on 3001, falling back to app://localhost/index.html");
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.loadURL("app://localhost/index.html");
+        }
+      }, 300);
+    }
   });
 
   mainWindow.on("closed", () => {
@@ -451,6 +509,43 @@ ipcMain.handle("desktop:save-file", async (_event, options = {}) => {
 });
 
 app.whenReady().then(() => {
+  setupFileLogging();
+  const paths = resolveAppPaths();
+
+  // Handle custom 'app' protocol
+  protocol.handle("app", async (request) => {
+    try {
+      const url = new URL(request.url);
+      let pathname = decodeURIComponent(url.pathname);
+      if (pathname.startsWith("/")) pathname = pathname.slice(1);
+
+      // Proxy API and storage requests to backend server on port 3001
+      if (pathname.startsWith("api/") || pathname.startsWith("storage/")) {
+        const targetUrl = `http://127.0.0.1:3001/${pathname}${url.search}`;
+        return electronNet.fetch(targetUrl, {
+          method: request.method,
+          headers: request.headers,
+          body: request.body,
+          duplex: "half",
+        });
+      }
+
+      // Serve static asset if file exists
+      const targetPath = path.join(paths.frontendDist, pathname);
+      if (pathname && fs.existsSync(targetPath) && fs.statSync(targetPath).isFile()) {
+        return electronNet.fetch(pathToFileURL(targetPath).toString());
+      }
+
+      // Default to index.html for SPA
+      const indexPath = path.join(paths.frontendDist, "index.html");
+      return electronNet.fetch(pathToFileURL(indexPath).toString());
+    } catch (err) {
+      console.error("[Protocol app] Error:", err);
+      const indexPath = path.join(paths.frontendDist, "index.html");
+      return electronNet.fetch(pathToFileURL(indexPath).toString());
+    }
+  });
+
   createWindow();
 
   app.on("activate", () => {

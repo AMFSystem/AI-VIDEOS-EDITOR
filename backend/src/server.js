@@ -11,6 +11,14 @@ const server = http.createServer(app);
 // Initialize WebSocket Manager
 socketManager.init(server);
 
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    logger.warn(`[Backend] Port ${config.port} already in use. Service is active or shared.`);
+  } else {
+    logger.error("[Backend] Server error:", err);
+  }
+});
+
 server.listen(config.port, config.host, async () => {
   logger.info(`[Backend] HTTP & WebSocket Server running at http://${config.host}:${config.port}`);
   

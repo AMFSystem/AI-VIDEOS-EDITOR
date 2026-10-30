@@ -551,6 +551,7 @@ export class ModelManagerService {
     return {
       modelsDir: this.baseModelsDir,
       totalModels: MODELS_REGISTRY.length,
+      totalCount: MODELS_REGISTRY.length,
       installedCount: models.filter((m) => m.installed).length,
       totalInstalledSizeBytes: totalInstalledBytes,
       totalInstalledFormatted: formatSize(totalInstalledBytes),

@@ -14,8 +14,12 @@ const frontendDist = process.env.FRONTEND_DIST || path.resolve(__dirname, "../..
 
 export const app = express();
 
-// Initialize Storage directories
-await fileManager.init();
+// Initialize Storage directories safely
+try {
+  await fileManager.init();
+} catch (err) {
+  console.warn("[App] Initial storage dir setup skipped:", err?.message || err);
+}
 
 app.use(cors(corsConfig));
 app.use((req, res, next) => {

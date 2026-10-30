@@ -6,7 +6,11 @@ const getBackendBase = () =>
 
 const resolveApiUrl = (endpoint) => {
   const clean = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-  if (typeof window !== "undefined" && window.location.protocol === "file:") {
+  if (typeof window === "undefined") return clean;
+  const isLocalDirect =
+    window.location.origin === "http://127.0.0.1:3001" ||
+    window.location.origin === "http://localhost:3001";
+  if (!isLocalDirect) {
     const base = getBackendBase();
     return `${base}${clean}`;
   }

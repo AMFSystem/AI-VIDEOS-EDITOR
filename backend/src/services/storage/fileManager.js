@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { config } from "../../config/index.js";
 
 export class FileManager {
@@ -17,8 +18,19 @@ export class FileManager {
   }
 
   async init() {
-    for (const dir of Object.values(this.dirs)) {
-      await fs.mkdir(dir, { recursive: true });
+    for (const [key, dir] of Object.entries(this.dirs)) {
+      try {
+        await fs.mkdir(dir, { recursive: true });
+      } catch (err) {
+        console.warn(`[FileManager] Primary mkdir failed for ${dir} (${err.code}), falling back to user temp.`);
+        // Fallback to user temp if AppData or Program Files has permission issues
+        try {
+          const fallbackBase = path.join(os.tmpdir(), "ai-video-editor-storage");
+          const fallbackDir = path.join(fallbackBase, key);
+          await fs.mkdir(fallbackDir, { recursive: true });
+          this.dirs[key] = fallbackDir;
+        } catch {}
+      }
     }
   }
 
