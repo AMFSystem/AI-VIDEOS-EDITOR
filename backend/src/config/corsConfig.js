@@ -15,7 +15,8 @@ export const corsConfig = {
     "User-Agent",
     "Sec-Fetch-Mode",
     "Sec-Fetch-Site",
-    "Sec-Fetch-Dest"
+    "Sec-Fetch-Dest",
+    "Access-Control-Request-Private-Network"
   ],
   exposedHeaders: ["Content-Range", "Accept-Ranges", "Content-Length", "Content-Type"],
   credentials: true,

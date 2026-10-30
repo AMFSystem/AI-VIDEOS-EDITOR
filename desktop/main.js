@@ -20,6 +20,13 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
+// Allow loopback API fetches without Chromium Private Network Access (PNA) or mixed-content blocking
+app.commandLine.appendSwitch(
+  "disable-features",
+  "BlockInsecurePrivateNetworkRequests,BlockInsecurePrivateNetworkRequestsFromPrivate,BlockInsecurePrivateNetworkRequestsFromUnknown"
+);
+app.commandLine.appendSwitch("ignore-certificate-errors");
+
 let mainWindow = null;
 let backendProcess = null;
 let pythonProcess = null;
@@ -381,7 +388,8 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      webSecurity: true,
+      webSecurity: false,
+      allowRunningInsecureContent: true,
     },
     backgroundColor: "#101720",
   });
@@ -522,12 +530,16 @@ app.whenReady().then(() => {
       // Proxy API and storage requests to backend server on port 3001
       if (pathname.startsWith("api/") || pathname.startsWith("storage/")) {
         const targetUrl = `http://127.0.0.1:3001/${pathname}${url.search}`;
-        return electronNet.fetch(targetUrl, {
+        const hasBody = request.method !== "GET" && request.method !== "HEAD" && Boolean(request.body);
+        const fetchOptions = {
           method: request.method,
           headers: request.headers,
-          body: request.body,
-          duplex: "half",
-        });
+        };
+        if (hasBody) {
+          fetchOptions.body = request.body;
+          fetchOptions.duplex = "half";
+        }
+        return electronNet.fetch(targetUrl, fetchOptions);
       }
 
       // Serve static asset if file exists

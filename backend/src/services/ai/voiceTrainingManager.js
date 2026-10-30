@@ -1,21 +1,33 @@
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { config } from "../../config/index.js";
 
 export const trainingEvents = new EventEmitter();
 
 class VoiceTrainingManager {
   constructor() {
-    this.modelsDir = path.join(process.cwd(), "models", "custom_trained_voices");
-    this.datasetsDir = path.join(process.cwd(), "data", "training_datasets");
+    this.modelsDir = path.join(config.modelsDir || path.join(os.tmpdir(), "ai-models"), "custom_trained_voices");
+    this.datasetsDir = path.join(config.storagePath || path.join(os.tmpdir(), "ai-storage"), "training_datasets");
     this.ensureDirs();
     this.activeJobs = new Map(); // jobId -> { status, progress, logs, ... }
   }
 
   ensureDirs() {
-    if (!fs.existsSync(this.modelsDir)) fs.mkdirSync(this.modelsDir, { recursive: true });
-    if (!fs.existsSync(this.datasetsDir)) fs.mkdirSync(this.datasetsDir, { recursive: true });
+    try {
+      if (!fs.existsSync(this.modelsDir)) fs.mkdirSync(this.modelsDir, { recursive: true });
+      if (!fs.existsSync(this.datasetsDir)) fs.mkdirSync(this.datasetsDir, { recursive: true });
+    } catch (err) {
+      console.warn("[VoiceTrainingManager] Primary dirs permission issue, using temp fallback:", err?.message);
+      this.modelsDir = path.join(os.tmpdir(), "ai-video-editor-models", "custom_trained_voices");
+      this.datasetsDir = path.join(os.tmpdir(), "ai-video-editor-storage", "training_datasets");
+      try {
+        if (!fs.existsSync(this.modelsDir)) fs.mkdirSync(this.modelsDir, { recursive: true });
+        if (!fs.existsSync(this.datasetsDir)) fs.mkdirSync(this.datasetsDir, { recursive: true });
+      } catch {}
+    }
   }
 
   getPythonBin() {

@@ -10,6 +10,9 @@ export class SocketManager {
   init(httpServer) {
     try {
       this.wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+      this.wss.on("error", (err) => {
+        logger.warn("[WebSocket] WebSocketServer warning: " + (err?.message || err));
+      });
       this.wss.on("connection", (ws) => {
         this.clients.add(ws);
         logger.info("[WebSocket] Client connected. Total clients: " + this.clients.size);

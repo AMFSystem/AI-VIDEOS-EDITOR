@@ -23,6 +23,7 @@ try {
 
 app.use(cors(corsConfig));
 app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Private-Network", "true");
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   // Only apply strict COOP/COEP isolation to HTML web views that require SharedArrayBuffer, not API/SSE responses
   if (!req.path.startsWith("/api") && !req.path.startsWith("/storage")) {
