@@ -2316,6 +2316,7 @@ export function App() {
           t={t}
           onOpenModelsManager={() => setShowModelsManager(true)}
           requireModel={requireModel}
+          isModelInstalled={isModelInstalled}
         />
       )}
       <AIModelsManagerModal

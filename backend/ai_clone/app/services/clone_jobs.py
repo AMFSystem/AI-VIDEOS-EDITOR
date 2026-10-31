@@ -145,8 +145,21 @@ class CloneJobQueue:
         except Exception:
             pass
 
+    def _purge_queued_for_user(self, user_id: str) -> None:
+        """Cancel and evict older unstarted queued jobs for the user so duplicates never saturate the queue."""
+        try:
+            queue_ids = self._redis.lrange(QUEUE_KEY, 0, -1)
+            for jid in queue_ids:
+                data = self._redis.hgetall(job_key(jid))
+                if data and data.get("user_id") == str(user_id) and data.get("status") == "queued":
+                    self._redis.lrem(QUEUE_KEY, 0, jid)
+                    self._redis.hset(job_key(jid), mapping={"status": "failed", "error": "Cancelled: superseded by newer request"})
+        except Exception as exc:
+            logger.warning("Error purging queued jobs for user %s: %s", user_id, exc)
+
     def submit(self, job: CloneJob) -> CloneJob:
         self.prune_stale_processing()
+        self._purge_queued_for_user(job.user_id)
         if self.pending_count() >= self._max_pending:
             # Emergency secondary prune if queue still reports full
             self.prune_stale_processing()
@@ -219,8 +232,8 @@ class CloneJobQueue:
 
     def _process(self, job_id: str) -> None:
         job = self.get(job_id)
-        if job is None:
-            return  # expired or deleted while waiting
+        if job is None or job.status == "failed":
+            return  # expired, deleted, or cancelled while waiting
         job.status = "running"
         job.progress = max(job.progress, 15)
         job.stage = job.stage or "Initializing synthesis..."

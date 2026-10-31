@@ -38,6 +38,7 @@ aiRouter.post("/translate", aiController.translateText);
 // Local AI Model Hub & Manager
 aiRouter.get("/models", aiController.getModelsStatus);
 aiRouter.post("/models/download/:id", aiController.downloadModel);
+aiRouter.post("/models/cancel/:id", aiController.cancelModelDownload);
 aiRouter.get("/models/progress/:id", aiController.streamModelProgress);
 aiRouter.delete("/models/:id", aiController.deleteModel);
 

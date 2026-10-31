@@ -129,7 +129,7 @@ class VoxCPM2Engine:
             from huggingface_hub import snapshot_download
             from voxcpm import VoxCPM
 
-            # Detect direct cached snapshot to eliminate network dependency
+            # Detect direct cached snapshot or direct UI-downloaded folder to eliminate network dependency
             path = None
             snap_folder = cache_dir / "models--openbmb--VoxCPM2" / "snapshots"
             if snap_folder.exists():
@@ -137,6 +137,13 @@ class VoxCPM2Engine:
                 if snaps:
                     path = str(snaps[0])
                     logger.info("VoxCPM2: Resolved local cached snapshot directly: %s", path)
+
+            if not path:
+                clean_repo_name = f"models--{repo.replace('/', '--')}"
+                direct_candidate = Path(cache_dir) / clean_repo_name
+                if (direct_candidate / "model.safetensors").exists() or (direct_candidate / "config.json").exists():
+                    path = str(direct_candidate)
+                    logger.info("VoxCPM2: Using UI-downloaded local model folder %s [FULL LOCAL POWER]", path)
 
             if not path:
                 try:
@@ -347,8 +354,8 @@ class VoiceCloneService:
         )
         prompt = getattr(engine, "create_prompt", lambda p, t: None)(clean_ref_path, clean_ref_text)
 
-        # Handle sentence chunking: VoxCPM2 handles up to 220 characters smoothly in a single flow
-        max_chunk = 220 if isinstance(engine, VoxCPM2Engine) else 90
+        # Handle sentence chunking: VoxCPM2 handles up to 120 characters smoothly with minimal latency
+        max_chunk = 120 if isinstance(engine, VoxCPM2Engine) else 80
         sentences = split_sentences(text, max_chunk_len=max_chunk)
         chunks = []
         curr = ""

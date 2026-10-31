@@ -69,5 +69,12 @@ def split_sentences(text: str, max_chunk_len: int = 100) -> list[str]:
             else:
                 curr += p
         if curr.strip():
-            results.append(curr.strip())
+            c = curr.strip()
+            if len(c) > max_chunk_len:
+                for idx in range(0, len(c), max_chunk_len):
+                    sub = c[idx:idx + max_chunk_len].strip()
+                    if sub:
+                        results.append(sub)
+            else:
+                results.append(c)
     return [r for r in results if r.strip()]

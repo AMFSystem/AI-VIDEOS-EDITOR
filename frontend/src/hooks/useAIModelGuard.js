@@ -7,10 +7,7 @@ const getBackendBase = () =>
 const resolveApiUrl = (endpoint) => {
   const clean = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   if (typeof window === "undefined") return clean;
-  const isLocalDirect =
-    window.location.origin === "http://127.0.0.1:3001" ||
-    window.location.origin === "http://localhost:3001";
-  if (!isLocalDirect) {
+  if (window.location.protocol === "file:") {
     const base = getBackendBase();
     return `${base}${clean}`;
   }
@@ -45,9 +42,15 @@ export function useAIModelGuard({ notify = console.log } = {}) {
 
   const refreshStatus = useCallback(async () => {
     try {
-      const res = await fetch(resolveApiUrl("/api/ai/models"));
-      if (res.ok) {
-        const json = await res.json();
+      let json = null;
+      if (window.desktopAPI?.getModelsStatus) {
+        json = await window.desktopAPI.getModelsStatus();
+      }
+      if (!json) {
+        const res = await fetch(resolveApiUrl("/api/ai/models"));
+        if (res.ok) json = await res.json();
+      }
+      if (json) {
         const map = { ...getCachedInstalledModels() };
         json.models?.forEach((m) => {
           if (m.installed) {

@@ -658,6 +658,16 @@ export const aiController = {
     }
   },
 
+  async cancelModelDownload(req, res) {
+    try {
+      const { id } = req.params;
+      const result = modelManager.cancelDownload(id);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
   async streamModelProgress(req, res) {
     const { id } = req.params;
     res.setHeader("Content-Type", "text/event-stream");

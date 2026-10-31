@@ -24,10 +24,7 @@ const getBackendBase = () =>
 const resolveApiUrl = (endpoint) => {
   const clean = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   if (typeof window === "undefined") return clean;
-  const isLocalDirect =
-    window.location.origin === "http://127.0.0.1:3001" ||
-    window.location.origin === "http://localhost:3001";
-  if (!isLocalDirect) {
+  if (window.location.protocol === "file:") {
     const base = getBackendBase();
     return `${base}${clean}`;
   }
@@ -45,6 +42,9 @@ export function AIModelGuideModal({
 }) {
   const [downloading, setDownloading] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0);
+  const [downloadSpeed, setDownloadSpeed] = useState("");
+  const [downloadEta, setDownloadEta] = useState("");
+  const [currentFile, setCurrentFile] = useState("");
   const [isInstalled, setIsInstalled] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
   const eventSourceRef = useRef(null);
@@ -64,9 +64,15 @@ export function AIModelGuideModal({
   const checkStatus = async () => {
     if (!modelId) return false;
     try {
-      const res = await fetch(resolveApiUrl("/api/ai/models"));
-      if (res.ok) {
-        const json = await res.json();
+      let json = null;
+      if (window.desktopAPI?.getModelsStatus) {
+        json = await window.desktopAPI.getModelsStatus();
+      }
+      if (!json) {
+        const res = await fetch(resolveApiUrl("/api/ai/models"));
+        if (res.ok) json = await res.json();
+      }
+      if (json) {
         const found = json.models?.find((m) => m.id === modelId);
         if (found?.installed) {
           setIsInstalled(true);
@@ -104,15 +110,21 @@ export function AIModelGuideModal({
       es.onmessage = (event) => {
         try {
           const state = JSON.parse(event.data);
-          setProgressPercent(state.percent || 0);
+          if (state.percent !== undefined) setProgressPercent(state.percent);
+          if (state.speedFormatted) setDownloadSpeed(state.speedFormatted);
+          if (state.etaFormatted) setDownloadEta(state.etaFormatted);
+          if (state.currentFile) setCurrentFile(state.currentFile);
+
           if (state.status === "ready") {
             setIsInstalled(true);
             setDownloading(false);
             setProgressPercent(100);
+            setDownloadSpeed("");
+            setDownloadEta("");
+            setCurrentFile("");
             es.close();
             eventSourceRef.current = null;
             notify(`ម៉ូដែល ${model.name} បានទាញយករួចរាល់ ១០០%!`, "success");
-            // Auto proceed on download complete
             setTimeout(() => {
               if (typeof onProceed === "function") onProceed();
               onClose();
@@ -151,14 +163,23 @@ export function AIModelGuideModal({
     if (!downloading || !isOpen || !modelId) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(resolveApiUrl("/api/ai/models"));
-        if (!res.ok) return;
-        const json = await res.json();
+        let json = null;
+        if (window.desktopAPI?.getModelsStatus) {
+          json = await window.desktopAPI.getModelsStatus();
+        }
+        if (!json) {
+          const res = await fetch(resolveApiUrl("/api/ai/models"));
+          if (res.ok) json = await res.json();
+        }
+        if (!json) return;
         const found = json.models?.find((m) => m.id === modelId);
         if (found?.installed) {
           setIsInstalled(true);
           setDownloading(false);
           setProgressPercent(100);
+          setDownloadSpeed("");
+          setDownloadEta("");
+          setCurrentFile("");
           notify(`ម៉ូដែល ${model.name} បានទាញយករួចរាល់ ១០០%!`, "success");
           setTimeout(() => {
             if (typeof onProceed === "function") onProceed();
@@ -166,6 +187,9 @@ export function AIModelGuideModal({
           }, 600);
         } else if (found?.downloading || found?.progress > 0) {
           setProgressPercent(found.progress || 0);
+          if (found.speedFormatted) setDownloadSpeed(found.speedFormatted);
+          if (found.etaFormatted) setDownloadEta(found.etaFormatted);
+          if (found.currentFile) setCurrentFile(found.currentFile);
         }
       } catch {}
     }, 2000);
@@ -180,13 +204,20 @@ export function AIModelGuideModal({
     startListening(modelId);
 
     try {
-      const res = await fetch(resolveApiUrl(`/api/ai/models/download/${modelId}`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || `HTTP ${res.status}`);
+      if (window.desktopAPI?.downloadModel) {
+        const result = await window.desktopAPI.downloadModel(modelId);
+        if (result?.error) {
+          throw new Error(result.error);
+        }
+      } else {
+        const res = await fetch(resolveApiUrl(`/api/ai/models/download/${modelId}`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          throw new Error(errJson.error || `HTTP ${res.status}`);
+        }
       }
       notify(`កំពុងចាប់ផ្ដើមទាញយកម៉ូដែល ${model.name}...`, "info");
     } catch (err) {
@@ -289,7 +320,7 @@ export function AIModelGuideModal({
                   ) : (
                     <span className="text-downloading-3d">
                       <CircleNotch size={15} weight="bold" className="spin-icon" />
-                      កំពុងទាញយក...
+                      កំពុងទាញយក... {downloadSpeed ? `(${downloadSpeed})` : ""}
                     </span>
                   )}
                 </span>
@@ -298,9 +329,15 @@ export function AIModelGuideModal({
               <div className="progress-track-3d">
                 <div
                   className={`progress-fill-3d ${isInstalled ? "is-complete" : ""}`}
-                  style={{ width: `${Math.max(progressPercent, 5)}%` }}
+                  style={{ width: `${Math.max(progressPercent, 5)}%`, transition: "width 0.25s ease-out" }}
                 />
               </div>
+              {!isInstalled && (downloadEta || currentFile) && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "11px", color: "rgba(255,255,255,0.65)", fontWeight: 500 }}>
+                  <span>{currentFile ? `ឯកសារ: ${currentFile}` : ""}</span>
+                  <span>{downloadEta ? `នៅសល់ប្រហែល: ${downloadEta}` : ""}</span>
+                </div>
+              )}
             </div>
           )}
 

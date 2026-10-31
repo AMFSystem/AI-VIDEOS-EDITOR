@@ -496,6 +496,44 @@ function terminateChildren() {
 // IPC Handlers
 ipcMain.handle("desktop:ping", () => "pong");
 
+ipcMain.handle("desktop:download-model", async (_event, modelId) => {
+  try {
+    const res = await electronNet.fetch(`http://127.0.0.1:3001/api/ai/models/download/${encodeURIComponent(modelId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { error: data.error || `HTTP ${res.status}` };
+    }
+    return { success: true, ...data };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle("desktop:cancel-download-model", async (_event, modelId) => {
+  try {
+    const res = await electronNet.fetch(`http://127.0.0.1:3001/api/ai/models/cancel/${encodeURIComponent(modelId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    return await res.json().catch(() => ({ success: true }));
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle("desktop:get-models-status", async () => {
+  try {
+    const res = await electronNet.fetch("http://127.0.0.1:3001/api/ai/models");
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+});
+
 ipcMain.handle("desktop:select-file", async (_event, options = {}) => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -531,9 +569,11 @@ app.whenReady().then(() => {
       if (pathname.startsWith("api/") || pathname.startsWith("storage/")) {
         const targetUrl = `http://127.0.0.1:3001/${pathname}${url.search}`;
         const hasBody = request.method !== "GET" && request.method !== "HEAD" && Boolean(request.body);
+        const headers = new Headers(request.headers);
+        headers.delete("host");
         const fetchOptions = {
           method: request.method,
-          headers: request.headers,
+          headers,
         };
         if (hasBody) {
           fetchOptions.body = request.body;

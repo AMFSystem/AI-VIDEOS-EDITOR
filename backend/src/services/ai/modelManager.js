@@ -162,10 +162,14 @@ export const MODELS_REGISTRY = [
     sizeFormatted: "2.4 GB",
     relDir: path.join("hf", "hub", "models--openbmb--VoxCPM2"),
     repo: "openbmb/VoxCPM2",
-    keyFiles: ["model.safetensors", "config.json"],
+    keyFiles: ["model.safetensors", "audiovae.safetensors", "config.json", "tokenizer.json"],
     downloadUrls: [
       "https://huggingface.co/openbmb/VoxCPM2/resolve/main/model.safetensors",
-      "https://huggingface.co/openbmb/VoxCPM2/resolve/main/config.json"
+      "https://huggingface.co/openbmb/VoxCPM2/resolve/main/audiovae.safetensors",
+      "https://huggingface.co/openbmb/VoxCPM2/resolve/main/config.json",
+      "https://huggingface.co/openbmb/VoxCPM2/resolve/main/tokenizer.json",
+      "https://huggingface.co/openbmb/VoxCPM2/resolve/main/tokenizer_config.json",
+      "https://huggingface.co/openbmb/VoxCPM2/resolve/main/special_tokens_map.json"
     ]
   },
   {
@@ -297,7 +301,7 @@ export const MODELS_REGISTRY = [
   }
 ];
 
-// Active in-progress downloads: modelId -> { percent, downloadedBytes, totalBytes, speed, status, abortCtrl }
+// Active in-progress downloads: modelId -> { percent, downloadedBytes, totalBytes, speedFormatted, etaFormatted, status, abortController }
 const activeDownloads = new Map();
 
 function formatSize(bytes) {
@@ -306,6 +310,16 @@ function formatSize(bytes) {
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatEta(seconds) {
+  if (!seconds || seconds <= 0 || !isFinite(seconds)) return "";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  if (m < 60) return `${m}m ${s}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
 }
 
 function getDirSize(dirPath, visitedPaths = new Set()) {
@@ -321,6 +335,7 @@ function getDirSize(dirPath, visitedPaths = new Set()) {
 
     const entries = fs.readdirSync(dirPath);
     for (const name of entries) {
+      if (name.endsWith(".part") || name.endsWith(".tmp")) continue;
       const full = path.join(dirPath, name);
       try {
         const stat = fs.statSync(full);
@@ -336,13 +351,14 @@ function getDirSize(dirPath, visitedPaths = new Set()) {
 }
 
 /**
- * Checks recursively if any model weight files exist in directory or its subdirectories
+ * Checks recursively if any non-empty model weight files exist in directory or its subdirectories
  */
 function hasValidModelWeights(dirPath, maxDepth = 4, currentDepth = 0) {
   if (!dirPath || !fs.existsSync(dirPath) || currentDepth > maxDepth) return false;
   try {
     const entries = fs.readdirSync(dirPath);
     for (const name of entries) {
+      if (name.endsWith(".part") || name.endsWith(".tmp")) continue;
       const full = path.join(dirPath, name);
       try {
         const stat = fs.statSync(full);
@@ -355,10 +371,11 @@ function hasValidModelWeights(dirPath, maxDepth = 4, currentDepth = 0) {
             lower.endsWith(".bin") ||
             lower.endsWith(".pth") ||
             lower.endsWith(".pt") ||
-            lower.endsWith(".gguf")
+            lower.endsWith(".gguf") ||
+            lower === "model.json"
           ) {
-            // Must have non-trivial size (> 500 KB) to ensure not an empty/corrupted file
-            if (stat.size > 500 * 1024) return true;
+            // Must have non-trivial size (> 50 KB) to ensure not an empty/corrupted stub
+            if (stat.size > 50 * 1024) return true;
           }
         } else if (stat.isDirectory()) {
           if (hasValidModelWeights(full, maxDepth, currentDepth + 1)) return true;
@@ -366,6 +383,62 @@ function hasValidModelWeights(dirPath, maxDepth = 4, currentDepth = 0) {
       } catch {}
     }
   } catch {}
+  return false;
+}
+
+/**
+ * Checks if a specific key file exists in targetDir or subdirectories (handles Windows & Mac path variances)
+ */
+function keyFileExists(targetDir, keyFile) {
+  if (!targetDir || !fs.existsSync(targetDir)) return false;
+  const directPath = path.join(targetDir, keyFile);
+  if (fs.existsSync(directPath)) {
+    try {
+      if (fs.statSync(directPath).size > 10) return true;
+    } catch {}
+  }
+  const baseName = path.basename(keyFile);
+  const baseDirect = path.join(targetDir, baseName);
+  if (fs.existsSync(baseDirect)) {
+    try {
+      if (fs.statSync(baseDirect).size > 10) return true;
+    } catch {}
+  }
+  // Check snapshots subfolder if exists
+  const snapshotsDir = path.join(targetDir, "snapshots");
+  if (fs.existsSync(snapshotsDir)) {
+    try {
+      const subs = fs.readdirSync(snapshotsDir);
+      for (const sub of subs) {
+        const snapPath = path.join(snapshotsDir, sub, keyFile);
+        if (fs.existsSync(snapPath) && fs.statSync(snapPath).size > 10) return true;
+        const snapBase = path.join(snapshotsDir, sub, baseName);
+        if (fs.existsSync(snapBase) && fs.statSync(snapBase).size > 10) return true;
+      }
+    } catch {}
+  }
+  return false;
+}
+
+/**
+ * Windows & Mac safe atomic rename with retries for open file handle release
+ */
+function safeRenameSync(src, dest, maxRetries = 10) {
+  if (!fs.existsSync(src)) return false;
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      if (fs.existsSync(dest)) {
+        try { fs.unlinkSync(dest); } catch {}
+      }
+      fs.renameSync(src, dest);
+      return true;
+    } catch (err) {
+      if (i === maxRetries - 1) throw err;
+      const start = Date.now();
+      while (Date.now() - start < 100 * (i + 1)) {}
+    }
+  }
   return false;
 }
 
@@ -410,16 +483,6 @@ export class ModelManagerService {
     return path.join(this.baseModelsDir, modelDef.relDir);
   }
 
-  /**
-   * Exhaustively collects all possible locations where this model could be stored:
-   * 1. baseModelsDir / relDir
-   * 2. baseModelsDir / hub / basename
-   * 3. baseModelsDir / basename
-   * 4. baseModelsDir / id
-   * 5. HuggingFace default cache (~/.cache/huggingface/hub/...)
-   * 6. Windows User Profile cache (AppData/Local, %USERPROFILE%/.cache/...)
-   * 7. Bundled ai_clone/models directory
-   */
   getCandidateModelDirs(modelDef) {
     const candidates = [];
     const baseDir = this.baseModelsDir;
@@ -459,47 +522,53 @@ export class ModelManagerService {
       candidates.push(path.join(process.env.HF_HOME, "hub", relBase));
     }
 
-    // Deduplicate
     return [...new Set(candidates.filter(Boolean))];
   }
 
   /**
-   * Returns true if the model has already been downloaded and verified on disk.
-   * Under NO circumstances returns false if model files exist.
+   * Returns true if model is completely downloaded and ready to use
    */
   isModelInstalled(modelDef) {
+    const active = activeDownloads.get(modelDef.id);
+    if (active && active.status === "downloading") {
+      return false;
+    }
+
     const candidateDirs = this.getCandidateModelDirs(modelDef);
 
     for (const targetDir of candidateDirs) {
       if (!fs.existsSync(targetDir)) continue;
 
-      // 1. Check if model weight files exist directly or in snapshots
-      if (hasValidModelWeights(targetDir)) {
-        return true;
+      // 1. Verify keyFiles if specified
+      if (modelDef.keyFiles && modelDef.keyFiles.length > 0) {
+        const allKeyFilesPresent = modelDef.keyFiles.every((kf) => keyFileExists(targetDir, kf));
+        if (allKeyFilesPresent) {
+          return true;
+        }
       }
 
-      // 2. Check total directory size
-      const dirSize = getDirSize(targetDir);
-      const minThreshold = (modelDef.sizeBytes && modelDef.sizeBytes < 10 * 1024 * 1024)
-        ? 500 * 1024
-        : 10 * 1024 * 1024;
-
-      if (dirSize >= minThreshold) return true;
+      // 2. Check model weights presence and directory size
+      if (hasValidModelWeights(targetDir)) {
+        const dirSize = getDirSize(targetDir);
+        const minExpected = (modelDef.sizeBytes && modelDef.sizeBytes > 5 * 1024 * 1024)
+          ? Math.floor(modelDef.sizeBytes * 0.45)
+          : 50 * 1024;
+        if (dirSize >= minExpected) {
+          return true;
+        }
+      }
 
       // 3. Check snapshots directory explicitly
       const snapshotsDir = path.join(targetDir, "snapshots");
       if (fs.existsSync(snapshotsDir)) {
         if (hasValidModelWeights(snapshotsDir)) return true;
-        const snapSize = getDirSize(snapshotsDir);
-        if (snapSize >= minThreshold) return true;
       }
     }
 
     // 4. Check persistent install map
     const persisted = this.getPersistedInstalledMap();
     if (persisted[modelDef.id]) {
-      // Re-verify that at least one candidate folder exists
-      if (candidateDirs.some((d) => fs.existsSync(d))) {
+      if (candidateDirs.some((d) => fs.existsSync(d) && hasValidModelWeights(d))) {
         return true;
       }
     }
@@ -511,7 +580,7 @@ export class ModelManagerService {
     const candidateDirs = this.getCandidateModelDirs(modelDef);
     for (const d of candidateDirs) {
       if (fs.existsSync(d)) {
-        if (hasValidModelWeights(d) || getDirSize(d) > 500 * 1024) {
+        if (hasValidModelWeights(d) || getDirSize(d) > 100 * 1024) {
           return d;
         }
       }
@@ -543,6 +612,9 @@ export class ModelManagerService {
         downloading: Boolean(downloadState && downloadState.status === "downloading"),
         progress: downloadState ? downloadState.percent : (isInstalled ? 100 : 0),
         status: downloadState ? downloadState.status : (isInstalled ? "ready" : "not_downloaded"),
+        speedFormatted: downloadState?.speedFormatted || "",
+        etaFormatted: downloadState?.etaFormatted || "",
+        currentFile: downloadState?.currentFile || "",
         error: downloadState?.error || null,
         localPath: isInstalled ? modelPath : null
       };
@@ -559,70 +631,225 @@ export class ModelManagerService {
     };
   }
 
-  async downloadFile(url, destPath, onProgress) {
+  /**
+   * Resilient single-file download with Range resume, socket timeout & redirects
+   */
+  _attemptSingleDownload(url, destPath, partPath, startByte, onChunk, signal) {
     return new Promise((resolve, reject) => {
+      let activeRequest = null;
+      let activeStream = null;
+      let isDone = false;
+
+      const cleanup = () => {
+        isDone = true;
+        if (activeRequest) {
+          try { activeRequest.destroy(); } catch {}
+          activeRequest = null;
+        }
+        if (activeStream) {
+          try { activeStream.close(); } catch {}
+          activeStream = null;
+        }
+      };
+
+      if (signal) {
+        signal.addEventListener("abort", () => {
+          cleanup();
+          reject(new Error("Download aborted by user"));
+        }, { once: true });
+      }
+
       const followRedirects = (currentUrl, redirectCount = 0) => {
-        if (redirectCount > 8) {
-          return reject(new Error("Too many redirects"));
+        if (signal?.aborted || isDone) return;
+        if (redirectCount > 10) {
+          cleanup();
+          return reject(new Error("Too many HTTP redirects (limit 10)"));
         }
 
         const client = currentUrl.startsWith("https") ? https : http;
+        const headers = {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          Accept: "*/*",
+          "Accept-Encoding": "identity",
+        };
+
+        if (startByte > 0) {
+          headers.Range = `bytes=${startByte}-`;
+        }
+
         const req = client.get(
           currentUrl,
-          {
-            headers: {
-              "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-              Accept: "*/*",
-            },
-          },
+          { headers, timeout: 35000 },
           (res) => {
             if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
               try {
+                res.resume();
                 const nextUrl = new URL(res.headers.location, currentUrl).href;
                 return followRedirects(nextUrl, redirectCount + 1);
               } catch (err) {
+                cleanup();
                 return reject(new Error(`Invalid redirect URL: ${res.headers.location}`));
               }
             }
 
-            if (res.statusCode !== 200) {
-              return reject(new Error(`Download failed with HTTP ${res.statusCode} for ${currentUrl}`));
+            if (res.statusCode === 416) {
+              res.resume();
+              if (startByte > 1000) {
+                try {
+                  safeRenameSync(partPath, destPath);
+                  cleanup();
+                  return resolve();
+                } catch {}
+              }
+              try { fs.unlinkSync(partPath); } catch {}
+              cleanup();
+              return reject(new Error("Range not satisfiable (resetting part file)"));
             }
 
-            const total = parseInt(res.headers["content-length"] || "0", 10);
-            let downloaded = 0;
+            if (res.statusCode !== 200 && res.statusCode !== 206) {
+              res.resume();
+              cleanup();
+              return reject(new Error(`Server returned HTTP ${res.statusCode} for ${currentUrl}`));
+            }
 
-            fs.mkdirSync(path.dirname(destPath), { recursive: true });
-            const fileStream = fs.createWriteStream(destPath);
+            const isPartial = res.statusCode === 206;
+            const openFlags = isPartial && startByte > 0 ? "a" : "w";
+            const actualStart = isPartial ? startByte : 0;
+
+            const fileStream = fs.createWriteStream(partPath, { flags: openFlags });
+            activeStream = fileStream;
+
+            let inactivityTimeout = setTimeout(() => {
+              cleanup();
+              reject(new Error("Download stalled (no data received for 35s)"));
+            }, 35000);
 
             res.on("data", (chunk) => {
-              downloaded += chunk.length;
-              if (total && onProgress) {
-                onProgress(downloaded, total);
+              if (isDone) return;
+              clearTimeout(inactivityTimeout);
+              inactivityTimeout = setTimeout(() => {
+                cleanup();
+                reject(new Error("Download stalled (no data received for 35s)"));
+              }, 35000);
+
+              if (onChunk) {
+                onChunk(chunk.length);
               }
             });
 
             res.pipe(fileStream);
 
             fileStream.on("finish", () => {
-              fileStream.close(() => resolve());
+              clearTimeout(inactivityTimeout);
+              fileStream.close(() => {
+                if (isDone) return;
+                try {
+                  safeRenameSync(partPath, destPath);
+                  cleanup();
+                  resolve();
+                } catch (rErr) {
+                  cleanup();
+                  reject(rErr);
+                }
+              });
             });
 
-            fileStream.on("error", (err) => {
-              fs.unlink(destPath, () => {});
-              reject(err);
+            fileStream.on("error", (fErr) => {
+              clearTimeout(inactivityTimeout);
+              cleanup();
+              reject(fErr);
             });
           }
         );
 
-        req.on("error", (err) => {
-          fs.unlink(destPath, () => {});
-          reject(err);
+        activeRequest = req;
+
+        req.on("timeout", () => {
+          cleanup();
+          reject(new Error("Network connection timeout (35s)"));
+        });
+
+        req.on("error", (netErr) => {
+          cleanup();
+          reject(netErr);
         });
       };
 
       followRedirects(url);
     });
+  }
+
+  /**
+   * Resilient file downloader with auto-retry & exponential backoff
+   */
+  async downloadFileWithResume(url, destPath, onChunk, signal) {
+    const maxRetries = 6;
+    const partPath = `${destPath}.part`;
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      if (signal?.aborted) {
+        throw new Error("Download cancelled");
+      }
+
+      let startByte = 0;
+      if (fs.existsSync(partPath)) {
+        try {
+          startByte = fs.statSync(partPath).size;
+        } catch {
+          startByte = 0;
+        }
+      }
+
+      try {
+        await this._attemptSingleDownload(url, destPath, partPath, startByte, onChunk, signal);
+        return;
+      } catch (err) {
+        if (signal?.aborted) {
+          throw err;
+        }
+        console.warn(`[ModelManager] Retry ${attempt}/${maxRetries} for ${path.basename(destPath)}: ${err.message}`);
+        if (attempt === maxRetries) {
+          throw new Error(`Failed to download ${path.basename(destPath)} after ${maxRetries} attempts: ${err.message}`);
+        }
+        const waitMs = Math.min(8000, 1000 * Math.pow(2, attempt - 1));
+        await new Promise((r) => setTimeout(r, waitMs));
+      }
+    }
+  }
+
+  /**
+   * Creates snapshot compatibility directories (snapshots/default and refs/main)
+   * for Hugging Face hub library compatibility on Mac and Windows
+   */
+  ensureSnapshotCompatibility(targetDir, modelDef) {
+    try {
+      if (!modelDef.repo) return;
+      const snapshotsDir = path.join(targetDir, "snapshots", "default");
+      const refsDir = path.join(targetDir, "refs");
+      fs.mkdirSync(snapshotsDir, { recursive: true });
+      fs.mkdirSync(refsDir, { recursive: true });
+
+      // Write refs/main -> default
+      fs.writeFileSync(path.join(refsDir, "main"), "default", "utf-8");
+
+      // Hard link or copy files into snapshots/default
+      const entries = fs.readdirSync(targetDir);
+      for (const entry of entries) {
+        if (entry === "snapshots" || entry === "refs" || entry.endsWith(".part")) continue;
+        const src = path.join(targetDir, entry);
+        const dest = path.join(snapshotsDir, entry);
+        if (fs.existsSync(src) && fs.statSync(src).isFile() && !fs.existsSync(dest)) {
+          try {
+            fs.linkSync(src, dest);
+          } catch {
+            try { fs.copyFileSync(src, dest); } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[ModelManager] Snapshot compatibility setup skipped:", err.message);
+    }
   }
 
   async downloadModel(modelId) {
@@ -631,7 +858,7 @@ export class ModelManagerService {
       throw new Error(`Model with id "${modelId}" not found in registry`);
     }
 
-    // If model is already downloaded and valid, return ready immediately to prevent duplicate downloads
+    // If model is already fully downloaded and valid, return ready immediately
     if (this.isModelInstalled(modelDef)) {
       return {
         modelId,
@@ -639,6 +866,8 @@ export class ModelManagerService {
         percent: 100,
         downloadedBytes: modelDef.sizeBytes,
         totalBytes: modelDef.sizeBytes,
+        speedFormatted: "",
+        etaFormatted: "",
         error: null
       };
     }
@@ -647,55 +876,115 @@ export class ModelManagerService {
       return activeDownloads.get(modelId);
     }
 
+    const targetDir = this.getModelPath(modelDef);
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const totalExpectedBytes = modelDef.sizeBytes || 1;
+    let totalDownloadedBytes = 0;
+
+    // Check existing progress on disk
+    for (const url of modelDef.downloadUrls) {
+      const urlObj = new URL(url);
+      const parts = urlObj.pathname.split("/resolve/main/");
+      const relativeName = parts.length > 1 ? parts[1] : path.basename(urlObj.pathname);
+      const dest = path.join(targetDir, relativeName);
+      const part = `${dest}.part`;
+
+      if (fs.existsSync(dest)) {
+        try { totalDownloadedBytes += fs.statSync(dest).size; } catch {}
+      } else if (fs.existsSync(part)) {
+        try { totalDownloadedBytes += fs.statSync(part).size; } catch {}
+      }
+    }
+
+    const abortController = new AbortController();
     const state = {
       modelId,
       status: "downloading",
-      percent: 0,
-      downloadedBytes: 0,
-      totalBytes: modelDef.sizeBytes,
-      error: null
+      percent: Math.min(99, Math.round((totalDownloadedBytes / totalExpectedBytes) * 100)),
+      downloadedBytes: totalDownloadedBytes,
+      totalBytes: totalExpectedBytes,
+      speedFormatted: "0 KB/s",
+      etaFormatted: "",
+      currentFile: "",
+      error: null,
+      abortController
     };
     activeDownloads.set(modelId, state);
 
-    // Start background download
+    // Run background download task
     (async () => {
-      const targetDir = this.getModelPath(modelDef);
-      fs.mkdirSync(targetDir, { recursive: true });
+      let lastTime = Date.now();
+      let bytesSinceLastCheck = 0;
+      let lastEmitTime = Date.now();
+
+      const onChunk = (chunkLen) => {
+        totalDownloadedBytes += chunkLen;
+        bytesSinceLastCheck += chunkLen;
+        state.downloadedBytes = totalDownloadedBytes;
+
+        const now = Date.now();
+        const timeDelta = (now - lastTime) / 1000;
+        if (timeDelta >= 1.0) {
+          const speed = bytesSinceLastCheck / timeDelta;
+          state.speedFormatted = `${formatSize(speed)}/s`;
+          const remainingBytes = Math.max(0, totalExpectedBytes - totalDownloadedBytes);
+          const etaSeconds = speed > 0 ? Math.round(remainingBytes / speed) : 0;
+          state.etaFormatted = formatEta(etaSeconds);
+
+          lastTime = now;
+          bytesSinceLastCheck = 0;
+        }
+
+        const percent = Math.min(99, Math.round((totalDownloadedBytes / totalExpectedBytes) * 100));
+        state.percent = percent;
+
+        if (now - lastEmitTime >= 250) {
+          lastEmitTime = now;
+          modelEvents.emit(`progress:${modelId}`, { ...state, abortController: undefined });
+        }
+      };
 
       try {
         const totalFiles = modelDef.downloadUrls.length;
-        let completedFiles = 0;
 
         for (let i = 0; i < totalFiles; i++) {
+          if (abortController.signal.aborted) break;
+
           const url = modelDef.downloadUrls[i];
           const urlObj = new URL(url);
-          // Preserve subfolder structure (e.g. onnx/model.onnx)
           const parts = urlObj.pathname.split("/resolve/main/");
           const relativeName = parts.length > 1 ? parts[1] : path.basename(urlObj.pathname);
           const dest = path.join(targetDir, relativeName);
-          fs.mkdirSync(path.dirname(dest), { recursive: true });
 
-          await this.downloadFile(url, dest, (fileDownloaded, fileTotal) => {
-            const overallPercent = Math.min(
-              99,
-              Math.round(((completedFiles + (fileTotal ? fileDownloaded / fileTotal : 0)) / totalFiles) * 100)
-            );
-            state.percent = overallPercent;
-            modelEvents.emit(`progress:${modelId}`, state);
-          });
+          state.currentFile = `${path.basename(relativeName)} (${i + 1}/${totalFiles})`;
+          modelEvents.emit(`progress:${modelId}`, { ...state, abortController: undefined });
 
-          completedFiles++;
+          // If file already exists and is complete, skip downloading
+          if (fs.existsSync(dest) && fs.statSync(dest).size > 100) {
+            continue;
+          }
+
+          await this.downloadFileWithResume(url, dest, onChunk, abortController.signal);
         }
 
-        state.percent = 100;
-        state.status = "ready";
-        this.markModelInstalled(modelId, true);
-        modelEvents.emit(`progress:${modelId}`, state);
+        if (!abortController.signal.aborted) {
+          state.percent = 100;
+          state.status = "ready";
+          state.speedFormatted = "";
+          state.etaFormatted = "";
+          state.currentFile = "Complete";
+          this.markModelInstalled(modelId, true);
+          this.ensureSnapshotCompatibility(targetDir, modelDef);
+          modelEvents.emit(`progress:${modelId}`, { ...state, abortController: undefined });
+        }
       } catch (err) {
-        console.error(`[ModelManager] Download failed for ${modelId}:`, err);
-        state.status = "error";
-        state.error = err.message;
-        modelEvents.emit(`progress:${modelId}`, state);
+        if (!abortController.signal.aborted) {
+          console.error(`[ModelManager] Download error for ${modelId}:`, err);
+          state.status = "error";
+          state.error = err.message;
+          modelEvents.emit(`progress:${modelId}`, { ...state, abortController: undefined });
+        }
       } finally {
         setTimeout(() => {
           activeDownloads.delete(modelId);
@@ -703,22 +992,54 @@ export class ModelManagerService {
       }
     })();
 
-    return state;
+    return { ...state, abortController: undefined };
+  }
+
+  cancelDownload(modelId) {
+    const active = activeDownloads.get(modelId);
+    if (active) {
+      if (active.abortController) {
+        try { active.abortController.abort(); } catch {}
+      }
+      active.status = "not_downloaded";
+      activeDownloads.delete(modelId);
+      modelEvents.emit(`progress:${modelId}`, {
+        modelId,
+        status: "not_downloaded",
+        percent: 0,
+        error: "Download cancelled"
+      });
+      return { success: true, message: `Download cancelled for ${modelId}` };
+    }
+    return { success: false, message: "No active download found" };
   }
 
   deleteModel(modelId) {
+    this.cancelDownload(modelId);
     const modelDef = MODELS_REGISTRY.find((m) => m.id === modelId);
     if (!modelDef) {
       throw new Error(`Model with id "${modelId}" not found in registry`);
     }
 
-    const targetDir = this.getModelPath(modelDef);
+    const candidateDirs = this.getCandidateModelDirs(modelDef);
     this.markModelInstalled(modelId, false);
-    if (fs.existsSync(targetDir)) {
-      fs.rmSync(targetDir, { recursive: true, force: true });
-      return { success: true, message: `Model ${modelDef.name} deleted successfully` };
+
+    let deleted = false;
+    for (const d of candidateDirs) {
+      if (fs.existsSync(d)) {
+        try {
+          fs.rmSync(d, { recursive: true, force: true });
+          deleted = true;
+        } catch (err) {
+          console.warn(`[ModelManager] Could not delete dir ${d}:`, err.message);
+        }
+      }
     }
-    return { success: true, message: "Model directory was already empty" };
+
+    return {
+      success: true,
+      message: deleted ? `Model ${modelDef.name} deleted successfully` : "Model directory was already empty"
+    };
   }
 }
 

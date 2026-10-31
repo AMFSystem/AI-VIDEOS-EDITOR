@@ -103,6 +103,7 @@ export function VoiceCloneStudioPage({
   notify = console.log,
   onOpenModelsManager,
   requireModel,
+  isModelInstalled,
 }) {
   // Navigation View: "tts" (Main Studio & Library) | "train" | "stt"
   const [activeTab, setActiveTab] = useState(
@@ -169,6 +170,7 @@ export function VoiceCloneStudioPage({
   const [previewPlayingId, setPreviewPlayingId] = useState(null);
   const previewAudioRef = useRef(null);
   const abortControllerRef = useRef(null);
+  const isGeneratingRef = useRef(false);
 
   const handleCancelGeneration = () => {
     if (abortControllerRef.current) {
@@ -595,6 +597,10 @@ export function VoiceCloneStudioPage({
 
   // Generate Voice Handler (Full Integration with Auto-Detect Clone/TTS + Gemini Auto-Director)
   const handleGenerateVoice = async () => {
+    if (isGeneratingRef.current || isGenerating) {
+      console.warn("handleGenerateVoice: Already generating voice, skipping duplicate invocation");
+      return;
+    }
     if (!ttsText.trim()) {
       notify("សូមបញ្ចូលអត្ថបទជាមុនសិន!", "warning");
       return;
@@ -612,13 +618,17 @@ export function VoiceCloneStudioPage({
       if (resolvedEngine === "mms") reqModel = "mms-tts-khm";
       else if (resolvedEngine === "clone" || resolvedEngine === "voxcpm2") reqModel = "voxcpm2-clone";
       if (reqModel) {
-        const ok = await requireModel(reqModel, () => {
-          handleGenerateVoice();
-        });
-        if (!ok) return;
+        const isInstalled = typeof isModelInstalled === "function" ? isModelInstalled(reqModel) : false;
+        if (!isInstalled) {
+          requireModel(reqModel, () => {
+            handleGenerateVoice();
+          });
+          return;
+        }
       }
     }
 
+    isGeneratingRef.current = true;
     setIsGenerating(true);
     setGenerationOverlayDismissed(false);
     setPipelineStageIndex(0);
@@ -1090,6 +1100,7 @@ export function VoiceCloneStudioPage({
     } catch (err) {
       notify("បញ្ហាផលិតសំឡេង: " + err.message, "error");
     } finally {
+      isGeneratingRef.current = false;
       clearInterval(timerInterval);
       clearInterval(progressInterval);
       if (!blob) {
@@ -1179,10 +1190,13 @@ export function VoiceCloneStudioPage({
       return;
     }
     if (typeof requireModel === "function") {
-      const ok = await requireModel("whisper-khmer", () => {
-        handleAutoTranscribeHelper(audioFile, onResult, setBusyState);
-      });
-      if (!ok) return;
+      const isInstalled = typeof isModelInstalled === "function" ? isModelInstalled("whisper-khmer") : false;
+      if (!isInstalled) {
+        requireModel("whisper-khmer", () => {
+          handleAutoTranscribeHelper(audioFile, onResult, setBusyState);
+        });
+        return;
+      }
     }
     setBusyState(true);
     try {
@@ -1265,10 +1279,13 @@ export function VoiceCloneStudioPage({
     }
     if (typeof requireModel === "function") {
       const targetModel = (sttLang === "km" || sttLang === "auto") ? "whisper-khmer" : "whisper-multilingual";
-      const ok = await requireModel(targetModel, () => {
-        handleTranscribeSubmit();
-      });
-      if (!ok) return;
+      const isInstalled = typeof isModelInstalled === "function" ? isModelInstalled(targetModel) : false;
+      if (!isInstalled) {
+        requireModel(targetModel, () => {
+          handleTranscribeSubmit();
+        });
+        return;
+      }
     }
     setSttBusy(true);
     setSttResult(null);

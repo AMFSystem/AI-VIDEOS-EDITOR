@@ -7,4 +7,7 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   ping: () => ipcRenderer.invoke("desktop:ping"),
   selectFile: (options) => ipcRenderer.invoke("desktop:select-file", options),
   saveFile: (options) => ipcRenderer.invoke("desktop:save-file", options),
+  downloadModel: (modelId) => ipcRenderer.invoke("desktop:download-model", modelId),
+  cancelDownloadModel: (modelId) => ipcRenderer.invoke("desktop:cancel-download-model", modelId),
+  getModelsStatus: () => ipcRenderer.invoke("desktop:get-models-status"),
 });

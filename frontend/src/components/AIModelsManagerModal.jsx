@@ -178,10 +178,7 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
   const resolveApiUrl = (endpoint) => {
     const clean = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
     if (typeof window === "undefined") return clean;
-    const isLocalDirect =
-      window.location.origin === "http://127.0.0.1:3001" ||
-      window.location.origin === "http://localhost:3001";
-    if (!isLocalDirect) {
+    if (window.location.protocol === "file:") {
       const base = getBackendBase();
       return `${base}${clean}`;
     }
@@ -191,9 +188,15 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
   const fetchStatus = async () => {
     try {
       setLoading(true);
-      const res = await fetch(resolveApiUrl("/api/ai/models"));
-      if (res.ok) {
-        const json = await res.json();
+      let json = null;
+      if (window.desktopAPI?.getModelsStatus) {
+        json = await window.desktopAPI.getModelsStatus();
+      }
+      if (!json) {
+        const res = await fetch(resolveApiUrl("/api/ai/models"));
+        if (res.ok) json = await res.json();
+      }
+      if (json) {
         setData(json);
 
         // Sync downloading state if any model is currently downloading
@@ -250,7 +253,13 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
                 changed = true;
                 notify(`Model ${m.name} បានទាញយករួចរាល់ និងរក្សាទុកក្នុង Local Computer!`, "success");
               } else if (m.downloading || m.progress > 0) {
-                next[m.id] = { percent: m.progress, status: "downloading" };
+                next[m.id] = {
+                  percent: m.progress,
+                  status: "downloading",
+                  speedFormatted: m.speedFormatted,
+                  etaFormatted: m.etaFormatted,
+                  currentFile: m.currentFile
+                };
                 changed = true;
               }
             }
@@ -276,7 +285,14 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
           const state = JSON.parse(event.data);
           setDownloadingModels((prev) => ({
             ...prev,
-            [modelId]: { percent: state.percent, status: state.status, error: state.error }
+            [modelId]: {
+              percent: state.percent,
+              status: state.status,
+              error: state.error,
+              speedFormatted: state.speedFormatted,
+              etaFormatted: state.etaFormatted,
+              currentFile: state.currentFile
+            }
           }));
 
           if (state.status === "ready") {
@@ -310,16 +326,21 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
       }));
       listenProgress(modelId);
 
-      const res = await fetch(resolveApiUrl(`/api/ai/models/download/${modelId}`), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
+      if (window.desktopAPI?.downloadModel) {
+        const result = await window.desktopAPI.downloadModel(modelId);
+        if (result?.error) throw new Error(result.error);
+      } else {
+        const res = await fetch(resolveApiUrl(`/api/ai/models/download/${modelId}`), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || `HTTP ${res.status}`);
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          throw new Error(errJson.error || `HTTP ${res.status}`);
+        }
       }
 
       notify("កំពុងចាប់ផ្ដើមទាញយក Model ពី HuggingFace និងរក្សាទុកក្នុងម៉ាស៊ីន...", "info");
@@ -592,15 +613,18 @@ export function AIModelsManagerModal({ isOpen, onClose, notify = console.log }) 
                         <div className="model-progress-bar-track">
                           <div
                             className="model-progress-bar-fill"
-                            style={{ width: `${currentPercent}%` }}
+                            style={{ width: `${currentPercent}%`, transition: "width 0.25s ease-out" }}
                           ></div>
                         </div>
                         <div className="model-progress-meta">
                           <span className="model-progress-status">
                             <CircleNotch size={12} className="is-spinning" />
-                            Downloading weights from HuggingFace to Local Computer...
+                            {liveDownload?.currentFile ? `Downloading: ${liveDownload.currentFile}` : "Downloading weights to Local Computer..."}
+                            {liveDownload?.speedFormatted ? ` (${liveDownload.speedFormatted})` : ""}
                           </span>
-                          <span className="model-progress-pct">{currentPercent}%</span>
+                          <span className="model-progress-pct">
+                            {currentPercent}% {liveDownload?.etaFormatted ? `• ETA: ${liveDownload.etaFormatted}` : ""}
+                          </span>
                         </div>
                       </div>
                     )}
